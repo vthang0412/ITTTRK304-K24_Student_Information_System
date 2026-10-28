@@ -45,23 +45,23 @@ function App() {
 
             <Route path="/dashboard" element={withLayout(<Dashboard />)} />
 
-            {/*<Route path="/student/profile" element={withLayout(<Profile />, ['STUDENT'])} />*/}
-            {/*<Route path="/student/courses" element={withLayout(<StudentCourses />, ['STUDENT'])} />*/}
-            {/*<Route path="/student/enrollments" element={withLayout(<StudentEnrollments />, ['STUDENT'])} />*/}
-            {/*<Route path="/student/grades" element={withLayout(<StudentGrades />, ['STUDENT'])} />*/}
+            <Route path="/student/profile" element={withLayout(<Profile />, ['STUDENT'])} />
+            <Route path="/student/courses" element={withLayout(<StudentCourses />, ['STUDENT'])} />
+            <Route path="/student/enrollments" element={withLayout(<StudentEnrollments />, ['STUDENT'])} />
+            <Route path="/student/grades" element={withLayout(<StudentGrades />, ['STUDENT'])} />
 
-            {/*<Route path="/lecturer/profile" element={withLayout(<Profile />, ['LECTURER'])} />*/}
-            {/*<Route path="/lecturer/sections" element={withLayout(<LecturerSections />, ['LECTURER'])} />*/}
-            {/*<Route path="/lecturer/grades" element={withLayout(<LecturerGrades />, ['LECTURER'])} />*/}
+            <Route path="/lecturer/profile" element={withLayout(<Profile />, ['LECTURER'])} />
+            <Route path="/lecturer/sections" element={withLayout(<LecturerSections />, ['LECTURER'])} />
+            <Route path="/lecturer/grades" element={withLayout(<LecturerGrades />, ['LECTURER'])} />
 
             <Route path="/admin/profile" element={withLayout(<Profile />, ['ADMIN'])} />
             <Route path="/admin/students" element={withLayout(<AdminStudents />, ['ADMIN'])} />
             <Route path="/admin/lecturers" element={withLayout(<AdminLecturers />, ['ADMIN'])} />
             <Route path="/admin/courses" element={withLayout(<AdminCourses />, ['ADMIN'])} />
-            {/*<Route path="/admin/semesters" element={withLayout(<AdminSemesters />, ['ADMIN'])} />*/}
-            {/*<Route path="/admin/sections" element={withLayout(<AdminSections />, ['ADMIN'])} />*/}
-            {/*<Route path="/admin/gradebooks" element={withLayout(<AdminGradebooks />, ['ADMIN'])} />*/}
-            {/*<Route path="/admin/gradebook-config" element={withLayout(<AdminGradebookConfig />, ['ADMIN'])} />*/}
+            <Route path="/admin/semesters" element={withLayout(<AdminSemesters />, ['ADMIN'])} />
+            <Route path="/admin/sections" element={withLayout(<AdminSections />, ['ADMIN'])} />
+            <Route path="/admin/gradebooks" element={withLayout(<AdminGradebooks />, ['ADMIN'])} />
+            <Route path="/admin/gradebook-config" element={withLayout(<AdminGradebookConfig />, ['ADMIN'])} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

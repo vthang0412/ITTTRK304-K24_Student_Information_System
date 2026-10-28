@@ -78,8 +78,8 @@ const Dashboard = () => {
       </div>
 
       {role === 'ADMIN' && data && <AdminDashboard data={data} />}
-      {/*{role === 'LECTURER' && data && <LecturerDashboard data={data} />}*/}
-      {/*{role === 'STUDENT' && data && <StudentDashboard data={data} />}*/}
+      {role === 'LECTURER' && data && <LecturerDashboard data={data} />}
+      {role === 'STUDENT' && data && <StudentDashboard data={data} />}
     </>
   );
 };
