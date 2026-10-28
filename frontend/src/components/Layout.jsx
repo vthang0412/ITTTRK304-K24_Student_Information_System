@@ -26,13 +26,13 @@ const MENUS = {
     { label: 'Hồ sơ cá nhân', to: '/admin/profile', icon: UserIcon },
     { label: 'Sinh viên', to: '/admin/students', icon: StudentsIcon },
     { label: 'Giảng viên', to: '/admin/lecturers', icon: UsersIcon },
-    // { label: 'Môn học', to: '/admin/courses', icon: BookIcon },
+    { label: 'Môn học', to: '/admin/courses', icon: BookIcon },
     // { label: 'Học kỳ', to: '/admin/semesters', icon: CalendarIcon },
     // { label: 'Lớp học phần', to: '/admin/sections', icon: LayersIcon },
     // { label: 'Bảng điểm', to: '/admin/gradebooks', icon: AwardIcon },
   ],
 };
-
+0.
 const TITLES = {
   '/dashboard': 'Tổng quan',
   '/student/profile': 'Hồ sơ cá nhân',
