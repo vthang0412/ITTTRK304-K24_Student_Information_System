@@ -1,4 +1,4 @@
-﻿import httpClient from './httpClient';
+import httpClient from './httpClient';
 
 export const authApi = {
   login: (data) => httpClient.post('/api/auth/login', data),
@@ -70,4 +70,13 @@ export const gradebookApi = {
 
 export const reportApi = {
   getDashboard: () => httpClient.get('/api/reports/dashboard'),
+};
+
+export const notificationApi = {
+  getAll: () => httpClient.get('/api/notifications'),
+  getUnreadCount: () => httpClient.get('/api/notifications/unread-count'),
+  markAsRead: (id) => httpClient.put(`/api/notifications/${id}/read`),
+  markAllAsRead: () => httpClient.put('/api/notifications/read-all'),
+  create: (data) => httpClient.post('/api/notifications', data),
+  delete: (id) => httpClient.delete(`/api/notifications/${id}`),
 };

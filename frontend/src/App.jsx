@@ -24,6 +24,8 @@ import AdminSemesters from './pages/admin/AdminSemesters';
 import AdminSections from './pages/admin/AdminSections';
 import AdminGradebooks from './pages/admin/AdminGradebooks';
 import AdminGradebookConfig from './pages/admin/AdminGradebookConfig';
+import AdminNotifications from './pages/admin/AdminNotifications';
+import StudentNotifications from './pages/student/StudentNotifications';
 
 const withLayout = (element, roles) => (
   <ProtectedRoute allowedRoles={roles}>
@@ -49,6 +51,7 @@ function App() {
             <Route path="/student/courses" element={withLayout(<StudentCourses />, ['STUDENT'])} />
             <Route path="/student/enrollments" element={withLayout(<StudentEnrollments />, ['STUDENT'])} />
             <Route path="/student/grades" element={withLayout(<StudentGrades />, ['STUDENT'])} />
+            <Route path="/student/notifications" element={withLayout(<StudentNotifications />, ['STUDENT'])} />
 
             <Route path="/lecturer/profile" element={withLayout(<Profile />, ['LECTURER'])} />
             <Route path="/lecturer/sections" element={withLayout(<LecturerSections />, ['LECTURER'])} />
@@ -62,6 +65,7 @@ function App() {
             <Route path="/admin/sections" element={withLayout(<AdminSections />, ['ADMIN'])} />
             <Route path="/admin/gradebooks" element={withLayout(<AdminGradebooks />, ['ADMIN'])} />
             <Route path="/admin/gradebook-config" element={withLayout(<AdminGradebookConfig />, ['ADMIN'])} />
+            <Route path="/admin/notifications" element={withLayout(<AdminNotifications />, ['ADMIN'])} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>
