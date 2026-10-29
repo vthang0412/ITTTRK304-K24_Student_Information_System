@@ -1,7 +1,5 @@
 package com.example.student_management.service;
 
-
-
 import com.example.student_management.dto.AuthResponse;
 import com.example.student_management.dto.ForgotPasswordRequest;
 import com.example.student_management.dto.LoginRequest;
@@ -17,6 +15,7 @@ import com.example.student_management.security.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -49,19 +48,27 @@ public class AuthService {
     private PasswordEncoder passwordEncoder;
 
     public AuthResponse login(LoginRequest request) {
+        User user = userRepository.findByUsername(request.getUsername())
+                .orElseThrow(() -> new UnauthorizedException("Tên đăng nhập hoặc mật khẩu không chính xác"));
+
+        if (user.getStatus() == AccountStatus.INACTIVE) {
+            throw new UnauthorizedException("Tài khoản đã bị ngừng hoạt động. Vui lòng liên hệ quản trị viên.");
+        }
+        if (user.getStudent() != null && user.getStudent().getStatus() == AccountStatus.INACTIVE) {
+            throw new UnauthorizedException("Tài khoản sinh viên đã bị ngừng hoạt động. Vui lòng liên hệ quản trị viên.");
+        }
+        if (user.getLecturer() != null && user.getLecturer().getStatus() == AccountStatus.INACTIVE) {
+            throw new UnauthorizedException("Tài khoản giảng viên đã bị ngừng hoạt động. Vui lòng liên hệ quản trị viên.");
+        }
+
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
             );
+        } catch (DisabledException e) {
+            throw new UnauthorizedException("Tài khoản đã bị ngừng hoạt động. Vui lòng liên hệ quản trị viên.");
         } catch (BadCredentialsException e) {
-            throw new UnauthorizedException("Invalid username or password");
-        }
-
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new UnauthorizedException("User not found"));
-
-        if (user.getStatus() == AccountStatus.INACTIVE) {
-            throw new UnauthorizedException("Account is disabled");
+            throw new UnauthorizedException("Tên đăng nhập hoặc mật khẩu không chính xác");
         }
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
