@@ -4,6 +4,7 @@ import AuthShell from '../components/AuthShell';
 import { Alert, Field } from '../components/UI';
 import { authApi } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../utils/format';
 
 const initial = {
@@ -14,12 +15,14 @@ const Register = () => {
   const [form, setForm] = useState(initial);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [skipAutoRedirect, setSkipAutoRedirect] = useState(false);
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
 
   useEffect(() => {
-    if (isAuthenticated) navigate('/dashboard', { replace: true });
-  }, [isAuthenticated, navigate]);
+    if (isAuthenticated && !skipAutoRedirect) navigate('/dashboard', { replace: true });
+  }, [isAuthenticated, navigate, skipAutoRedirect]);
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -38,7 +41,16 @@ const Register = () => {
     e.preventDefault();
     setError('');
     const validation = validate();
-    if (validation) { setError(validation); return; }
+    if (validation) {
+      setError(validation);
+      toast.showAuthModal({
+        icon: 'error',
+        title: 'Đăng ký thất bại',
+        message: validation,
+        duration: 2200,
+      });
+      return;
+    }
 
     setLoading(true);
     try {
@@ -49,10 +61,26 @@ const Register = () => {
         password: form.password,
         role: form.role,
       });
+      setSkipAutoRedirect(true);
       login(res.data);
-      navigate('/dashboard', { replace: true });
+      toast.showAuthModal({
+        icon: 'success',
+        title: 'Đăng ký thành công',
+        message: 'Tài khoản của bạn đã được tạo thành công. Đang chuyển hướng...',
+        duration: 2000,
+      });
+      window.setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 2200);
     } catch (err) {
-      setError(getErrorMessage(err, 'Đăng ký thất bại. Vui lòng thử lại.'));
+      const message = getErrorMessage(err, 'Đăng ký thất bại. Vui lòng thử lại.');
+      setError(message);
+      toast.showAuthModal({
+        icon: 'error',
+        title: 'Đăng ký thất bại',
+        message,
+        duration: 2200,
+      });
     } finally {
       setLoading(false);
     }

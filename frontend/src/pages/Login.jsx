@@ -5,6 +5,7 @@ import { Alert, Field } from '../components/UI';
 import { EyeIcon, EyeOffIcon, LockIcon, MailIcon } from '../components/Icons';
 import { authApi } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { getErrorMessage } from '../utils/format';
 
 const DEMO = [
@@ -18,15 +19,24 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [skipAutoRedirect, setSkipAutoRedirect] = useState(false);
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
 
   useEffect(() => {
-    if (isAuthenticated) navigate('/dashboard', { replace: true });
-  }, [isAuthenticated, navigate]);
+    if (isAuthenticated && !skipAutoRedirect) navigate('/dashboard', { replace: true });
+  }, [isAuthenticated, navigate, skipAutoRedirect]);
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  /* Kiểm tra xem lỗi có phải do tài khoản bị vô hiệu hoá không */
+  const isDisabledAccount = (err) => {
+    const data = err?.response?.data;
+    const msg = (typeof data === 'string' ? data : data?.message) || '';
+    return msg === 'Account is disabled' || msg.toLowerCase().includes('disabled');
   };
 
   const handleSubmit = async (e) => {
@@ -34,15 +44,48 @@ const Login = () => {
     setError('');
     if (!form.username.trim() || !form.password) {
       setError('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.');
+      toast.showAuthModal({
+        icon: 'error',
+        title: 'Thông tin đăng nhập chưa hợp lệ',
+        message: 'Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.',
+        duration: 2200,
+      });
       return;
     }
     setLoading(true);
     try {
       const res = await authApi.login({ username: form.username.trim(), password: form.password });
+      setSkipAutoRedirect(true);
       login(res.data);
-      navigate('/dashboard', { replace: true });
+      toast.showAuthModal({
+        icon: 'success',
+        title: 'Đăng nhập thành công',
+        message: 'Bạn sẽ được chuyển hướng đến trang tổng quan.',
+        duration: 2000,
+      });
+      window.setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 2200);
     } catch (err) {
-      setError(getErrorMessage(err, 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.'));
+      if (isDisabledAccount(err)) {
+        toast.showAuthModal({
+          icon: 'warning',
+          title: 'Tài khoản đã bị khóa',
+          message: 'Tài khoản của bạn đã bị quản trị viên ngừng hoạt động. Vui lòng liên hệ Admin để được hỗ trợ.',
+          duration: 4000,
+          showConfirmButton: true,
+          confirmButtonText: 'Đã hiểu',
+        });
+      } else {
+        const message = getErrorMessage(err, 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
+        setError(message);
+        toast.showAuthModal({
+          icon: 'error',
+          title: 'Đăng nhập thất bại',
+          message,
+          duration: 2200,
+        });
+      }
     } finally {
       setLoading(false);
     }
