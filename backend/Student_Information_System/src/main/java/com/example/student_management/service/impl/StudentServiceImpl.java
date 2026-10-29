@@ -1,12 +1,11 @@
 package com.example.student_management.service.impl;
 
-
-
 import com.example.student_management.entity.Student;
 import com.example.student_management.exception.BadRequestException;
 import com.example.student_management.exception.ConflictException;
 import com.example.student_management.exception.NotFoundException;
 import com.example.student_management.repository.StudentRepository;
+import com.example.student_management.repository.UserRepository;
 import com.example.student_management.service.StudentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -19,6 +18,9 @@ import java.util.Optional;
 public class StudentServiceImpl implements StudentService {
     @Autowired
     private StudentRepository studentRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Override
     public List<Student> findAll() {
@@ -53,7 +55,23 @@ public class StudentServiceImpl implements StudentService {
         existing.setFullName(student.getFullName());
         existing.setEmail(student.getEmail());
         existing.setDepartment(student.getDepartment());
-        existing.setStatus(student.getStatus());
+        if (student.getStatus() != null) {
+            existing.setStatus(student.getStatus());
+        }
+
+        if (existing.getUser() != null) {
+            if (student.getStatus() != null) {
+                existing.getUser().setStatus(student.getStatus());
+            }
+            if (student.getFullName() != null) {
+                existing.getUser().setFullName(student.getFullName());
+            }
+            if (student.getEmail() != null) {
+                existing.getUser().setEmail(student.getEmail());
+            }
+            userRepository.save(existing.getUser());
+        }
+
         return studentRepository.save(existing);
     }
 }

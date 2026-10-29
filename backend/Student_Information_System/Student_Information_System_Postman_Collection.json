@@ -1,0 +1,1413 @@
+{
+  "info": {
+    "_postman_id": "c1f8a840-0e12-4c6e-9901-sis-student-management",
+    "name": "Student Information System API",
+    "description": "Bộ API hoàn chỉnh cho Hệ Thống Quản Lý Thông Tin Sinh Viên (Student Information System - SIS)\n\n### Hướng dẫn sử dụng:\n1. Chạy request **Login as Admin / Lecturer / Student** trong thư mục **1. Authentication** trước.\n2. Script test sẽ tự động lưu token vào biến `token` (hoặc `admin_token`, `lecturer_token`, `student_token`).\n3. Các request khác đã cấu hình kế thừa Bearer Token từ Collection Variable `token`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "lecturer_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "student_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "1. Authentication & Me",
+      "item": [
+        {
+          "name": "Login as Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.token) {",
+                  "    pm.collectionVariables.set(\"token\", jsonData.token);",
+                  "    pm.collectionVariables.set(\"admin_token\", jsonData.token);",
+                  "    console.log(\"Saved Admin Token:\", jsonData.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Đăng nhập tài khoản Admin (tự động cập nhật biến `token` và `admin_token`)"
+          }
+        },
+        {
+          "name": "Login as Lecturer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.token) {",
+                  "    pm.collectionVariables.set(\"token\", jsonData.token);",
+                  "    pm.collectionVariables.set(\"lecturer_token\", jsonData.token);",
+                  "    console.log(\"Saved Lecturer Token:\", jsonData.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"lecturer\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Đăng nhập tài khoản Giảng viên (tự động cập nhật biến `token` và `lecturer_token`)"
+          }
+        },
+        {
+          "name": "Login as Student",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.token) {",
+                  "    pm.collectionVariables.set(\"token\", jsonData.token);",
+                  "    pm.collectionVariables.set(\"student_token\", jsonData.token);",
+                  "    console.log(\"Saved Student Token:\", jsonData.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"student\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Đăng nhập tài khoản Sinh viên (tự động cập nhật biến `token` và `student_token`)"
+          }
+        },
+        {
+          "name": "Register User",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"sinhvien_moi\",\n  \"email\": \"sinhvien_moi@sis.edu.vn\",\n  \"password\": \"password123\",\n  \"fullName\": \"Nguy\\u1ec5n V\\u0103n M\\u1edbi\",\n  \"role\": \"STUDENT\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Đăng ký tài khoản mới (STUDENT hoặc LECTURER)"
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@sis.edu.vn\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/forgot-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "description": "Yêu cầu khôi phục mật khẩu qua Email"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Đăng xuất"
+          }
+        },
+        {
+          "name": "Get Current Profile (Me)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "me"
+              ]
+            },
+            "description": "Lấy thông tin cá nhân của người dùng đang đăng nhập"
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Qu\\u1ea3n Tr\\u1ecb Vi\\u00ean H\\u1ec7 Th\\u1ed1ng\",\n  \"email\": \"admin@sis.edu.vn\",\n  \"department\": \"Ph\\u00f2ng \\u0110\\u00e0o T\\u1ea1o\",\n  \"currentPassword\": \"123456\",\n  \"newPassword\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "me"
+              ]
+            },
+            "description": "Cập nhật họ tên, email, khoa, hoặc đổi mật khẩu"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Students (Sinh viên)",
+      "item": [
+        {
+          "name": "Get All Students (Admin)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/students",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students"
+              ]
+            },
+            "description": "Lấy danh sách tất cả sinh viên (Yêu cầu quyền ADMIN)"
+          }
+        },
+        {
+          "name": "Get Student by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/students/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Lấy chi tiết sinh viên theo ID"
+          }
+        },
+        {
+          "name": "Create Student (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentCode\": \"SV2026001\",\n  \"fullName\": \"Nguy\\u1ec5n Ho\\u00e0ng Anh\",\n  \"email\": \"sv2026001@sis.edu.vn\",\n  \"department\": \"C\\u00f4ng ngh\\u1ec7 th\\u00f4ng tin\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/students",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students"
+              ]
+            },
+            "description": "Tạo mới sinh viên (Yêu cầu ADMIN)"
+          }
+        },
+        {
+          "name": "Update Student (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentCode\": \"SV2026001\",\n  \"fullName\": \"Nguy\\u1ec5n Ho\\u00e0ng Anh C\\u1eadp Nh\\u1eadt\",\n  \"email\": \"sv2026001_updated@sis.edu.vn\",\n  \"department\": \"C\\u00f4ng ngh\\u1ec7 th\\u00f4ng tin\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/students/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "students",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Cập nhật sinh viên theo ID (ADMIN)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Lecturers (Giảng viên)",
+      "item": [
+        {
+          "name": "Get All Lecturers (Admin)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/lecturers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "lecturers"
+              ]
+            },
+            "description": "Lấy danh sách giảng viên (ADMIN)"
+          }
+        },
+        {
+          "name": "Create Lecturer (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lecturerCode\": \"GV202601\",\n  \"fullName\": \"TS. Ph\\u1ea1m Minh Tu\\u1ea5n\",\n  \"email\": \"pmtuan@sis.edu.vn\",\n  \"department\": \"Khoa h\\u1ecdc m\\u00e1y t\\u00ednh\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/lecturers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "lecturers"
+              ]
+            },
+            "description": "Tạo giảng viên mới (ADMIN)"
+          }
+        },
+        {
+          "name": "Update Lecturer (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Tr\\u1ea7n V\\u0103n Gi\\u1ea3ng Updated\",\n  \"email\": \"lecturer@sis.edu.vn\",\n  \"department\": \"C\\u00f4ng ngh\\u1ec7 ph\\u1ea7n m\\u1ec1m\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/lecturers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "lecturers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Cập nhật thông tin giảng viên (ADMIN)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Courses (Môn học)",
+      "item": [
+        {
+          "name": "Get All Courses",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/courses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "courses"
+              ]
+            },
+            "description": "Xem danh sách môn học"
+          }
+        },
+        {
+          "name": "Create Course (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"courseCode\": \"CS305\",\n  \"courseName\": \"L\\u1eadp tr\\u00ecnh Web n\\u00e2ng cao\",\n  \"credits\": 3,\n  \"description\": \"X\\u00e2y d\\u1ef1ng REST API v\\u1edbi Spring Boot v\\u00e0 Vue.js\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/courses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "courses"
+              ]
+            },
+            "description": "Tạo môn học mới (ADMIN)"
+          }
+        },
+        {
+          "name": "Update Course (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"courseName\": \"L\\u1eadp tr\\u00ecnh Web n\\u00e2ng cao (2026)\",\n  \"credits\": 4,\n  \"description\": \"C\\u1eadp nh\\u1eadt n\\u1ed9i dung kh\\u00f3a h\\u1ecdc\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/courses/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "courses",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Cập nhật môn học (ADMIN)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Semesters (Học kỳ)",
+      "item": [
+        {
+          "name": "Get All Semesters",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/semesters",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "semesters"
+              ]
+            },
+            "description": "Lấy danh sách tất cả học kỳ"
+          }
+        },
+        {
+          "name": "Create Semester (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"semesterCode\": \"2026-HK1\",\n  \"semesterName\": \"H\\u1ecdc k\\u1ef3 1 N\\u0103m h\\u1ecdc 2026-2027\",\n  \"startDate\": \"2026-09-01\",\n  \"endDate\": \"2027-01-15\",\n  \"registrationStart\": \"2026-08-15T00:00:00\",\n  \"registrationEnd\": \"2026-08-30T23:59:59\",\n  \"status\": \"UPCOMING\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/semesters",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "semesters"
+              ]
+            },
+            "description": "Tạo học kỳ mới (ADMIN)"
+          }
+        },
+        {
+          "name": "Update Semester (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"semesterName\": \"H\\u1ecdc k\\u1ef3 1 N\\u0103m h\\u1ecdc 2026-2027 (\\u0110\\u00e3 m\\u1edf)\",\n  \"startDate\": \"2026-09-01\",\n  \"endDate\": \"2027-01-15\",\n  \"registrationStart\": \"2026-08-15T00:00:00\",\n  \"registrationEnd\": \"2026-08-30T23:59:59\",\n  \"status\": \"ONGOING\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/semesters/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "semesters",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Cập nhật học kỳ (ADMIN)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Course Sections (Lớp học phần)",
+      "item": [
+        {
+          "name": "Get All Course Sections",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/course-sections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "course-sections"
+              ]
+            },
+            "description": "Lấy danh sách các lớp học phần"
+          }
+        },
+        {
+          "name": "Get My Course Sections (Lecturer)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/course-sections/mine",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "course-sections",
+                "mine"
+              ]
+            },
+            "description": "Lấy danh sách lớp học phần do Giảng viên hiện tại phụ trách"
+          }
+        },
+        {
+          "name": "Create Course Section (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sectionCode\": \"CS305-01\",\n  \"course\": {\n    \"id\": 1\n  },\n  \"semester\": {\n    \"id\": 1\n  },\n  \"lecturer\": {\n    \"id\": 1\n  },\n  \"capacity\": 60,\n  \"schedule\": \"Th\\u1ee9 Ba (Ti\\u1ebft 1-4) - Ph\\u00f2ng B201\",\n  \"status\": \"OPEN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/course-sections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "course-sections"
+              ]
+            },
+            "description": "Tạo lớp học phần mới (ADMIN)"
+          }
+        },
+        {
+          "name": "Update Course Section (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"course\": {\n    \"id\": 1\n  },\n  \"semester\": {\n    \"id\": 1\n  },\n  \"lecturer\": {\n    \"id\": 1\n  },\n  \"capacity\": 65,\n  \"schedule\": \"Th\\u1ee9 Ba (Ti\\u1ebft 1-4) - Ph\\u00f2ng B201 (\\u0110\\u1ed5i ph\\u00f2ng B301)\",\n  \"status\": \"OPEN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/course-sections/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "course-sections",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Cập nhật lớp học phần (ADMIN)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Enrollments (Đăng ký học phần)",
+      "item": [
+        {
+          "name": "Get My Enrollments (Student)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/enrollments/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "enrollments",
+                "me"
+              ]
+            },
+            "description": "Lấy danh sách các lớp học phần mà sinh viên hiện tại đã đăng ký"
+          }
+        },
+        {
+          "name": "Enroll Course Section (Student)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/course-sections/:id/enroll",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "course-sections",
+                ":id",
+                "enroll"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Sinh viên bấm đăng ký vào lớp học phần"
+          }
+        },
+        {
+          "name": "Withdraw Course Section (Student)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/enrollments/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "enrollments",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Sinh viên hủy môn / rút khỏi lớp học phần"
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Grades & Gradebook (Nhập điểm & Sổ điểm)",
+      "item": [
+        {
+          "name": "Get Section Grades (Lecturer / Admin)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/course-sections/:id/grades",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "course-sections",
+                ":id",
+                "grades"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Xem bảng điểm danh sách sinh viên trong lớp học phần"
+          }
+        },
+        {
+          "name": "Update Student Grade (Lecturer / Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"componentScore\": 8.5,\n  \"finalScore\": 9.0,\n  \"componentScores\": {\n    \"1\": 8.5,\n    \"2\": 9.0\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/enrollments/:id/grade",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "enrollments",
+                ":id",
+                "grade"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Giảng viên/Admin nhập/cập nhật điểm cho 1 sinh viên trong lớp"
+          }
+        },
+        {
+          "name": "Get My Grades (Student - Simple)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/grades/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "grades",
+                "me"
+              ]
+            },
+            "description": "Sinh viên xem điểm tổng kết các môn đã công bố"
+          }
+        },
+        {
+          "name": "Get Student Grades Detail (Student)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/student/grades",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "student",
+                "grades"
+              ]
+            },
+            "description": "Sinh viên xem chi tiết từng đầu điểm thành phần đã được công bố"
+          }
+        },
+        {
+          "name": "Get Section Gradebook Detail (Lecturer / Admin)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/course-sections/:sectionId/gradebook",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "course-sections",
+                ":sectionId",
+                "gradebook"
+              ],
+              "variable": [
+                {
+                  "key": "sectionId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Lấy chi tiết bảng điểm và các cột điểm của lớp học phần"
+          }
+        },
+        {
+          "name": "Get Section Grade Components",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/course-sections/:sectionId/grade-components",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "course-sections",
+                ":sectionId",
+                "grade-components"
+              ],
+              "variable": [
+                {
+                  "key": "sectionId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Lấy cấu hình các cột điểm thành phần của lớp học phần"
+          }
+        },
+        {
+          "name": "Update Grade Components Config (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"components\": [\n    {\n      \"componentName\": \"Chuy\\u00ean c\\u1ea7n\",\n      \"weight\": 10.0,\n      \"maxScore\": 10.0,\n      \"componentType\": \"ATTENDANCE\",\n      \"displayOrder\": 1,\n      \"required\": true\n    },\n    {\n      \"componentName\": \"Ki\\u1ec3m tra gi\\u1eefa k\\u1ef3\",\n      \"weight\": 30.0,\n      \"maxScore\": 10.0,\n      \"componentType\": \"MIDTERM\",\n      \"displayOrder\": 2,\n      \"required\": true\n    },\n    {\n      \"componentName\": \"Thi cu\\u1ed1i k\\u1ef3\",\n      \"weight\": 60.0,\n      \"maxScore\": 10.0,\n      \"componentType\": \"FINAL\",\n      \"displayOrder\": 3,\n      \"required\": true\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/course-sections/:sectionId/grade-components",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "course-sections",
+                ":sectionId",
+                "grade-components"
+              ],
+              "variable": [
+                {
+                  "key": "sectionId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Cấu hình trọng số và các cột điểm thành phần cho lớp học phần (Tổng weight = 100)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Gradebook Approval Workflow (Quy trình duyệt sổ điểm)",
+      "item": [
+        {
+          "name": "List Gradebooks (Admin)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/gradebooks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "gradebooks"
+              ]
+            },
+            "description": "Admin xem danh sách tất cả các sổ điểm và trạng thái (OPEN, LOCKED, APPROVED, PUBLISHED)"
+          }
+        },
+        {
+          "name": "Gradebooks Progress (Admin)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/gradebooks/progress",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "gradebooks",
+                "progress"
+              ]
+            },
+            "description": "Admin theo dõi tiến độ hoàn thành điểm số của các lớp"
+          }
+        },
+        {
+          "name": "Get Gradebook Summary (Admin)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/gradebooks/:gradebookId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "gradebooks",
+                ":gradebookId"
+              ],
+              "variable": [
+                {
+                  "key": "gradebookId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Xem chi tiết tổng quan 1 sổ điểm"
+          }
+        },
+        {
+          "name": "Get Gradebook Audit Logs (Admin)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/gradebooks/:gradebookId/audit-logs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "gradebooks",
+                ":gradebookId",
+                "audit-logs"
+              ],
+              "variable": [
+                {
+                  "key": "gradebookId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Xem lịch sử thay đổi / nhật ký thao tác (Audit Logs) trên sổ điểm"
+          }
+        },
+        {
+          "name": "Lock Gradebook (Admin)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/gradebooks/:gradebookId/lock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "gradebooks",
+                ":gradebookId",
+                "lock"
+              ],
+              "variable": [
+                {
+                  "key": "gradebookId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Khóa sổ điểm (Chuyển trạng thái sang LOCKED, ngăn giảng viên sửa điểm)"
+          }
+        },
+        {
+          "name": "Unlock Gradebook (Admin)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/gradebooks/:gradebookId/unlock",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "gradebooks",
+                ":gradebookId",
+                "unlock"
+              ],
+              "variable": [
+                {
+                  "key": "gradebookId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Mở khóa sổ điểm về OPEN để giảng viên có thể sửa lại"
+          }
+        },
+        {
+          "name": "Approve Gradebook (Admin)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/gradebooks/:gradebookId/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "gradebooks",
+                ":gradebookId",
+                "approve"
+              ],
+              "variable": [
+                {
+                  "key": "gradebookId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Phê duyệt sổ điểm (Chuyển trạng thái sang APPROVED)"
+          }
+        },
+        {
+          "name": "Publish Gradebook (Admin)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/gradebooks/:gradebookId/publish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "gradebooks",
+                ":gradebookId",
+                "publish"
+              ],
+              "variable": [
+                {
+                  "key": "gradebookId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Công bố điểm số cho sinh viên xem (Chuyển trạng thái sang PUBLISHED)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Reports & Dashboard (Thống kê)",
+      "item": [
+        {
+          "name": "Get Dashboard Overview (Admin)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "dashboard"
+              ]
+            },
+            "description": "Lấy số liệu thống kê tổng quan (Tổng số sinh viên, giảng viên, môn học, lớp học phần)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Notifications (Thông báo)",
+      "item": [
+        {
+          "name": "Get My Notifications",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications"
+              ]
+            },
+            "description": "Lấy danh sách thông báo của người dùng hiện tại (cá nhân và thông báo chung)"
+          }
+        },
+        {
+          "name": "Get Unread Count",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/unread-count",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "unread-count"
+              ]
+            },
+            "description": "Đếm số lượng thông báo chưa đọc"
+          }
+        },
+        {
+          "name": "Mark Notification As Read",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/:id/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                ":id",
+                "read"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Đánh dấu 1 thông báo là đã đọc"
+          }
+        },
+        {
+          "name": "Mark All Notifications As Read",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/read-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "read-all"
+              ]
+            },
+            "description": "Đánh dấu toàn bộ thông báo là đã đọc"
+          }
+        },
+        {
+          "name": "Admin Create Notification (Role / Broadcast)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Th\\u00f4ng b\\u00e1o l\\u1ecbch thi h\\u1ecdc k\\u1ef3\",\n  \"content\": \"L\\u1ecbch thi h\\u1ecdc k\\u1ef3 1 \\u0111\\u00e3 \\u0111\\u01b0\\u1ee3c c\\u1eadp nh\\u1eadt tr\\u00ean c\\u1ed5ng th\\u00f4ng tin sinh vi\\u00ean.\",\n  \"type\": \"ACADEMIC\",\n  \"targetRole\": \"STUDENT\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications"
+              ]
+            },
+            "description": "Admin gửi thông báo cho nhóm đối tượng (STUDENT, LECTURER, hoặc ALL)"
+          }
+        },
+        {
+          "name": "Admin Create Personal Notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"C\\u1ea3nh b\\u00e1o h\\u1ecdc v\\u1ee5\",\n  \"content\": \"Sinh vi\\u00ean ch\\u01b0a ho\\u00e0n th\\u00e0nh h\\u1ecdc ph\\u00ed h\\u1ecdc k\\u1ef3, vui l\\u00f2ng li\\u00ean h\\u1ec7 ph\\u00f2ng t\\u00e0i v\\u1ee5.\",\n  \"type\": \"SYSTEM\",\n  \"recipientId\": 8\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications"
+              ]
+            },
+            "description": "Admin gửi thông báo riêng cho 1 sinh viên hoặc giảng viên cụ thể"
+          }
+        },
+        {
+          "name": "Delete Notification",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Xóa thông báo (Admin xóa bất kỳ, User xóa thông báo của mình)"
+          }
+        }
+      ]
+    }
+  ]
+}

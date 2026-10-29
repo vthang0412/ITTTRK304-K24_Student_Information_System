@@ -353,3 +353,33 @@ SET gr.component_score = ROUND(calc.calc_comp, 2),
     gr.updated_by = 'system',
     gr.updated_at = NOW()
 WHERE g.status = 'PUBLISHED';
+
+
+-- ------------------------------------------------------------
+-- THÔNG BÁO (NOTIFICATIONS)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS notifications (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    type VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',
+    recipient_id BIGINT,
+    sender_id BIGINT,
+    target_role VARCHAR(20),
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at DATETIME(6) NOT NULL,
+    CONSTRAINT fk_notification_recipient FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_notification_sender FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+INSERT INTO notifications (title, content, type, recipient_id, sender_id, target_role, is_read, created_at)
+SELECT 'Chào mừng đến với Hệ thống Thông tin Sinh viên', 'Chào mừng bạn đến với cổng thông tin đào tạo trực tuyến.', 'SYSTEM', NULL, 1, NULL, FALSE, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE title = 'Chào mừng đến với Hệ thống Thông tin Sinh viên');
+
+INSERT INTO notifications (title, content, type, recipient_id, sender_id, target_role, is_read, created_at)
+SELECT 'Thông báo đăng ký học phần Học kỳ 1', 'Cổng đăng ký học phần cho học kỳ mới sẽ mở từ ngày 15/08.', 'ACADEMIC', NULL, 1, 'STUDENT', FALSE, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE title = 'Thông báo đăng ký học phần Học kỳ 1');
+
+INSERT INTO notifications (title, content, type, recipient_id, sender_id, target_role, is_read, created_at)
+SELECT 'Nhắc nhở nộp bảng điểm', 'Kính gửi quý thầy cô, vui lòng hoàn tất nhập điểm trước ngày kết thúc học kỳ.', 'ACADEMIC', NULL, 1, 'LECTURER', FALSE, NOW()
+WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE title = 'Nhắc nhở nộp bảng điểm');
