@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import {
@@ -93,6 +94,43 @@ const AdminDashboard = ({ data }) => (
       <StatLink to="/admin/sections"><StatCard label="Lớp học phần" value={data.totalSections} icon={<LayersIcon />} tone="indigo" /></StatLink>
     </div>
 
+    <div className="card" style={{ marginBottom: 22 }}>
+      <div className="card-head">
+        <div>
+          <h2>Thống kê tổng quan</h2>
+          <p>Tỷ lệ tài khoản và trạng thái hoạt động trong hệ thống</p>
+        </div>
+      </div>
+      <div className="card-body">
+        <div className="chart-layout">
+          <div className="chart-panel" style={{ height: 260 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={data.accountOverview} dataKey="value" nameKey="name" innerRadius={54} outerRadius={88} paddingAngle={3}>
+                  {data.accountOverview.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value) => [`${value}`, 'Số lượng']} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="chart-legend">
+            {data.accountOverview.map((item) => (
+              <div key={item.name} className="chart-legend-item">
+                <span className="chart-dot" style={{ background: item.color }} />
+                <div style={{ flex: 1 }}>
+                  <span>{item.name}</span>
+                </div>
+                <strong>{item.value}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div className="split">
       <div className="card">
         <div className="card-head">
@@ -164,6 +202,44 @@ const LecturerDashboard = ({ data }) => (
       <StatCard label="Lớp đang mở" value={data.openCount} icon={<BookIcon />} tone="green" />
       <StatCard label="Tổng sĩ số" value={data.totalCapacity} icon={<StudentsIcon />} tone="amber" />
       <StatCard label="Sinh viên đã đăng ký" value={data.enrolledCount} icon={<UsersIcon />} tone="indigo" />
+    </div>
+
+    <div className="card" style={{ marginBottom: 22 }}>
+      <div className="card-head">
+        <div>
+          <h2>Thống kê sinh viên phụ trách</h2>
+          <p>Tỷ lệ sinh viên theo trạng thái trong các lớp bạn phụ trách</p>
+        </div>
+        <span className="badge badge-blue">{data.sectionCount} lớp đang phụ trách</span>
+      </div>
+      <div className="card-body">
+        <div className="chart-layout">
+          <div className="chart-panel" style={{ height: 260 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={data.overview} dataKey="value" nameKey="name" innerRadius={54} outerRadius={88} paddingAngle={3}>
+                  {data.overview.map((entry) => (
+                    <Cell key={entry.name} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(value) => [`${value}`, 'Số lượng']} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="chart-legend">
+            {data.overview.map((item) => (
+              <div key={item.name} className="chart-legend-item">
+                <span className="chart-dot" style={{ background: item.color }} />
+                <div style={{ flex: 1 }}>
+                  <span>{item.name}</span>
+                </div>
+                <strong>{item.value}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
 
     <div className="split">

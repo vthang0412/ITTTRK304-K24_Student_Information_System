@@ -22,6 +22,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userRepository.findByUsername(username)
+                .or(() -> userRepository.findByEmail(username))
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
         boolean isEnabled = user.getStatus() == AccountStatus.ACTIVE;
@@ -39,7 +40,6 @@ public class CustomUserDetailsService implements UserDetailsService {
                 true,
                 true,
                 true,
-                Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
-        );
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())));
     }
 }

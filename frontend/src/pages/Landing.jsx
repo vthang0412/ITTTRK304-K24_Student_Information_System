@@ -62,10 +62,7 @@ const Landing = () => {
             {isAuthenticated ? (
               <Link to="/dashboard" className="btn btn-primary">Vào hệ thống <ArrowRightIcon /></Link>
             ) : (
-              <>
-                <Link to="/login" className="btn btn-secondary">Đăng nhập</Link>
-                <Link to="/register" className="btn btn-primary">Bắt đầu</Link>
-              </>
+              <Link to="/login" className="btn btn-primary">Đăng nhập</Link>
             )}
           </div>
         </div>

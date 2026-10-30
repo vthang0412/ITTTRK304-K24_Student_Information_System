@@ -1,4 +1,4 @@
-import { courseSectionApi, enrollmentApi, gradeApi, reportApi } from '../api';
+import { courseSectionApi, enrollmentApi, gradeApi, lecturerApi, reportApi, studentApi } from '../api';
 
 const numberOrZero = (value) => {
   const num = Number(value);
@@ -13,12 +13,21 @@ const average = (values) => {
 };
 
 const loadAdmin = async () => {
-  const [reportRes, sectionsRes] = await Promise.all([
+  const [reportRes, sectionsRes, studentsRes, lecturersRes] = await Promise.all([
     reportApi.getDashboard(),
     courseSectionApi.getAll(),
+    studentApi.getAll().catch(() => ({ data: [] })),
+    lecturerApi.getAll().catch(() => ({ data: [] })),
   ]);
+
   const report = reportRes.data || {};
   const sections = sectionsRes.data || [];
+  const students = studentsRes.data || [];
+  const lecturers = lecturersRes.data || [];
+
+  const activeAccounts = students.filter((s) => s.status === 'ACTIVE').length + lecturers.filter((l) => l.status === 'ACTIVE').length;
+  const inactiveAccounts = students.filter((s) => s.status === 'INACTIVE').length + lecturers.filter((l) => l.status === 'INACTIVE').length;
+
   const statuses = ['DRAFT', 'OPEN', 'IN_PROGRESS', 'CLOSED', 'COMPLETED', 'CANCELLED'];
   const total = sections.length || 1;
   const statusBreakdown = statuses.map((status) => {
@@ -27,10 +36,18 @@ const loadAdmin = async () => {
   });
 
   return {
-    totalStudents: report.totalStudents ?? 0,
-    totalLecturers: report.totalLecturers ?? 0,
+    totalStudents: report.totalStudents ?? students.length,
+    totalLecturers: report.totalLecturers ?? lecturers.length,
     totalCourses: report.totalCourses ?? 0,
     totalSections: report.totalCourseSections ?? sections.length,
+    activeAccounts,
+    inactiveAccounts,
+    accountOverview: [
+      { name: 'Sinh viên', value: report.totalStudents ?? students.length, color: '#2563eb' },
+      { name: 'Giảng viên', value: report.totalLecturers ?? lecturers.length, color: '#10b981' },
+      { name: 'Đang hoạt động', value: activeAccounts, color: '#22c55e' },
+      { name: 'Ngừng hoạt động', value: inactiveAccounts, color: '#f59e0b' },
+    ],
     recentSections: [...sections].slice(-6).reverse(),
     statusBreakdown,
   };
@@ -49,18 +66,30 @@ const loadLecturer = async () => {
     sections.map((s) => gradeApi.getGradesBySection(s.id)),
   );
 
-  const enrolledCount = gradeResponses.reduce((sum, result) => {
-    if (result.status !== 'fulfilled') return sum;
+  const allStudents = [];
+  gradeResponses.forEach((result) => {
+    if (result.status !== 'fulfilled') return;
     const list = result.value.data || [];
-    return sum + list.filter((e) => e.status === 'ENROLLED').length;
-  }, 0);
+    list.forEach((item) => allStudents.push(item));
+  });
+
+  const activeStudents = allStudents.filter((e) => e.status === 'ENROLLED').length;
+  const inactiveStudents = allStudents.length - activeStudents;
 
   return {
     sections,
     sectionCount: sections.length,
     openCount: sections.filter((s) => s.status === 'OPEN').length,
     totalCapacity: sections.reduce((sum, s) => sum + numberOrZero(s.capacity), 0),
-    enrolledCount,
+    enrolledCount: activeStudents,
+    totalStudents: allStudents.length,
+    activeStudents,
+    inactiveStudents,
+    overview: [
+      { name: 'Sinh viên phụ trách', value: allStudents.length, color: '#2563eb' },
+      { name: 'Đang hoạt động', value: activeStudents, color: '#10b981' },
+      { name: 'Ngừng hoạt động', value: inactiveStudents, color: '#f59e0b' },
+    ],
   };
 };
 
