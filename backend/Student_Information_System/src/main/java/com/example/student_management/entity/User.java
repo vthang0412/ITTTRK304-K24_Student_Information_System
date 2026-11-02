@@ -1,7 +1,5 @@
 package com.example.student_management.entity;
 
-
-
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -32,6 +30,9 @@ public class User {
 
     @Column(length = 100)
     private String fullName;
+
+    @Column(length = 500)
+    private String avatarUrl;
 
     @JsonIgnore
     @Column(nullable = false)

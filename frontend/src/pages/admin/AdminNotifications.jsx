@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { notificationApi } from '../../api';
+import { lecturerApi, notificationApi } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import {
   BellIcon, CheckCircleIcon, InboxIcon, PlusIcon, RefreshIcon, TrashIcon,
@@ -37,17 +37,27 @@ const typeColor = (type) => ({
 const typeLabel = (type) => typeOptions.find((o) => o.value === type)?.label || type || '—';
 const roleLabel = (role) => targetRoleOptions.find((o) => o.value === role)?.label || 'Tất cả';
 
-const EMPTY_FORM = { title: '', content: '', type: 'ANNOUNCEMENT', targetRole: '' };
+const EMPTY_FORM = { title: '', content: '', type: 'ANNOUNCEMENT', targetRole: 'LECTURER', recipientId: '' };
 
 /* ─── Form gửi thông báo ───────────────────────────────── */
 const SendModal = ({ open, onClose, onSent }) => {
   const [form, setForm] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
   const [sending, setSending] = useState(false);
+  const [lecturers, setLecturers] = useState([]);
+  const [loadingLecturers, setLoadingLecturers] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
-    if (open) { setForm(EMPTY_FORM); setErrors({}); }
+    if (!open) return;
+    setForm(EMPTY_FORM);
+    setErrors({});
+    setLoadingLecturers(true);
+    lecturerApi.getAll().then((res) => {
+      setLecturers(res.data || []);
+    }).catch(() => {
+      setLecturers([]);
+    }).finally(() => setLoadingLecturers(false));
   }, [open]);
 
   const validate = () => {
@@ -68,10 +78,11 @@ const SendModal = ({ open, onClose, onSent }) => {
         content: form.content.trim(),
         type: form.type || 'ANNOUNCEMENT',
         targetRole: form.targetRole || null,
-        recipientId: null,
+        recipientId: form.targetRole === 'LECTURER' && form.recipientId ? Number(form.recipientId) : null,
       };
       await notificationApi.create(payload);
-      toast.success('Gửi thông báo thành công', `"${payload.title}" đã được gửi đến ${roleLabel(payload.targetRole)}.`);
+      const recipientText = payload.recipientId ? `giảng viên ${lecturers.find((l) => String(l.id) === String(payload.recipientId))?.fullName || 'đã chọn'}` : roleLabel(payload.targetRole);
+      toast.success('Gửi thông báo thành công', `"${payload.title}" đã được gửi đến ${recipientText}.`);
       onSent();
       onClose();
     } catch (err) {
@@ -84,7 +95,7 @@ const SendModal = ({ open, onClose, onSent }) => {
   return (
     <Modal
       open={open}
-      onClose={sending ? () => {} : onClose}
+      onClose={sending ? () => { } : onClose}
       title="Gửi thông báo mới"
       subtitle="Soạn và gửi thông báo đến người dùng trong hệ thống."
       footer={(
@@ -135,7 +146,10 @@ const SendModal = ({ open, onClose, onSent }) => {
             <select
               className="select"
               value={form.targetRole}
-              onChange={(e) => setForm({ ...form, targetRole: e.target.value })}
+              onChange={(e) => {
+                const nextRole = e.target.value;
+                setForm({ ...form, targetRole: nextRole, recipientId: nextRole === 'LECTURER' ? '' : '' });
+              }}
             >
               {targetRoleOptions.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -143,6 +157,22 @@ const SendModal = ({ open, onClose, onSent }) => {
             </select>
           </Field>
         </div>
+
+        {form.targetRole === 'LECTURER' && (
+          <Field label="Giảng viên cụ thể (tùy chọn)" error={errors.recipientId}>
+            <select
+              className={`select${errors.recipientId ? ' invalid' : ''}`}
+              value={form.recipientId}
+              onChange={(e) => setForm({ ...form, recipientId: e.target.value })}
+              disabled={loadingLecturers || lecturers.length === 0}
+            >
+              <option value="">{loadingLecturers ? 'Đang tải danh sách giảng viên...' : 'Gửi cho tất cả giảng viên'}</option>
+              {lecturers.map((lecturer) => (
+                <option key={lecturer.id} value={lecturer.id}>{lecturer.fullName || lecturer.email || `Giảng viên #${lecturer.id}`}</option>
+              ))}
+            </select>
+          </Field>
+        )}
 
         {/* Preview */}
         <div style={{
@@ -168,6 +198,7 @@ const AdminNotifications = () => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sendOpen, setSendOpen] = useState(false);
+  const [detailTarget, setDetailTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -286,6 +317,7 @@ const AdminNotifications = () => {
                     </td>
                     <td>
                       <div className="row-actions">
+                        <button className="btn btn-secondary btn-sm" onClick={() => setDetailTarget(n)}>Xem chi tiết</button>
                         <button
                           className="btn btn-danger btn-sm"
                           onClick={() => setDeleteTarget(n)}
@@ -304,6 +336,49 @@ const AdminNotifications = () => {
 
       {/* Modal gửi thông báo */}
       <SendModal open={sendOpen} onClose={() => setSendOpen(false)} onSent={load} />
+
+      {/* Chi tiết thông báo */}
+      <Modal
+        open={!!detailTarget}
+        onClose={() => setDetailTarget(null)}
+        title={detailTarget?.title || 'Chi tiết thông báo'}
+        subtitle="Thông tin đầy đủ của thông báo đã gửi."
+        footer={<button className="btn btn-secondary" onClick={() => setDetailTarget(null)}>Đóng</button>}
+      >
+        {detailTarget && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ background: `${typeColor(detailTarget.type)}20`, color: typeColor(detailTarget.type), borderRadius: 6, padding: '4px 10px', fontWeight: 700, fontSize: 12 }}>
+                {typeLabel(detailTarget.type)}
+              </span>
+              <span style={{ color: 'var(--muted)', fontSize: 12 }}>{formatDateTime(detailTarget.createdAt)}</span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: 12 }}>
+                <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 6 }}>Người gửi</div>
+                <div style={{ fontWeight: 600 }}>{detailTarget.senderName || 'Admin'}</div>
+              </div>
+              <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: 12 }}>
+                <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 6 }}>Đối tượng nhận</div>
+                <div style={{ fontWeight: 600 }}>{detailTarget.recipientName || roleLabel(detailTarget.targetRole)}</div>
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: 12 }}>
+              <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 6 }}>Trạng thái</div>
+              <div style={{ fontWeight: 600, color: detailTarget.isRead ? '#16a34a' : '#d97706' }}>
+                {detailTarget.isRead ? 'Đã đọc' : 'Chưa đọc'}
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: 12 }}>
+              <div style={{ color: 'var(--muted)', fontSize: 12, marginBottom: 8 }}>Nội dung</div>
+              <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, color: 'var(--text)' }}>{detailTarget.content}</div>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Xác nhận xoá */}
       <ConfirmDialog

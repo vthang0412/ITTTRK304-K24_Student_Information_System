@@ -16,6 +16,7 @@ import StudentEnrollments from './pages/student/StudentEnrollments';
 import StudentGrades from './pages/student/StudentGrades';
 import LecturerSections from './pages/lecturer/LecturerSections';
 import LecturerGrades from './pages/lecturer/LecturerGrades';
+import LecturerNotifications from './pages/lecturer/LecturerNotifications';
 import AdminStudents from './pages/admin/AdminStudents';
 import AdminLecturers from './pages/admin/AdminLecturers';
 import AdminCourses from './pages/admin/AdminCourses';
@@ -54,6 +55,7 @@ function App() {
             <Route path="/lecturer/profile" element={withLayout(<Profile />, ['LECTURER'])} />
             <Route path="/lecturer/sections" element={withLayout(<LecturerSections />, ['LECTURER'])} />
             <Route path="/lecturer/grades" element={withLayout(<LecturerGrades />, ['LECTURER'])} />
+            <Route path="/lecturer/notifications" element={withLayout(<LecturerNotifications />, ['LECTURER'])} />
 
             <Route path="/admin/profile" element={withLayout(<Profile />, ['ADMIN'])} />
             <Route path="/admin/students" element={withLayout(<AdminStudents />, ['ADMIN'])} />

@@ -25,6 +25,7 @@ export const AuthProvider = ({ children }) => {
       email: authData.email,
       role: authData.role,
       userId: authData.userId,
+      avatarUrl: authData.avatarUrl,
     };
     setToken(authData.token);
     setUser(nextUser);
@@ -50,6 +51,7 @@ export const AuthProvider = ({ children }) => {
         role: data.role || user?.role,
         userId: data.id || user?.userId,
         fullName: data.fullName,
+        avatarUrl: data.avatarUrl || user?.avatarUrl,
         studentId: data.studentId,
         studentCode: data.studentCode,
         lecturerId: data.lecturerId,

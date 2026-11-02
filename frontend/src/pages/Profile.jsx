@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { authApi } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -25,6 +25,30 @@ const InfoRow = ({ label, value }) => (
   </div>
 );
 
+const DEFAULT_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+    <defs>
+      <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+        <stop offset="0%" stop-color="#60a5fa"/>
+        <stop offset="100%" stop-color="#2563eb"/>
+      </linearGradient>
+    </defs>
+    <rect width="100" height="100" rx="50" fill="url(#g)"/>
+    <circle cx="50" cy="38" r="18" fill="#e0f2fe"/>
+    <path d="M22 82c6-14 18-20 28-20s22 6 28 20" fill="#e0f2fe"/>
+  </svg>
+`)}`;
+
+const AVATAR_MAX_SIZE = 5 * 1024 * 1024;
+const AVATAR_ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+
+const resolveAvatarUrl = (url) => {
+  if (!url) return DEFAULT_AVATAR;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+  return `${baseUrl.replace(/\/$/, '')}${url.startsWith('/') ? url : `/${url}`}`;
+};
+
 const emptyForm = {
   fullName: '',
   email: '',
@@ -44,6 +68,8 @@ const Profile = () => {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
+  const [avatarDraft, setAvatarDraft] = useState(null);
+  const avatarInputRef = useRef(null);
 
   const load = async () => {
     try {
@@ -61,6 +87,7 @@ const Profile = () => {
       updateUser({
         fullName: me.fullName,
         email: me.email,
+        avatarUrl: me.avatarUrl,
         studentId: me.studentId,
         studentCode: me.studentCode,
         lecturerId: me.lecturerId,
@@ -80,6 +107,7 @@ const Profile = () => {
   const currentRole = profile?.role || user?.role || 'STUDENT';
   const meta = ROLE_META[currentRole] || ROLE_META.STUDENT;
   const displayName = profile?.fullName || user?.fullName || user?.username || 'Người dùng';
+  const avatarUrl = resolveAvatarUrl(profile?.avatarUrl || user?.avatarUrl);
   const initials = useMemo(
     () => displayName.trim().split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase(),
     [displayName],
@@ -161,6 +189,7 @@ const Profile = () => {
       updateUser({
         fullName: me.fullName,
         email: me.email,
+        avatarUrl: me.avatarUrl,
         department: me.department,
         role: me.role,
         studentCode: me.studentCode,
@@ -178,6 +207,63 @@ const Profile = () => {
       setSaving(false);
     }
   };
+
+  const handleAvatarSelect = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!AVATAR_ALLOWED_TYPES.includes(file.type.toLowerCase())) {
+      toast.error('Tệp không hợp lệ', 'Chỉ chấp nhận ảnh JPG, PNG hoặc WEBP.');
+      event.target.value = '';
+      return;
+    }
+    if (file.size > AVATAR_MAX_SIZE) {
+      toast.error('Ảnh quá lớn', 'Dung lượng ảnh tối đa là 5MB.');
+      event.target.value = '';
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarDraft({ file, previewUrl });
+    event.target.value = '';
+  };
+
+  const handleAvatarReset = () => {
+    if (avatarDraft?.previewUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(avatarDraft.previewUrl);
+    }
+    setAvatarDraft(null);
+  };
+
+  const handleAvatarSave = async () => {
+    if (!avatarDraft?.file) return;
+    try {
+      const res = await authApi.uploadAvatar(avatarDraft.file);
+      const me = res.data || {};
+      setProfile(me);
+      updateUser({
+        fullName: me.fullName,
+        email: me.email,
+        avatarUrl: me.avatarUrl,
+        studentCode: me.studentCode,
+        lecturerCode: me.lecturerCode,
+        department: me.department,
+        role: me.role,
+      });
+      handleAvatarReset();
+      toast.success('Cập nhật ảnh đại diện thành công', 'Ảnh của bạn đã được lưu và đồng bộ trên hệ thống.');
+    } catch (err) {
+      const message = err.response?.data?.message || 'Không thể cập nhật ảnh đại diện.';
+      toast.error('Cập nhật ảnh thất bại', message);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (avatarDraft?.previewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(avatarDraft.previewUrl);
+      }
+    };
+  }, [avatarDraft]);
 
   return (
     <>
@@ -211,13 +297,47 @@ const Profile = () => {
               </div>
               <div className="card-body">
                 <div className="profile-head">
-                  <div className="avatar avatar-lg">{initials}</div>
+                  <div className="profile-avatar-wrap">
+                    <div className="profile-avatar-shell">
+                      <div className="avatar avatar-lg avatar-image profile-avatar">
+                        <img
+                          src={avatarDraft?.previewUrl ? avatarDraft.previewUrl : avatarUrl}
+                          alt={displayName}
+                          onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="profile-avatar-button"
+                      onClick={() => avatarInputRef.current?.click()}
+                    >
+                      <PencilIcon size={14} /> Đổi ảnh
+                    </button>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                      hidden
+                      onChange={handleAvatarSelect}
+                    />
+                  </div>
                   <div>
                     <h2>{displayName}</h2>
                     <p>{profileCode || 'Chưa có mã định danh'}</p>
                     <div style={{ marginTop: 8 }}><StatusBadge status={profile?.status || 'ACTIVE'} /></div>
                   </div>
                 </div>
+                {avatarDraft && (
+                  <div className="profile-avatar-actions" style={{ marginBottom: 18 }}>
+                    <button type="button" className="btn btn-primary btn-sm" onClick={handleAvatarSave}>
+                      Lưu ảnh
+                    </button>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={handleAvatarReset}>
+                      Hủy
+                    </button>
+                  </div>
+                )}
                 <div className="info-list">
                   <InfoRow label="Tên đăng nhập" value={profile?.username || user?.username} />
                   <InfoRow label="Email" value={profile?.email || user?.email} />
@@ -276,7 +396,7 @@ const Profile = () => {
 
       <Modal
         open={editing}
-        onClose={saving ? () => {} : () => setEditing(false)}
+        onClose={saving ? () => { } : () => setEditing(false)}
         title="Chỉnh sửa hồ sơ"
         subtitle="Cập nhật họ tên, email, khoa/bộ môn hoặc đổi mật khẩu."
         footer={(

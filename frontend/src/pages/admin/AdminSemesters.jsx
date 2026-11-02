@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import Swal from 'sweetalert2';
 import { semesterApi } from '../../api';
 import { useToast } from '../../context/ToastContext';
-import { CalendarIcon, ClockIcon, PencilIcon, PlusIcon } from '../../components/Icons';
+import { CalendarIcon, ClockIcon, PencilIcon, PlusIcon, TrashIcon } from '../../components/Icons';
 import {
   EmptyState, Field, LoadingBlock, Modal, PageHeader, Pagination, SearchInput, StatCard, StatusBadge,
 } from '../../components/UI';
@@ -111,6 +112,69 @@ const AdminSemesters = () => {
     }
   };
 
+  const handleDelete = async (semester) => {
+    const linkedSections = semesters.filter((item) => item.id !== semester.id && item.sections?.some?.((section) => section.semesterId === semester.id));
+    const inUse = linkedSections.length > 0 || semester.status === 'REGISTRATION_OPEN' || semester.status === 'IN_PROGRESS';
+    if (inUse) {
+      const reason = semester.status === 'REGISTRATION_OPEN' || semester.status === 'IN_PROGRESS'
+        ? 'Học kỳ đang mở đăng ký hoặc đang diễn ra, không thể xóa cứng để tránh ảnh hưởng lịch học và đăng ký.'
+        : 'Học kỳ đã có lớp học phần hoặc dữ liệu liên quan, nên phải giữ lại để phục vụ tra cứu lịch sử.';
+      await Swal.fire({
+        title: 'Không thể xóa học kỳ',
+        text: reason,
+        icon: 'warning',
+        confirmButtonText: 'Đã hiểu',
+        customClass: {
+          popup: 'swal-auth-popup',
+          title: 'swal-auth-title',
+          htmlContainer: 'swal-auth-text',
+          confirmButton: 'swal-auth-confirm',
+          icon: 'swal-auth-icon',
+        },
+        buttonsStyling: false,
+        background: '#ffffff',
+        color: '#0f172a',
+      });
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: 'Xác nhận xoá học kỳ?',
+      text: `Bạn có chắc muốn xoá ${semester.semesterName || semester.semesterCode}?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Xoá học kỳ',
+      cancelButtonText: 'Huỷ',
+      reverseButtons: true,
+      customClass: {
+        popup: 'swal-auth-popup',
+        title: 'swal-auth-title',
+        htmlContainer: 'swal-auth-text',
+        confirmButton: 'swal-auth-confirm',
+        cancelButton: 'swal-auth-cancel',
+        icon: 'swal-auth-icon',
+      },
+      buttonsStyling: false,
+      background: '#ffffff',
+      color: '#0f172a',
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      await semesterApi.delete(semester.id);
+      toast.success('Xoá thành công', `Đã xoá học kỳ ${semester.semesterName}.`);
+      load();
+    } catch (err) {
+      const status = err?.response?.status;
+      if (status === 404 || status === 405) {
+        toast.error('Backend chưa hỗ trợ xóa học kỳ', 'API DELETE /api/semesters/{id} chưa được triển khai. Xóa cứng chưa an toàn trong hệ thống hiện tại.');
+      } else {
+        toast.error('Không thể xóa học kỳ', getErrorMessage(err));
+      }
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -176,6 +240,7 @@ const AdminSemesters = () => {
                       <td>
                         <div className="row-actions">
                           <button className="btn btn-secondary btn-sm" onClick={() => openEdit(s)}><PencilIcon size={14} /> Sửa</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(s)}><TrashIcon size={14} /> Xóa</button>
                         </div>
                       </td>
                     </tr>
@@ -190,7 +255,7 @@ const AdminSemesters = () => {
 
       <Modal
         open={open}
-        onClose={saving ? () => {} : () => setOpen(false)}
+        onClose={saving ? () => { } : () => setOpen(false)}
         title={editing ? 'Cập nhật học kỳ' : 'Thêm học kỳ mới'}
         subtitle={editing ? `Mã học kỳ: ${editing.semesterCode}` : 'Thiết lập học kỳ và thời gian đăng ký.'}
         footer={(
