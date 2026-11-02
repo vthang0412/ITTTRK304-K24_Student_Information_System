@@ -7,6 +7,13 @@ export const authApi = {
   logout: () => httpClient.post('/api/auth/logout'),
   me: () => httpClient.get('/api/me'),
   updateProfile: (data) => httpClient.put('/api/me', data),
+  uploadAvatar: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return httpClient.post('/api/me/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
 
 export const studentApi = {
@@ -20,6 +27,7 @@ export const studentApi = {
 
 export const lecturerApi = {
   getAll: () => httpClient.get('/api/lecturers'),
+  getById: (id) => httpClient.get(`/api/lecturers/${id}`),
   create: (data) => httpClient.post('/api/lecturers', data),
   update: (id, data) => httpClient.put(`/api/lecturers/${id}`, data),
   delete: (id) => httpClient.delete(`/api/lecturers/${id}`),
@@ -29,12 +37,14 @@ export const courseApi = {
   getAll: () => httpClient.get('/api/courses'),
   create: (data) => httpClient.post('/api/courses', data),
   update: (id, data) => httpClient.put(`/api/courses/${id}`, data),
+  delete: (id) => httpClient.delete(`/api/courses/${id}`),
 };
 
 export const semesterApi = {
   getAll: () => httpClient.get('/api/semesters'),
   create: (data) => httpClient.post('/api/semesters', data),
   update: (id, data) => httpClient.put(`/api/semesters/${id}`, data),
+  delete: (id) => httpClient.delete(`/api/semesters/${id}`),
 };
 
 export const courseSectionApi = {
@@ -42,6 +52,7 @@ export const courseSectionApi = {
   getMine: () => httpClient.get('/api/course-sections/mine'),
   create: (data) => httpClient.post('/api/course-sections', data),
   update: (id, data) => httpClient.put(`/api/course-sections/${id}`, data),
+  delete: (id) => httpClient.delete(`/api/course-sections/${id}`),
 };
 
 export const enrollmentApi = {

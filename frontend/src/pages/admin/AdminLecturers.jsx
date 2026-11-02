@@ -50,6 +50,8 @@ const AdminLecturers = () => {
   const [form, setForm] = useState(EMPTY);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [initialForm, setInitialForm] = useState(EMPTY);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -89,18 +91,52 @@ const AdminLecturers = () => {
     setOpen(true);
   };
 
-  const openEdit = (lecturer) => {
-    setEditing(lecturer);
-    setForm({
-      lecturerCode: lecturer.lecturerCode || '',
-      fullName: lecturer.fullName || '',
-      email: lecturer.email || '',
-      department: lecturer.department || '',
-      status: lecturer.status || 'ACTIVE',
-    });
-    setErrors({});
+  const normalizeEditForm = (source = {}) => ({
+    fullName: source.user?.fullName || source.fullName || '',
+    email: source.user?.email || source.email || '',
+    department: source.department || '',
+    status: source.status || 'ACTIVE',
+    password: '',
+    confirmPassword: '',
+  });
+
+  const openEdit = async (lecturer) => {
     setOpen(true);
+    setErrors({});
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+    setLoadingProfile(true);
+    try {
+      const res = await lecturerApi.getById(lecturer.id);
+      const profile = res.data || lecturer;
+      const nextForm = normalizeEditForm(profile);
+      setEditing(profile);
+      setForm(nextForm);
+      setInitialForm(nextForm);
+    } catch (err) {
+      toast.error('Không tải được dữ liệu giảng viên', getErrorMessage(err));
+      setOpen(false);
+      setEditing(null);
+    } finally {
+      setLoadingProfile(false);
+    }
   };
+
+  const isDirty = editing && JSON.stringify({
+    fullName: form.fullName.trim(),
+    email: form.email.trim(),
+    department: form.department.trim(),
+    status: form.status,
+    password: form.password,
+    confirmPassword: form.confirmPassword,
+  }) !== JSON.stringify({
+    fullName: initialForm.fullName.trim(),
+    email: initialForm.email.trim(),
+    department: initialForm.department.trim(),
+    status: initialForm.status,
+    password: '',
+    confirmPassword: '',
+  });
 
   const validate = () => {
     const next = {};
@@ -108,7 +144,10 @@ const AdminLecturers = () => {
     if (!form.email.trim()) next.email = 'Email là bắt buộc.';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) next.email = 'Email không hợp lệ.';
 
-    if (!editing) {
+    const hasPasswordInput = Boolean(form.password || form.confirmPassword);
+    if (editing && !hasPasswordInput) {
+      // Không buộc đổi mật khẩu khi sửa, nhưng nếu admin nhập một trong hai trường thì phải hợp lệ.
+    } else {
       if (!form.password) next.password = 'Mật khẩu là bắt buộc.';
       else if (form.password.length < 6) next.password = 'Mật khẩu phải có ít nhất 6 ký tự.';
       if (!form.confirmPassword) next.confirmPassword = 'Vui lòng xác nhận mật khẩu.';
@@ -129,10 +168,10 @@ const AdminLecturers = () => {
         email: form.email.trim(),
         department: form.department.trim(),
         status: form.status,
-        ...(editing ? { lecturerCode: form.lecturerCode.trim() } : {}),
       };
 
       if (editing) {
+        if (form.password) payload.password = form.password;
         await lecturerApi.update(editing.id, payload);
         toast.success('Cập nhật thành công', `Đã cập nhật giảng viên ${payload.fullName}.`);
       } else {
@@ -291,21 +330,23 @@ const AdminLecturers = () => {
         open={open}
         onClose={saving ? () => { } : () => setOpen(false)}
         title={editing ? 'Cập nhật giảng viên' : 'Thêm giảng viên mới'}
-        subtitle={editing ? `Mã giảng viên: ${editing.lecturerCode}` : 'Tạo hồ sơ giảng viên mới trong hệ thống.'}
+        subtitle={editing ? `Mã giảng viên: ${editing.lecturerCode || editing.user?.lecturerCode || ''}` : 'Tạo hồ sơ giảng viên mới trong hệ thống.'}
         footer={(
           <>
-            <button className="btn btn-secondary" onClick={() => setOpen(false)} disabled={saving}>Huỷ</button>
-            <button className="btn btn-primary" onClick={handleSubmit} disabled={saving}>{saving ? 'Đang lưu...' : 'Lưu giảng viên'}</button>
+            <button className="btn btn-secondary" onClick={() => setOpen(false)} disabled={saving || loadingProfile}>Huỷ</button>
+            <button
+              className="btn btn-primary"
+              onClick={handleSubmit}
+              disabled={saving || loadingProfile || (editing && !isDirty)}
+              style={{ opacity: (saving || loadingProfile || (editing && !isDirty)) ? 0.5 : 1 }}
+            >
+              {saving ? 'Đang lưu...' : editing ? 'Lưu thay đổi' : 'Thêm mới'}
+            </button>
           </>
         )}
       >
         <form onSubmit={handleSubmit}>
           <div className="form-grid">
-            {editing && (
-              <Field label="Mã giảng viên" error={errors.lecturerCode}>
-                <input className={`input${errors.lecturerCode ? ' invalid' : ''}`} value={form.lecturerCode || ''} onChange={(e) => setForm({ ...form, lecturerCode: e.target.value })} disabled={!!editing} placeholder="VD: GV001" />
-              </Field>
-            )}
             <Field label="Họ và tên" required error={errors.fullName}>
               <input className={`input${errors.fullName ? ' invalid' : ''}`} value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} placeholder="Nguyễn Văn A" />
             </Field>
@@ -315,63 +356,62 @@ const AdminLecturers = () => {
             <Field label="Khoa / Ngành">
               <input className="input" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} placeholder="VD: Công nghệ thông tin" />
             </Field>
+
+            <Field label="Mật khẩu" required={!editing} error={errors.password} hint={editing ? 'Để trống nếu không muốn đổi mật khẩu' : 'Tối thiểu 6 ký tự'}>
+              <div style={{ position: 'relative' }}>
+                <input
+                  className={`input${errors.password ? ' invalid' : ''}`}
+                  type={showPassword ? 'text' : 'password'}
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  autoComplete="new-password"
+                  placeholder={editing ? 'Nhập mật khẩu mới (nếu muốn đổi)' : 'Nhập mật khẩu khởi tạo'}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  style={{ position: 'absolute', right: 8, top: 9, border: 'none', background: 'transparent', color: 'var(--muted)' }}
+                >
+                  {showPassword ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
+                </button>
+              </div>
+            </Field>
+
+            <Field label="Xác nhận mật khẩu" required={!editing} error={errors.confirmPassword}>
+              <div style={{ position: 'relative' }}>
+                <input
+                  className={`input${errors.confirmPassword ? ' invalid' : ''}`}
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={form.confirmPassword}
+                  onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                  autoComplete="new-password"
+                  placeholder={editing ? 'Nhập lại mật khẩu mới' : 'Nhập lại mật khẩu'}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((v) => !v)}
+                  aria-label={showConfirmPassword ? 'Ẩn mật khẩu xác nhận' : 'Hiện mật khẩu xác nhận'}
+                  style={{ position: 'absolute', right: 8, top: 9, border: 'none', background: 'transparent', color: 'var(--muted)' }}
+                >
+                  {showConfirmPassword ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
+                </button>
+              </div>
+            </Field>
+
             {!editing && (
-              <>
-                <Field label="Mật khẩu" required error={errors.password} hint="Tối thiểu 6 ký tự">
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      className={`input${errors.password ? ' invalid' : ''}`}
-                      type={showPassword ? 'text' : 'password'}
-                      value={form.password}
-                      onChange={(e) => setForm({ ...form, password: e.target.value })}
-                      autoComplete="new-password"
-                      placeholder="Nhập mật khẩu khởi tạo"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                      style={{ position: 'absolute', right: 8, top: 9, border: 'none', background: 'transparent', color: 'var(--muted)' }}
-                    >
-                      {showPassword ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
-                    </button>
-                  </div>
-                </Field>
-
-                <Field label="Xác nhận mật khẩu" required error={errors.confirmPassword}>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      className={`input${errors.confirmPassword ? ' invalid' : ''}`}
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      value={form.confirmPassword}
-                      onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-                      autoComplete="new-password"
-                      placeholder="Nhập lại mật khẩu"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword((v) => !v)}
-                      aria-label={showConfirmPassword ? 'Ẩn mật khẩu xác nhận' : 'Hiện mật khẩu xác nhận'}
-                      style={{ position: 'absolute', right: 8, top: 9, border: 'none', background: 'transparent', color: 'var(--muted)' }}
-                    >
-                      {showConfirmPassword ? <EyeOffIcon size={18} /> : <EyeIcon size={18} />}
-                    </button>
-                  </div>
-                </Field>
-
-                <div className="full" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => {
-                      const nextPassword = generatePassword();
-                      setForm((prev) => ({ ...prev, password: nextPassword, confirmPassword: nextPassword }));
-                    }}
-                  >
-                    Tạo mật khẩu ngẫu nhiên
-                  </button>
-                </div>
-              </>
+              <div className="full" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    const nextPassword = generatePassword();
+                    setForm((prev) => ({ ...prev, password: nextPassword, confirmPassword: nextPassword }));
+                  }}
+                >
+                  Tạo mật khẩu ngẫu nhiên
+                </button>
+              </div>
             )}
 
             <Field label="Trạng thái" className="full">

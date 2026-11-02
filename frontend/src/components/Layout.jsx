@@ -24,6 +24,7 @@ const MENUS = {
     { label: 'Hồ sơ cá nhân', to: '/lecturer/profile', icon: UserIcon },
     { label: 'Lớp học phần', to: '/lecturer/sections', icon: LayersIcon },
     { label: 'Nhập điểm', to: '/lecturer/grades', icon: ClipboardIcon },
+    { label: 'Thông báo', to: '/lecturer/notifications', icon: BellIcon },
   ],
   ADMIN: [
     { label: 'Tổng quan', to: '/dashboard', icon: DashboardIcon, section: 'Quản trị hệ thống' },
@@ -47,6 +48,7 @@ const TITLES = {
   '/lecturer/profile': 'Hồ sơ cá nhân',
   '/lecturer/sections': 'Lớp học phần',
   '/lecturer/grades': 'Nhập điểm',
+  '/lecturer/notifications': 'Thông báo',
   '/admin/profile': 'Hồ sơ cá nhân',
   '/admin/students': 'Quản lý sinh viên',
   '/admin/lecturers': 'Quản lý giảng viên',
@@ -67,6 +69,27 @@ const initials = (name = '') => {
 
 const roleLabel = (role) => ({ ADMIN: 'Quản trị viên', LECTURER: 'Giảng viên', STUDENT: 'Sinh viên' }[role] || role);
 
+const DEFAULT_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+    <defs>
+      <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+        <stop offset="0%" stop-color="#60a5fa"/>
+        <stop offset="100%" stop-color="#2563eb"/>
+      </linearGradient>
+    </defs>
+    <rect width="100" height="100" rx="50" fill="url(#g)"/>
+    <circle cx="50" cy="38" r="18" fill="#e0f2fe"/>
+    <path d="M22 82c6-14 18-20 28-20s22 6 28 20" fill="#e0f2fe"/>
+  </svg>
+`)}`;
+
+const resolveAvatarSource = (url) => {
+  if (!url) return DEFAULT_AVATAR;
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) return url;
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+  return `${baseUrl.replace(/\/$/, '')}${url.startsWith('/') ? url : `/${url}`}`;
+};
+
 const Layout = ({ children }) => {
   const { user, logout, refreshProfile } = useAuth();
   const navigate = useNavigate();
@@ -81,9 +104,9 @@ const Layout = ({ children }) => {
     refreshProfile();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* Poll số thông báo chưa đọc (chỉ dành cho STUDENT và ADMIN) */
+  /* Poll số thông báo chưa đọc cho STUDENT, ADMIN và LECTURER */
   useEffect(() => {
-    if (!user?.role || user.role === 'LECTURER') return undefined;
+    if (!user?.role) return undefined;
     const fetchUnread = async () => {
       try {
         const res = await notificationApi.getUnreadCount();
@@ -103,6 +126,7 @@ const Layout = ({ children }) => {
   const displayName = user?.fullName || user?.username || 'Người dùng';
   const currentTitle = TITLES[location.pathname] || 'Trang';
   const role = roleLabel(user?.role);
+  const userAvatar = resolveAvatarSource(user?.avatarUrl);
 
   const grouped = useMemo(() => {
     const groups = [];
@@ -246,7 +270,9 @@ const Layout = ({ children }) => {
 
         <div className="sidebar-footer">
           <div className="sidebar-user">
-            <div className="avatar">{initials(displayName)}</div>
+            <div className="avatar avatar-image">
+              <img src={userAvatar} alt={displayName} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }} />
+            </div>
             <div className="sidebar-user-meta">
               <strong>{displayName}</strong>
               <span>{role}</span>
@@ -307,7 +333,9 @@ const Layout = ({ children }) => {
                   <strong>{displayName}</strong>
                   <span>{role}</span>
                 </div>
-                <div className="avatar">{initials(displayName)}</div>
+                <div className="avatar avatar-image">
+                  <img src={userAvatar} alt={displayName} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }} />
+                </div>
               </div>
             </button>
           </div>

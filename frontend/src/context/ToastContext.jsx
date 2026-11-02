@@ -44,7 +44,7 @@ export const ToastProvider = ({ children }) => {
       icon = 'success',
       title = 'Thông báo',
       message = '',
-      duration = 2000,
+      duration = 1000,
       showConfirmButton: hasConfirmButton = duration === 0,
       confirmButtonText = 'Đã hiểu',
     } = config;

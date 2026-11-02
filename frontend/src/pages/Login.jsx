@@ -61,7 +61,7 @@ const Login = () => {
         icon: 'success',
         title: 'Đăng nhập thành công',
         message: 'Bạn sẽ được chuyển hướng đến trang tổng quan.',
-        duration: 2000,
+        duration: 1000,
       });
       window.setTimeout(() => {
         navigate('/dashboard', { replace: true });

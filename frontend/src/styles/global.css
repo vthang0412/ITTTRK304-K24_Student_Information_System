@@ -144,8 +144,15 @@ img { max-width: 100%; display: block; }
   width: 36px; height: 36px; border-radius: 50%; flex: 0 0 36px;
   display: flex; align-items: center; justify-content: center;
   background: var(--blue-600); color: #fff; font-weight: 700; font-size: 13px;
-  text-transform: uppercase;
+  text-transform: uppercase; overflow: hidden;
+  transition: transform .18s ease, box-shadow .18s ease;
 }
+.avatar:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(37, 99, 235, .22); }
+.avatar img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.avatar-image { position: relative; }
+.avatar-image img { border-radius: 50%; }
 
 .main-shell {
   flex: 1; min-width: 0; margin-left: var(--sidebar-w);
@@ -530,7 +537,19 @@ table.data-table { width: 100%; border-collapse: separate; border-spacing: 0; mi
 .info-row span { color: var(--muted); font-size: 12.5px; }
 .info-row strong { font-size: 13px; text-align: right; }
 .schedule-line { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 12.5px; }
-.avatar-lg { width: 72px; height: 72px; border-radius: 20px; font-size: 26px; }
+.avatar-lg { width: 72px; height: 72px; border-radius: 50%; font-size: 26px; }
+.profile-avatar-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.profile-avatar-shell { position: relative; }
+.profile-avatar { width: 88px; height: 88px; border-radius: 50%; border: 3px solid rgba(59, 130, 246, 0.18); box-shadow: 0 10px 30px rgba(37, 99, 235, 0.12); }
+.profile-avatar-button {
+  position: absolute; right: -4px; bottom: -2px;
+  border: 1px solid var(--border); border-radius: 999px; background: #fff;
+  color: var(--text); box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 11.5px; font-weight: 600;
+  cursor: pointer;
+}
+.profile-avatar-button:hover { background: var(--surface-2); }
+.profile-avatar-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .profile-head { display: flex; align-items: center; gap: 18px; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
 .profile-head h2 { font-size: 20px; font-weight: 800; }
 .profile-head p { color: var(--muted); font-size: 13px; }
