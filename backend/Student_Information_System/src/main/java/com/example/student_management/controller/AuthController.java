@@ -1,7 +1,5 @@
 package com.example.student_management.controller;
 
-
-
 import com.example.student_management.dto.AuthResponse;
 import com.example.student_management.dto.ForgotPasswordRequest;
 import com.example.student_management.dto.LoginRequest;
@@ -10,6 +8,7 @@ import com.example.student_management.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -24,6 +23,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.ok(authService.register(request));
     }

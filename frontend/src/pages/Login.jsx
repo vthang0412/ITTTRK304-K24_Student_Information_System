@@ -101,7 +101,7 @@ const Login = () => {
       {error && <Alert tone="error">{error}</Alert>}
 
       <form onSubmit={handleSubmit} noValidate>
-        <Field label="Tên đăng nhập" required>
+        <Field label="Email hoặc tên đăng nhập" required>
           <div style={{ position: 'relative' }}>
             <MailIcon size={17} style={{ position: 'absolute', left: 12, top: 12, color: 'var(--muted)' }} />
             <input
@@ -110,7 +110,7 @@ const Login = () => {
               name="username"
               value={form.username}
               onChange={handleChange}
-              placeholder="Nhập tên đăng nhập"
+              placeholder="Nhập email hoặc tên đăng nhập"
               autoComplete="username"
               autoFocus
             />
@@ -170,7 +170,7 @@ const Login = () => {
       </div>
 
       <div className="auth-foot">
-        Chưa có tài khoản? <Link to="/register">Đăng ký ngay</Link>
+        Tài khoản người dùng được cấp bởi quản trị viên.
       </div>
     </AuthShell>
   );

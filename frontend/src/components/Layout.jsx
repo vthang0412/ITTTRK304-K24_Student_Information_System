@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import Swal from 'sweetalert2';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -124,18 +125,61 @@ const Layout = ({ children }) => {
     });
   };
 
-  const handleLogout = () => {
-    toast.showAuthModal({
-      icon: 'success',
-      title: 'Đăng xuất thành công',
-      message: 'Bạn sẽ được chuyển về màn hình đăng nhập.',
-      duration: 2000,
+  const handleLogout = async () => {
+    const result = await Swal.fire({
+      title: 'Xác nhận đăng xuất?',
+      text: 'Bạn có chắc chắn muốn đăng xuất khỏi hệ thống không?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Xác nhận đăng xuất',
+      cancelButtonText: 'Hủy',
+      reverseButtons: true,
+      customClass: {
+        popup: 'swal-auth-popup',
+        title: 'swal-auth-title',
+        htmlContainer: 'swal-auth-text',
+        confirmButton: 'swal-auth-confirm',
+        cancelButton: 'swal-auth-cancel',
+        icon: 'swal-auth-icon',
+      },
+      buttonsStyling: false,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      background: '#ffffff',
+      color: '#0f172a',
+      width: 420,
+      didOpen: () => {
+        const popup = document.querySelector('.swal2-popup');
+        if (popup) {
+          popup.style.borderRadius = '16px';
+          popup.style.boxShadow = '0 20px 50px rgba(15, 23, 42, 0.18)';
+        }
+      },
     });
 
-    window.setTimeout(() => {
-      logout();
-      navigate('/login', { replace: true });
-    }, 2200);
+    if (!result.isConfirmed) return;
+
+    logout();
+    await Swal.fire({
+      icon: 'success',
+      title: 'Đăng xuất thành công',
+      text: 'Bạn đã được đăng xuất khỏi hệ thống.',
+      timer: 1500,
+      showConfirmButton: false,
+      customClass: {
+        popup: 'swal-auth-popup',
+        title: 'swal-auth-title',
+        htmlContainer: 'swal-auth-text',
+        icon: 'swal-auth-icon',
+      },
+      background: '#ffffff',
+      color: '#0f172a',
+      width: 420,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+    });
+
+    navigate('/login', { replace: true });
   };
 
   return (

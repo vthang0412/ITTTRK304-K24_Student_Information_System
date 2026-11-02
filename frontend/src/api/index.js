@@ -14,6 +14,7 @@ export const studentApi = {
   getById: (id) => httpClient.get(`/api/students/${id}`),
   create: (data) => httpClient.post('/api/students', data),
   update: (id, data) => httpClient.put(`/api/students/${id}`, data),
+  delete: (id) => httpClient.delete(`/api/students/${id}`),
   getMyGrades: () => httpClient.get('/api/student/grades'),
 };
 
@@ -21,6 +22,7 @@ export const lecturerApi = {
   getAll: () => httpClient.get('/api/lecturers'),
   create: (data) => httpClient.post('/api/lecturers', data),
   update: (id, data) => httpClient.put(`/api/lecturers/${id}`, data),
+  delete: (id) => httpClient.delete(`/api/lecturers/${id}`),
 };
 
 export const courseApi = {

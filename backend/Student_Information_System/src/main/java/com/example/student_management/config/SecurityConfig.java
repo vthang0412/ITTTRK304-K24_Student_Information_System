@@ -1,7 +1,5 @@
 package com.example.student_management.config;
 
-
-
 import com.example.student_management.security.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -45,9 +43,11 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/swagger-ui/**", "/swagger-ui.html", "/api-docs/**", "/v3/api-docs/**").permitAll()
-                        .anyRequest().authenticated()
-                )
+                        .requestMatchers("/api/auth/login", "/api/auth/forgot-password", "/swagger-ui/**",
+                                "/swagger-ui.html", "/api-docs/**", "/v3/api-docs/**")
+                        .permitAll()
+                        .requestMatchers("/api/auth/register", "/api/auth/logout").hasRole("ADMIN")
+                        .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

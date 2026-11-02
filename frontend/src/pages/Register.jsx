@@ -21,8 +21,23 @@ const Register = () => {
   const toast = useToast();
 
   useEffect(() => {
-    if (isAuthenticated && !skipAutoRedirect) navigate('/dashboard', { replace: true });
-  }, [isAuthenticated, navigate, skipAutoRedirect]);
+    if (!isAuthenticated) {
+      toast.showAuthModal({
+        icon: 'info',
+        title: 'Đăng ký công khai đã tắt',
+        message: 'Chỉ quản trị viên mới có quyền tạo tài khoản cho sinh viên và giảng viên.',
+        duration: 2200,
+        showConfirmButton: true,
+        confirmButtonText: 'Về trang đăng nhập',
+      });
+      window.setTimeout(() => navigate('/login', { replace: true }), 2200);
+      return;
+    }
+
+    if (isAuthenticated && !skipAutoRedirect) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, navigate, skipAutoRedirect, toast]);
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -87,44 +102,16 @@ const Register = () => {
   };
 
   return (
-    <AuthShell title="Tạo tài khoản" subtitle="Đăng ký để truy cập không gian học vụ của bạn.">
+    <AuthShell title="Tạo tài khoản" subtitle="Tài khoản người dùng không được tạo công khai trong hệ thống này.">
       {error && <Alert tone="error">{error}</Alert>}
-      <form onSubmit={handleSubmit} noValidate>
-        <Field label="Họ và tên" required>
-          <input className="input" name="fullName" value={form.fullName} onChange={handleChange} placeholder="Nguyễn Văn A" />
-        </Field>
+      <div className="card" style={{ padding: 18, borderColor: 'var(--border-strong)', background: 'var(--surface-2)' }}>
+        <p className="small muted" style={{ lineHeight: 1.6 }}>
+          Chỉ quản trị viên mới có quyền cấp tài khoản cho sinh viên và giảng viên.
+          Nếu bạn là người dùng hệ thống, hãy quay lại trang đăng nhập để sử dụng tài khoản đã được cấp.
+        </p>
+      </div>
 
-        <div className="form-grid">
-          <Field label="Tên đăng nhập" required>
-            <input className="input" name="username" value={form.username} onChange={handleChange} placeholder="nguyenvana" autoComplete="username" />
-          </Field>
-          <Field label="Vai trò" required>
-            <select className="select" name="role" value={form.role} onChange={handleChange}>
-              <option value="STUDENT">Sinh viên</option>
-              <option value="LECTURER">Giảng viên</option>
-            </select>
-          </Field>
-        </div>
-
-        <Field label="Email" required>
-          <input className="input" type="email" name="email" value={form.email} onChange={handleChange} placeholder="email@example.com" autoComplete="email" />
-        </Field>
-
-        <div className="form-grid">
-          <Field label="Mật khẩu" required hint="Tối thiểu 6 ký tự">
-            <input className="input" type="password" name="password" value={form.password} onChange={handleChange} autoComplete="new-password" />
-          </Field>
-          <Field label="Xác nhận mật khẩu" required>
-            <input className="input" type="password" name="confirmPassword" value={form.confirmPassword} onChange={handleChange} autoComplete="new-password" />
-          </Field>
-        </div>
-
-        <button className="btn btn-primary btn-block" type="submit" disabled={loading} style={{ marginTop: 4 }}>
-          {loading ? <><span className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,.35)' }} /> Đang tạo tài khoản...</> : 'Đăng ký'}
-        </button>
-      </form>
-
-      <div className="auth-foot">
+      <div className="auth-foot" style={{ marginTop: 18 }}>
         Đã có tài khoản? <Link to="/login">Đăng nhập</Link>
       </div>
     </AuthShell>

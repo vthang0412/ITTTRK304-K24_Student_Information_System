@@ -1,7 +1,5 @@
 package com.example.student_management.controller;
 
-
-
 import com.example.student_management.entity.Student;
 import com.example.student_management.service.StudentService;
 import jakarta.validation.Valid;
@@ -42,5 +40,12 @@ public class StudentController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Student> update(@PathVariable Long id, @Valid @RequestBody Student student) {
         return ResponseEntity.ok(studentService.update(id, student));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        studentService.delete(id);
+        return ResponseEntity.noContent().build();
     }
 }
