@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import Swal from 'sweetalert2';
 import { courseApi, courseSectionApi, lecturerApi, semesterApi } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import {
-  BookIcon, CalendarIcon, ClockIcon, LayersIcon, PencilIcon, PlusIcon, UserIcon, UsersIcon,
+  BookIcon, CalendarIcon, ClockIcon, LayersIcon, PencilIcon, PlusIcon, TrashIcon, UserIcon, UsersIcon,
 } from '../../components/Icons';
 import {
   EmptyState, Field, LoadingBlock, Modal, PageHeader, Pagination, SearchInput, StatCard, StatusBadge,
@@ -125,6 +126,68 @@ const AdminSections = () => {
     }
   };
 
+  const handleDelete = async (section) => {
+    const hasEnrollment = Number(section.enrolledStudents ?? 0) > 0 || Number(section.enrollmentCount ?? 0) > 0;
+    if (hasEnrollment || section.status === 'OPEN' || section.status === 'IN_PROGRESS' || section.status === 'CLOSED') {
+      const reason = hasEnrollment
+        ? 'Lớp học phần đã có sinh viên đăng ký hoặc dữ liệu điểm liên quan, nên không được xóa cứng.'
+        : 'Lớp học phần đang còn hoạt động hoặc đang diễn ra, vui lòng sử dụng chức năng hủy lớp hoặc chuyển trạng thái thay vì xóa cứng.';
+      await Swal.fire({
+        title: 'Không thể xóa lớp học phần',
+        text: reason,
+        icon: 'warning',
+        confirmButtonText: 'Đã hiểu',
+        customClass: {
+          popup: 'swal-auth-popup',
+          title: 'swal-auth-title',
+          htmlContainer: 'swal-auth-text',
+          confirmButton: 'swal-auth-confirm',
+          icon: 'swal-auth-icon',
+        },
+        buttonsStyling: false,
+        background: '#ffffff',
+        color: '#0f172a',
+      });
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: 'Xác nhận xoá lớp học phần?',
+      text: `Bạn có chắc muốn xoá ${section.sectionCode || 'lớp học phần'}?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Xoá lớp học phần',
+      cancelButtonText: 'Huỷ',
+      reverseButtons: true,
+      customClass: {
+        popup: 'swal-auth-popup',
+        title: 'swal-auth-title',
+        htmlContainer: 'swal-auth-text',
+        confirmButton: 'swal-auth-confirm',
+        cancelButton: 'swal-auth-cancel',
+        icon: 'swal-auth-icon',
+      },
+      buttonsStyling: false,
+      background: '#ffffff',
+      color: '#0f172a',
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      await courseSectionApi.delete(section.id);
+      toast.success('Xoá thành công', `Đã xoá lớp học phần ${section.sectionCode}.`);
+      load();
+    } catch (err) {
+      const status = err?.response?.status;
+      if (status === 404 || status === 405) {
+        toast.error('Backend chưa hỗ trợ xóa lớp học phần', 'API DELETE /api/course-sections/{id} chưa được triển khai. Không có xóa cứng nào được thực hiện vì hệ thống hiện chưa có route an toàn cho trường hợp này.');
+      } else {
+        toast.error('Không thể xóa lớp học phần', getErrorMessage(err));
+      }
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -207,6 +270,7 @@ const AdminSections = () => {
                       <td>
                         <div className="row-actions">
                           <button className="btn btn-secondary btn-sm" onClick={() => openEdit(s)}><PencilIcon size={14} /> Sửa</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(s)}><TrashIcon size={14} /> Xóa</button>
                         </div>
                       </td>
                     </tr>
@@ -221,7 +285,7 @@ const AdminSections = () => {
 
       <Modal
         open={open}
-        onClose={saving ? () => {} : () => setOpen(false)}
+        onClose={saving ? () => { } : () => setOpen(false)}
         title={editing ? 'Cập nhật lớp học phần' : 'Thêm lớp học phần mới'}
         subtitle={editing ? `Mã lớp: ${editing.sectionCode}` : 'Tạo lớp học phần và phân công giảng viên.'}
         footer={(

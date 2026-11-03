@@ -1,4 +1,4 @@
-﻿import httpClient from './httpClient';
+import httpClient from './httpClient';
 
 export const authApi = {
   login: (data) => httpClient.post('/api/auth/login', data),
@@ -7,6 +7,13 @@ export const authApi = {
   logout: () => httpClient.post('/api/auth/logout'),
   me: () => httpClient.get('/api/me'),
   updateProfile: (data) => httpClient.put('/api/me', data),
+  uploadAvatar: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return httpClient.post('/api/me/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 };
 
 export const studentApi = {
@@ -14,25 +21,30 @@ export const studentApi = {
   getById: (id) => httpClient.get(`/api/students/${id}`),
   create: (data) => httpClient.post('/api/students', data),
   update: (id, data) => httpClient.put(`/api/students/${id}`, data),
+  delete: (id) => httpClient.delete(`/api/students/${id}`),
   getMyGrades: () => httpClient.get('/api/student/grades'),
 };
 
 export const lecturerApi = {
   getAll: () => httpClient.get('/api/lecturers'),
+  getById: (id) => httpClient.get(`/api/lecturers/${id}`),
   create: (data) => httpClient.post('/api/lecturers', data),
   update: (id, data) => httpClient.put(`/api/lecturers/${id}`, data),
+  delete: (id) => httpClient.delete(`/api/lecturers/${id}`),
 };
 
 export const courseApi = {
   getAll: () => httpClient.get('/api/courses'),
   create: (data) => httpClient.post('/api/courses', data),
   update: (id, data) => httpClient.put(`/api/courses/${id}`, data),
+  delete: (id) => httpClient.delete(`/api/courses/${id}`),
 };
 
 export const semesterApi = {
   getAll: () => httpClient.get('/api/semesters'),
   create: (data) => httpClient.post('/api/semesters', data),
   update: (id, data) => httpClient.put(`/api/semesters/${id}`, data),
+  delete: (id) => httpClient.delete(`/api/semesters/${id}`),
 };
 
 export const courseSectionApi = {
@@ -40,6 +52,7 @@ export const courseSectionApi = {
   getMine: () => httpClient.get('/api/course-sections/mine'),
   create: (data) => httpClient.post('/api/course-sections', data),
   update: (id, data) => httpClient.put(`/api/course-sections/${id}`, data),
+  delete: (id) => httpClient.delete(`/api/course-sections/${id}`),
 };
 
 export const enrollmentApi = {
@@ -70,4 +83,13 @@ export const gradebookApi = {
 
 export const reportApi = {
   getDashboard: () => httpClient.get('/api/reports/dashboard'),
+};
+
+export const notificationApi = {
+  getAll: () => httpClient.get('/api/notifications'),
+  getUnreadCount: () => httpClient.get('/api/notifications/unread-count'),
+  markAsRead: (id) => httpClient.put(`/api/notifications/${id}/read`),
+  markAllAsRead: () => httpClient.put('/api/notifications/read-all'),
+  create: (data) => httpClient.post('/api/notifications', data),
+  delete: (id) => httpClient.delete(`/api/notifications/${id}`),
 };
