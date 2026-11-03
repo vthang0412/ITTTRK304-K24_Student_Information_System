@@ -1,8 +1,8 @@
 package com.example.student_management.security;
 
-import com.example.student_management.entity.AccountStatus;
-import com.example.student_management.entity.User;
-import com.example.student_management.repository.UserRepository;
+import com.example.student_management.entity.auth.AccountStatus;
+import com.example.student_management.entity.auth.User;
+import com.example.student_management.repository.auth.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
