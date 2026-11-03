@@ -15,14 +15,18 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/me")
@@ -39,10 +43,57 @@ public class MeController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    private static final long MAX_AVATAR_SIZE_BYTES = 5L * 1024 * 1024;
+    private static final Set<String> ALLOWED_AVATAR_TYPES = Set.of(
+            "image/jpeg",
+            "image/png",
+            "image/webp");
+
     @GetMapping
     @Transactional(readOnly = true)
     public ResponseEntity<Map<String, Object>> getCurrentUser(Authentication authentication) {
         return ResponseEntity.ok(buildProfile(currentUser(authentication)));
+    }
+
+    @PostMapping("/avatar")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> uploadAvatar(
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) throws IOException {
+        User user = currentUser(authentication);
+
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("Avatar file is required");
+        }
+
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_AVATAR_TYPES.contains(contentType.toLowerCase())) {
+            throw new BadRequestException("Only JPG, PNG and WEBP image files are allowed");
+        }
+
+        if (file.getSize() > MAX_AVATAR_SIZE_BYTES) {
+            throw new BadRequestException("Avatar image must be smaller than 5MB");
+        }
+
+        String uploadDir = Paths.get(System.getProperty("user.dir"), "uploads", "avatars").toString();
+        Files.createDirectories(Paths.get(uploadDir));
+
+        String originalFileName = file.getOriginalFilename();
+        String extension = ".png";
+        if (originalFileName != null && originalFileName.contains(".")) {
+            extension = originalFileName.substring(originalFileName.lastIndexOf('.')).toLowerCase();
+        }
+        if (!Set.of(".jpg", ".jpeg", ".png", ".webp").contains(extension)) {
+            throw new BadRequestException("Unsupported file extension");
+        }
+
+        String savedFileName = UUID.randomUUID() + extension;
+        Path target = Paths.get(uploadDir, savedFileName);
+        Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+
+        user.setAvatarUrl("/uploads/avatars/" + savedFileName);
+        userRepository.save(user);
+        return ResponseEntity.ok(buildProfile(user));
     }
 
     @PutMapping
@@ -119,6 +170,7 @@ public class MeController {
         result.put("role", user.getRole());
         result.put("status", user.getStatus());
         result.put("createdAt", user.getCreatedAt());
+        result.put("avatarUrl", user.getAvatarUrl());
 
         Student student = user.getStudent();
         if (student != null) {

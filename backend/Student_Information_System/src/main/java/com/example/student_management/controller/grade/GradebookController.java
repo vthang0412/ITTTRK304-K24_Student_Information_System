@@ -1,12 +1,6 @@
 package com.example.student_management.controller.grade;
 
-import com.example.student_management.dto.grade.GradeAuditLogDto;
-import com.example.student_management.dto.grade.GradeComponentDto;
-import com.example.student_management.dto.grade.GradebookDetailDto;
-import com.example.student_management.dto.grade.GradebookSummaryDto;
-import com.example.student_management.dto.grade.StudentGradeDto;
-import com.example.student_management.dto.*;
-import com.example.student_management.dto.grade.GradeComponentConfigRequest;
+import com.example.student_management.dto.grade.*;
 import com.example.student_management.service.grade.GradebookService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -1,8 +1,7 @@
 package com.example.student_management.service.auth;
 
-
-
 import com.example.student_management.entity.auth.Student;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -11,4 +10,5 @@ public interface StudentService {
     Optional<Student> findById(Long id);
     Student create(Student student);
     Student update(Long id, Student student);
+    void delete(Long id);
 }

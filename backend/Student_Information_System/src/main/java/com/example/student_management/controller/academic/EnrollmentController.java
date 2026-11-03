@@ -1,9 +1,7 @@
 package com.example.student_management.controller.academic;
 
 
-
 import com.example.student_management.entity.academic.Enrollment;
-import com.example.student_management.entity.*;
 import com.example.student_management.service.academic.EnrollmentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

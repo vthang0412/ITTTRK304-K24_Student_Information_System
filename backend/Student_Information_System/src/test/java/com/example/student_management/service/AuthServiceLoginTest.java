@@ -1,18 +1,20 @@
 package com.example.student_management.service;
 
-import com.example.student_management.dto.LoginRequest;
-import com.example.student_management.dto.AuthResponse;
-import com.example.student_management.entity.AccountStatus;
-import com.example.student_management.entity.Role;
-import com.example.student_management.entity.Student;
-import com.example.student_management.entity.User;
+import com.example.student_management.service.auth.AuthService;
+
+import com.example.student_management.dto.auth.AuthResponse;
+import com.example.student_management.dto.auth.LoginRequest;
+import com.example.student_management.entity.auth.AccountStatus;
+import com.example.student_management.entity.auth.Role;
+import com.example.student_management.entity.auth.Student;
+import com.example.student_management.entity.auth.User;
 import com.example.student_management.exception.BadRequestException;
-import com.example.student_management.service.impl.StudentServiceImpl;
-import com.example.student_management.repository.LecturerRepository;
-import com.example.student_management.repository.StudentRepository;
-import com.example.student_management.repository.UserRepository;
+import com.example.student_management.repository.auth.LecturerRepository;
+import com.example.student_management.repository.auth.StudentRepository;
+import com.example.student_management.repository.auth.UserRepository;
 import com.example.student_management.security.CustomUserDetailsService;
 import com.example.student_management.security.JwtUtil;
+import com.example.student_management.service.auth.impl.StudentServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -28,9 +30,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceLoginTest {

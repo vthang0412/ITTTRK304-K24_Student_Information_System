@@ -1,10 +1,11 @@
 package com.example.student_management.dto.academic;
 
 
-
-import com.example.student_management.entity.academic.Semester;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 

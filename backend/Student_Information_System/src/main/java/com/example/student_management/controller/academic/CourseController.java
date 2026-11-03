@@ -1,9 +1,11 @@
 package com.example.student_management.controller.academic;
 
-
-
 import com.example.student_management.entity.academic.Course;
+import com.example.student_management.exception.BadRequestException;
+import com.example.student_management.exception.NotFoundException;
 import com.example.student_management.repository.academic.CourseRepository;
+import com.example.student_management.repository.academic.CourseSectionRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,6 +18,9 @@ import java.util.List;
 public class CourseController {
     @Autowired
     private CourseRepository courseRepository;
+
+    @Autowired
+    private CourseSectionRepository courseSectionRepository;
 
     @GetMapping
     public ResponseEntity<List<Course>> getAll() {
@@ -40,5 +45,21 @@ public class CourseController {
                     return ResponseEntity.ok(courseRepository.save(existing));
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        Course course = courseRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Course not found"));
+
+        if (courseSectionRepository.existsByCourseId(id)) {
+            throw new BadRequestException(
+                    "Không thể xóa môn học vì môn học đang được sử dụng bởi ít nhất một học phần hoặc dữ liệu liên quan.");
+        }
+
+        courseRepository.delete(course);
+        return ResponseEntity.noContent().build();
     }
 }

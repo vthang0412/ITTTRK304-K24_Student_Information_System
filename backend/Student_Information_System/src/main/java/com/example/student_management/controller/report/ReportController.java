@@ -1,13 +1,11 @@
 package com.example.student_management.controller.report;
 
 
-
 import com.example.student_management.repository.academic.CourseRepository;
 import com.example.student_management.repository.academic.CourseSectionRepository;
 import com.example.student_management.repository.academic.EnrollmentRepository;
 import com.example.student_management.repository.auth.LecturerRepository;
 import com.example.student_management.repository.auth.StudentRepository;
-import com.example.student_management.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;

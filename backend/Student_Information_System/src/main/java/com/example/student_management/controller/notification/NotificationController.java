@@ -1,6 +1,5 @@
 package com.example.student_management.controller.notification;
 
-import com.example.student_management.entity.notification.Notification;
 import com.example.student_management.dto.notification.NotificationDto;
 import com.example.student_management.dto.notification.NotificationRequest;
 import com.example.student_management.service.notification.NotificationService;

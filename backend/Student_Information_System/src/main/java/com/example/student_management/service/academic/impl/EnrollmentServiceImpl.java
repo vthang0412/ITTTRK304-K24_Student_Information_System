@@ -1,26 +1,17 @@
 package com.example.student_management.service.academic.impl;
 
 
-
-import com.example.student_management.entity.academic.Course;
-import com.example.student_management.entity.academic.CourseSection;
-import com.example.student_management.entity.academic.CourseSectionStatus;
-import com.example.student_management.entity.academic.Enrollment;
-import com.example.student_management.entity.academic.EnrollmentStatus;
-import com.example.student_management.entity.academic.Semester;
-import com.example.student_management.entity.academic.SemesterStatus;
+import com.example.student_management.entity.academic.*;
 import com.example.student_management.entity.auth.AccountStatus;
 import com.example.student_management.entity.auth.Student;
 import com.example.student_management.entity.auth.User;
-import com.example.student_management.repository.academic.CourseSectionRepository;
-import com.example.student_management.repository.academic.EnrollmentRepository;
-import com.example.student_management.repository.auth.UserRepository;
-import com.example.student_management.entity.*;
 import com.example.student_management.exception.BadRequestException;
 import com.example.student_management.exception.ConflictException;
 import com.example.student_management.exception.ForbiddenException;
 import com.example.student_management.exception.NotFoundException;
-import com.example.student_management.repository.*;
+import com.example.student_management.repository.academic.CourseSectionRepository;
+import com.example.student_management.repository.academic.EnrollmentRepository;
+import com.example.student_management.repository.auth.UserRepository;
 import com.example.student_management.service.academic.EnrollmentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

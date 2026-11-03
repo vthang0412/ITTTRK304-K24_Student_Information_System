@@ -1,9 +1,9 @@
 package com.example.student_management.dto.auth;
 
 
-
-import com.example.student_management.entity.auth.Student;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data

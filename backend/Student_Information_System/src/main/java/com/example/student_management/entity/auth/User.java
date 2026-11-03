@@ -33,6 +33,9 @@ public class User {
     @Column(length = 100)
     private String fullName;
 
+    @Column(length = 500)
+    private String avatarUrl;
+
     @JsonIgnore
     @Column(nullable = false)
     private String passwordHash;

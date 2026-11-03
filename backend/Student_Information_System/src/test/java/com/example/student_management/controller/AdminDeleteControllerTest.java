@@ -1,8 +1,16 @@
 package com.example.student_management.controller;
 
-import com.example.student_management.entity.*;
+import com.example.student_management.controller.academic.CourseController;
+import com.example.student_management.controller.academic.CourseSectionController;
+import com.example.student_management.controller.academic.SemesterController;
+import com.example.student_management.entity.academic.*;
+import com.example.student_management.entity.auth.AccountStatus;
 import com.example.student_management.exception.BadRequestException;
-import com.example.student_management.repository.*;
+import com.example.student_management.repository.academic.CourseRepository;
+import com.example.student_management.repository.academic.CourseSectionRepository;
+import com.example.student_management.repository.academic.EnrollmentRepository;
+import com.example.student_management.repository.academic.SemesterRepository;
+import com.example.student_management.repository.grade.GradebookRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -11,7 +19,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)

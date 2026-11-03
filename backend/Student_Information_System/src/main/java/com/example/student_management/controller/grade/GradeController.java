@@ -1,13 +1,12 @@
 package com.example.student_management.controller.grade;
 
-import com.example.student_management.entity.academic.Course;
-import com.example.student_management.entity.auth.Role;
 import com.example.student_management.dto.grade.GradeRequest;
 import com.example.student_management.entity.academic.CourseSection;
 import com.example.student_management.entity.academic.Enrollment;
-import com.example.student_management.entity.grade.Grade;
 import com.example.student_management.entity.auth.Lecturer;
+import com.example.student_management.entity.auth.Role;
 import com.example.student_management.entity.auth.User;
+import com.example.student_management.entity.grade.Grade;
 import com.example.student_management.exception.ForbiddenException;
 import com.example.student_management.exception.NotFoundException;
 import com.example.student_management.repository.academic.CourseSectionRepository;
@@ -19,12 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -70,7 +64,7 @@ public class GradeController {
 
     private void requireSectionAccess(CourseSection section, Authentication authentication) {
         User user = currentUser(authentication);
-        if (user.getRole() == com.example.student_management.entity.Role.ADMIN) {
+        if (user.getRole() == Role.ADMIN) {
             return;
         }
         Lecturer lecturer = user.getLecturer();

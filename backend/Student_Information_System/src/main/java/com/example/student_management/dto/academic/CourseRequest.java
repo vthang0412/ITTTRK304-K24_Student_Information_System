@@ -1,8 +1,6 @@
 package com.example.student_management.dto.academic;
 
 
-
-import com.example.student_management.entity.academic.Course;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 

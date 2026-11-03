@@ -1,7 +1,7 @@
 package com.example.student_management.repository.notification;
 
-import com.example.student_management.entity.notification.Notification;
 import com.example.student_management.entity.auth.Role;
+import com.example.student_management.entity.notification.Notification;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;

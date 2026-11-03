@@ -1,16 +1,10 @@
 package com.example.student_management.entity.academic;
 
 
-
 import com.example.student_management.entity.auth.Student;
 import com.example.student_management.entity.grade.Grade;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
