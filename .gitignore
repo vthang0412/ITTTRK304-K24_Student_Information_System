@@ -30,6 +30,24 @@ replay_pid*
 backend/Student_Information_System/uploads/
 *.log
 
+# ---------- Frontend local env ----------
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# ---------- Debug / test artifacts (kept locally, not in Git) ----------
+backend/Student_Information_System/backend_test.log
+backend/Student_Information_System/build_compile.log
+backend/Student_Information_System/debug_avatar_check.js
+backend/Student_Information_System/postman_test_payloads.json
+backend/Student_Information_System/Student_Information_System_Postman_Collection.json
+
+# ---------- Deployment runtime state (created on the VPS) ----------
+deploy/.current_tag
+deploy/.previous_tag
+deploy/.images.env
+deploy/backups/
+
 # ---------- IDE / OS ----------
 .idea/
 .vscode/

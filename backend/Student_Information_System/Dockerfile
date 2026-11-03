@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---------- Build stage ----------
-FROM eclipse-temurin:21-jdk-jammy AS build
+FROM eclipse-temurin:21.0.5_11-jdk-jammy AS build
 
 WORKDIR /workspace
 
@@ -18,7 +18,12 @@ COPY src ./src
 RUN ./gradlew --no-daemon clean bootJar -x test
 
 # ---------- Runtime stage ----------
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:21.0.5_11-jre-jammy
+
+# curl is used by the Docker healthcheck against /actuator/health.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --system app \
     && useradd --system --gid app --home-dir /app --shell /usr/sbin/nologin app
