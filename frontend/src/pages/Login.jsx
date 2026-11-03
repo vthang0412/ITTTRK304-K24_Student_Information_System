@@ -14,6 +14,10 @@ const DEMO = [
   { role: 'Sinh viên', username: 'student', password: '123456' },
 ];
 
+// Demo credentials are only rendered by the Vite dev server.
+// Production builds (import.meta.env.PROD) never expose them in the UI.
+const SHOW_DEMO_ACCOUNTS = import.meta.env.DEV;
+
 const Login = () => {
   const [form, setForm] = useState({ username: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
@@ -151,23 +155,25 @@ const Login = () => {
         </button>
       </form>
 
-      <div style={{ marginTop: 18, padding: 12, border: '1px dashed var(--border-strong)', borderRadius: 10, background: 'var(--surface-2)' }}>
-        <div className="small" style={{ fontWeight: 600, marginBottom: 8 }}>Tài khoản demo</div>
-        <div style={{ display: 'grid', gap: 6 }}>
-          {DEMO.map((d) => (
-            <button
-              key={d.username}
-              type="button"
-              onClick={() => fillDemo(d)}
-              className="flex-between"
-              style={{ border: 'none', background: 'none', padding: '2px 0', textAlign: 'left' }}
-            >
-              <span className="small muted">{d.role}</span>
-              <span className="chip" style={{ fontSize: 11 }}>{d.username} / {d.password}</span>
-            </button>
-          ))}
+      {SHOW_DEMO_ACCOUNTS && (
+        <div style={{ marginTop: 18, padding: 12, border: '1px dashed var(--border-strong)', borderRadius: 10, background: 'var(--surface-2)' }}>
+          <div className="small" style={{ fontWeight: 600, marginBottom: 8 }}>Tài khoản demo</div>
+          <div style={{ display: 'grid', gap: 6 }}>
+            {DEMO.map((d) => (
+              <button
+                key={d.username}
+                type="button"
+                onClick={() => fillDemo(d)}
+                className="flex-between"
+                style={{ border: 'none', background: 'none', padding: '2px 0', textAlign: 'left' }}
+              >
+                <span className="small muted">{d.role}</span>
+                <span className="chip" style={{ fontSize: 11 }}>{d.username} / {d.password}</span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="auth-foot">
         Tài khoản người dùng được cấp bởi quản trị viên.

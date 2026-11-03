@@ -1,9 +1,17 @@
-name: sis
+name: sis-dev
+
+# Local development stack. It uses a separate Compose project, container names,
+# network and volumes from the production stack so both can coexist safely.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   mysql:
-    image: mysql:8.0
-    container_name: sis-mysql
+    image: mysql:8.0.43
+    container_name: sis-dev-mysql
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: ${DB_NAME:-sis_db}
@@ -25,33 +33,39 @@ services:
       start_period: 30s
     networks:
       - sis-network
+    logging: *default-logging
 
   backend:
     build:
       context: ./backend/Student_Information_System
       dockerfile: Dockerfile
-    container_name: sis-backend
+    container_name: sis-dev-backend
     restart: unless-stopped
     depends_on:
       mysql:
         condition: service_healthy
     environment:
+      SPRING_PROFILES_ACTIVE: dev
       DB_URL: jdbc:mysql://${DB_HOST:-mysql}:${DB_PORT:-3306}/${DB_NAME:-sis_db}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
       DB_USERNAME: ${DB_USERNAME:-sis_user}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, copy .env.example to .env}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required, copy .env.example to .env}
+      # Development keeps loading the demo seed data.
+      SPRING_SQL_INIT_MODE: ${SPRING_SQL_INIT_MODE:-always}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:
       - backend_uploads:/app/uploads
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8080'"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
       interval: 15s
       timeout: 5s
       retries: 10
       start_period: 60s
     networks:
       - sis-network
+    logging: *default-logging
 
   frontend:
     build:
@@ -59,21 +73,22 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/}
-    container_name: sis-frontend
+    container_name: sis-dev-frontend
     restart: unless-stopped
     depends_on:
       backend:
         condition: service_healthy
     ports:
-      - "${FRONTEND_PORT:-5173}:80"
+      - "${FRONTEND_PORT:-5173}:8080"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 10s
     networks:
       - sis-network
+    logging: *default-logging
 
 volumes:
   mysql_data:

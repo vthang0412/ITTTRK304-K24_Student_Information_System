@@ -1,0 +1,283 @@
+name: Deploy
+
+on:
+  # React to CI results from main (production images) and develop (dev images).
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+      - develop
+
+  # Manual (re)deploy of an already published image tag (useful for rollback).
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Existing image tag (commit SHA) to deploy."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+  actions: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.image_tag || github.event.workflow_run.head_sha || github.sha }}
+
+jobs:
+  build-production:
+    name: Build and push production images (main)
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout deployed commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+
+      - name: Compute image names
+        id: images
+        run: |
+          set -euo pipefail
+          prefix="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "backend=${prefix}-backend" >> "$GITHUB_OUTPUT"
+          echo "frontend=${prefix}-frontend" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend/Student_Information_System
+          file: ./backend/Student_Information_System/Dockerfile
+          push: true
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ env.IMAGE_TAG }}
+          tags: |
+            ${{ steps.images.outputs.backend }}:${{ env.IMAGE_TAG }}
+            ${{ steps.images.outputs.backend }}:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ env.IMAGE_TAG }}
+          build-args: |
+            VITE_API_BASE_URL=/
+          tags: |
+            ${{ steps.images.outputs.frontend }}:${{ env.IMAGE_TAG }}
+            ${{ steps.images.outputs.frontend }}:latest
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+  publish-dev:
+    name: Build and push dev images (develop)
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'develop'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout dev commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+
+      - name: Compute image names
+        id: images
+        run: |
+          set -euo pipefail
+          prefix="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "backend=${prefix}-backend" >> "$GITHUB_OUTPUT"
+          echo "frontend=${prefix}-frontend" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend (dev)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend/Student_Information_System
+          file: ./backend/Student_Information_System/Dockerfile
+          push: true
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ env.IMAGE_TAG }}
+          tags: |
+            ${{ steps.images.outputs.backend }}:${{ env.IMAGE_TAG }}
+            ${{ steps.images.outputs.backend }}:dev
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Build and push frontend (dev)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ env.IMAGE_TAG }}
+          build-args: |
+            VITE_API_BASE_URL=/
+          tags: |
+            ${{ steps.images.outputs.frontend }}:${{ env.IMAGE_TAG }}
+            ${{ steps.images.outputs.frontend }}:dev
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+  deploy:
+    name: Deploy to Ubuntu VPS (production)
+    needs:
+      - build-production
+    if: >-
+      always() &&
+      (github.event_name == 'workflow_dispatch' ||
+       (needs.build-production.result == 'success' &&
+        github.event.workflow_run.head_branch == 'main'))
+    runs-on: ubuntu-latest
+    # Requires manual approval when required reviewers are configured on the
+    # "production" GitHub Environment.
+    environment: production
+
+    steps:
+      - name: Checkout deployment files
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+
+      - name: Compute image names
+        id: images
+        run: |
+          set -euo pipefail
+          prefix="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "backend=${prefix}-backend" >> "$GITHUB_OUTPUT"
+          echo "frontend=${prefix}-frontend" >> "$GITHUB_OUTPUT"
+
+      - name: Configure SSH
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          for required in VPS_HOST VPS_USER VPS_SSH_PRIVATE_KEY; do
+            if [ -z "$(printenv "$required" || true)" ]; then
+              echo "::error::${required} secret is not set."
+              exit 1
+            fi
+          done
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" | tr -d '\r' > "$HOME/.ssh/sis_deploy_key"
+          chmod 600 "$HOME/.ssh/sis_deploy_key"
+          if [ -n "${VPS_KNOWN_HOSTS:-}" ]; then
+            printf '%s\n' "$VPS_KNOWN_HOSTS" | tr -d '\r' >> "$HOME/.ssh/known_hosts"
+          else
+            ssh-keyscan -p "${VPS_PORT:-22}" -H "$VPS_HOST" >> "$HOME/.ssh/known_hosts" 2>/dev/null
+            echo "::warning::VPS_KNOWN_HOSTS is not set; the host key was fetched with ssh-keyscan."
+          fi
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Upload deployment files
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          port="${VPS_PORT:-22}"
+          deploy_path="${VPS_DEPLOY_PATH:-/opt/sis}"
+          ssh -p "$port" -i "$HOME/.ssh/sis_deploy_key" \
+            -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "$VPS_USER@$VPS_HOST" "mkdir -p '$deploy_path/backups'"
+          scp -P "$port" -i "$HOME/.ssh/sis_deploy_key" \
+            -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            deploy/docker-compose.prod.yml \
+            deploy/deploy.sh \
+            deploy/backup.sh \
+            deploy/rollback.sh \
+            deploy/restore.sh \
+            "$VPS_USER@$VPS_HOST:$deploy_path/"
+
+      - name: Deploy over SSH
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+          # The token must belong to this account. Override with the GHCR_USER
+          # secret when a dedicated machine account owns the token.
+          GHCR_USER: ${{ secrets.GHCR_USER || github.repository_owner }}
+          BACKEND_IMAGE: ${{ steps.images.outputs.backend }}
+          FRONTEND_IMAGE: ${{ steps.images.outputs.frontend }}
+        run: |
+          set -euo pipefail
+          port="${VPS_PORT:-22}"
+          deploy_path="${VPS_DEPLOY_PATH:-/opt/sis}"
+          image_tag="$IMAGE_TAG"
+          if [ -z "$image_tag" ]; then
+            echo "::error::No image tag resolved."
+            exit 1
+          fi
+          ssh_opts=(-p "$port" -i "$HOME/.ssh/sis_deploy_key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
+          remote="cd '$deploy_path' && chmod +x deploy.sh backup.sh rollback.sh restore.sh && IMAGE_TAG='$image_tag' BACKEND_IMAGE='$BACKEND_IMAGE' FRONTEND_IMAGE='$FRONTEND_IMAGE' bash deploy.sh"
+          if [ -n "${GHCR_PULL_TOKEN:-}" ]; then
+            printf '%s' "$GHCR_PULL_TOKEN" | ssh "${ssh_opts[@]}" "$VPS_USER@$VPS_HOST" \
+              "cd '$deploy_path' && echo 'Logging in to GHCR...' && docker login ghcr.io -u '$GHCR_USER' --password-stdin && chmod +x deploy.sh backup.sh rollback.sh restore.sh && IMAGE_TAG='$image_tag' BACKEND_IMAGE='$BACKEND_IMAGE' FRONTEND_IMAGE='$FRONTEND_IMAGE' bash deploy.sh"
+          else
+            ssh "${ssh_opts[@]}" "$VPS_USER@$VPS_HOST" "$remote"
+          fi
+
+      - name: Deployment failed
+        if: failure()
+        run: |
+          echo "::error::Deployment failed. deploy.sh attempts an automatic rollback when AUTO_ROLLBACK=1."
+          echo "Check the VPS, then roll back manually with: cd /opt/sis && ./rollback.sh"
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f "$HOME/.ssh/sis_deploy_key"

@@ -2,6 +2,7 @@ package com.example.student_management.config;
 
 import com.example.student_management.security.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -18,7 +19,9 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -26,6 +29,9 @@ import java.util.Arrays;
 public class SecurityConfig {
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @Value("${app.cors.allowed-origins:}")
+    private String allowedOriginsConfig;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -44,7 +50,8 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/login", "/api/auth/forgot-password", "/swagger-ui/**",
-                                "/swagger-ui.html", "/v3/api-docs", "/v3/api-docs/**", "/uploads/**")
+                                "/swagger-ui.html", "/v3/api-docs", "/v3/api-docs/**", "/uploads/**",
+                                "/actuator/health", "/actuator/health/**")
                         .permitAll()
                         .requestMatchers("/api/auth/register", "/api/auth/logout").hasRole("ADMIN")
                         .anyRequest().authenticated())
@@ -56,7 +63,17 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost:3000"));
+        List<String> allowedOrigins = new ArrayList<>();
+        if (allowedOriginsConfig != null) {
+            for (String origin : allowedOriginsConfig.split(",")) {
+                String trimmed = origin.trim();
+                if (!trimmed.isEmpty()) {
+                    allowedOrigins.add(trimmed);
+                }
+            }
+        }
+        // Never fall back to "*": production is same-origin through Nginx.
+        configuration.setAllowedOrigins(allowedOrigins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
