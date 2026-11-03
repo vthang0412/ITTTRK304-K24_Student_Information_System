@@ -1,0 +1,45 @@
+# ---------- Secrets / environment ----------
+.env
+.env.*
+!.env.example
+*.local
+
+# ---------- Node / frontend ----------
+node_modules/
+dist/
+dist-ssr/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ---------- Java / Gradle / Maven ----------
+.gradle/
+**/build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+**/target/
+out/
+bin/
+*.class
+hs_err_pid*
+replay_pid*
+
+# ---------- Runtime data ----------
+backend/Student_Information_System/uploads/
+*.log
+
+# ---------- IDE / OS ----------
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+Thumbs.db
+
+# ---------- Temporary ----------
+*.tmp
+*.swp
+*.swo
