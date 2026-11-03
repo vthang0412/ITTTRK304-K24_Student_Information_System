@@ -1,12 +1,23 @@
 package com.example.student_management.service;
 
-import com.example.student_management.dto.request.GradeComponentConfigRequest;
-import com.example.student_management.dto.request.GradeComponentRequest;
-import com.example.student_management.dto.request.GradeRequest;
-import com.example.student_management.entity.*;
+import com.example.student_management.dto.grade.GradeComponentConfigRequest;
+import com.example.student_management.dto.grade.GradeComponentRequest;
+import com.example.student_management.dto.grade.GradeRequest;
+import com.example.student_management.entity.academic.CourseSection;
+import com.example.student_management.entity.academic.CourseSectionStatus;
+import com.example.student_management.entity.academic.Enrollment;
+import com.example.student_management.entity.academic.EnrollmentStatus;
+import com.example.student_management.entity.auth.Lecturer;
+import com.example.student_management.entity.auth.Role;
+import com.example.student_management.entity.auth.User;
+import com.example.student_management.entity.grade.*;
 import com.example.student_management.exception.BadRequestException;
 import com.example.student_management.exception.ConflictException;
-import com.example.student_management.repository.*;
+import com.example.student_management.repository.academic.CourseSectionRepository;
+import com.example.student_management.repository.academic.EnrollmentRepository;
+import com.example.student_management.repository.auth.UserRepository;
+import com.example.student_management.repository.grade.*;
+import com.example.student_management.service.grade.GradebookService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -18,7 +29,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
