@@ -1,0 +1,150 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - "feature/**"
+  pull_request:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (Java 21 + Gradle)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/Student_Information_System
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+          cache-dependency-path: |
+            backend/Student_Information_System/*.gradle
+            backend/Student_Information_System/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Grant execute permission for Gradle wrapper
+        run: chmod +x gradlew
+
+      - name: Build and test
+        run: ./gradlew build --no-daemon --stacktrace
+
+  frontend:
+    name: Frontend (Node.js + Vite)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  docker:
+    name: Docker images (build only)
+    runs-on: ubuntu-latest
+    needs:
+      - backend
+      - frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend/Student_Information_System
+          file: ./backend/Student_Information_System/Dockerfile
+          push: false
+          cache-from: type=gha,scope=ci-backend
+          cache-to: type=gha,mode=max,scope=ci-backend
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          build-args: |
+            VITE_API_BASE_URL=/
+          cache-from: type=gha,scope=ci-frontend
+          cache-to: type=gha,mode=max,scope=ci-frontend
+
+  config:
+    name: Compose and scripts validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate workflow YAML
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 - <<'PY'
+          import glob
+          import yaml
+          for path in glob.glob(".github/workflows/*.yml"):
+              with open(path, encoding="utf-8") as handle:
+                  yaml.safe_load(handle)
+              print(f"OK {path}")
+          PY
+
+      - name: Validate shell scripts
+        run: |
+          bash -n deploy/deploy.sh
+          bash -n deploy/backup.sh
+          bash -n deploy/rollback.sh
+          bash -n deploy/restore.sh
+
+      - name: Validate development compose file
+        run: |
+          cp .env.example .env
+          docker compose -f docker-compose.yml config --quiet
+          rm -f .env
+
+      - name: Validate production compose file
+        env:
+          IMAGE_TAG: ci-validation
+          BACKEND_IMAGE: example.invalid/sis-backend
+          FRONTEND_IMAGE: example.invalid/sis-frontend
+        run: |
+          docker compose -f deploy/docker-compose.prod.yml \
+            --env-file deploy/env.production.example config --quiet
