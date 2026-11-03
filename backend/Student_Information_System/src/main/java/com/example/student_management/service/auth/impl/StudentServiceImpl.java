@@ -1,0 +1,77 @@
+package com.example.student_management.service.auth.impl;
+
+import com.example.student_management.entity.auth.Student;
+import com.example.student_management.exception.BadRequestException;
+import com.example.student_management.exception.ConflictException;
+import com.example.student_management.exception.NotFoundException;
+import com.example.student_management.repository.auth.StudentRepository;
+import com.example.student_management.repository.auth.UserRepository;
+import com.example.student_management.service.auth.StudentService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class StudentServiceImpl implements StudentService {
+    @Autowired
+    private StudentRepository studentRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Override
+    public List<Student> findAll() {
+        return studentRepository.findAll();
+    }
+
+    @Override
+    public Optional<Student> findById(Long id) {
+        return studentRepository.findById(id);
+    }
+
+    @Override
+    @Transactional
+    public Student create(Student student) {
+        if (student.getStudentCode() == null || student.getStudentCode().isBlank()) {
+            throw new BadRequestException("Student code is required");
+        }
+        if (studentRepository.existsByStudentCode(student.getStudentCode())) {
+            throw new ConflictException("Student code already exists");
+        }
+        if (student.getEmail() != null && studentRepository.existsByEmail(student.getEmail())) {
+            throw new ConflictException("Email already exists");
+        }
+        return studentRepository.save(student);
+    }
+
+    @Override
+    @Transactional
+    public Student update(Long id, Student student) {
+        Student existing = studentRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("Student not found"));
+        existing.setFullName(student.getFullName());
+        existing.setEmail(student.getEmail());
+        existing.setDepartment(student.getDepartment());
+        if (student.getStatus() != null) {
+            existing.setStatus(student.getStatus());
+        }
+
+        if (existing.getUser() != null) {
+            if (student.getStatus() != null) {
+                existing.getUser().setStatus(student.getStatus());
+            }
+            if (student.getFullName() != null) {
+                existing.getUser().setFullName(student.getFullName());
+            }
+            if (student.getEmail() != null) {
+                existing.getUser().setEmail(student.getEmail());
+            }
+            userRepository.save(existing.getUser());
+        }
+
+        return studentRepository.save(existing);
+    }
+}
