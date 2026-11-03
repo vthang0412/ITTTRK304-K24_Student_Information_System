@@ -20,7 +20,7 @@ Copy `.env` example or set environment variables:
 
 ## API Docs
 - Swagger UI: http://localhost:8080/swagger-ui.html
-- OpenAPI: http://localhost:8080/api-docs
+- OpenAPI: http://localhost:8080/v3/api-docs
 
 ## Test
 ```bash
