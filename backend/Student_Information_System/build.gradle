@@ -42,3 +42,26 @@ dependencies {
 tasks.named('test') {
     useJUnitPlatform()
 }
+
+// Load local-only connection settings for `./gradlew bootRun` from .env.local.
+// The file is git-ignored and keeps real credentials out of the source tree.
+// Docker Compose does not use this file; it injects DB_URL/DB_PASSWORD directly.
+tasks.named('bootRun') {
+    def envFile = project.file('.env.local')
+    if (envFile.exists()) {
+        envFile.readLines('UTF-8').each { line ->
+            def trimmed = line.trim()
+            if (trimmed && !trimmed.startsWith('#') && trimmed.contains('=')) {
+                def separator = trimmed.indexOf('=')
+                def key = trimmed.substring(0, separator).trim()
+                def value = trimmed.substring(separator + 1).trim()
+                if (value.length() >= 2 &&
+                        ((value.startsWith('"') && value.endsWith('"')) ||
+                         (value.startsWith("'") && value.endsWith("'")))) {
+                    value = value.substring(1, value.length() - 1)
+                }
+                environment key, value
+            }
+        }
+    }
+}
