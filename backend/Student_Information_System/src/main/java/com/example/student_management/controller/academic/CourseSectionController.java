@@ -1,13 +1,18 @@
 package com.example.student_management.controller.academic;
 
+import com.example.student_management.entity.academic.Course;
 import com.example.student_management.entity.academic.CourseSection;
 import com.example.student_management.entity.academic.CourseSectionStatus;
+import com.example.student_management.entity.academic.Semester;
 import com.example.student_management.entity.auth.Lecturer;
 import com.example.student_management.entity.auth.User;
 import com.example.student_management.exception.BadRequestException;
+import com.example.student_management.exception.ConflictException;
 import com.example.student_management.exception.NotFoundException;
+import com.example.student_management.repository.academic.CourseRepository;
 import com.example.student_management.repository.academic.CourseSectionRepository;
 import com.example.student_management.repository.academic.EnrollmentRepository;
+import com.example.student_management.repository.academic.SemesterRepository;
 import com.example.student_management.repository.auth.LecturerRepository;
 import com.example.student_management.repository.auth.UserRepository;
 import com.example.student_management.repository.grade.GradebookRepository;
@@ -25,6 +30,12 @@ import java.util.List;
 public class CourseSectionController {
     @Autowired
     private CourseSectionRepository courseSectionRepository;
+
+    @Autowired
+    private CourseRepository courseRepository;
+
+    @Autowired
+    private SemesterRepository semesterRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -57,7 +68,45 @@ public class CourseSectionController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CourseSection> create(@RequestBody CourseSection courseSection) {
-        return ResponseEntity.ok(courseSectionRepository.save(courseSection));
+        if (courseSection.getSectionCode() == null || courseSection.getSectionCode().isBlank()) {
+            throw new BadRequestException("Mã lớp học phần là bắt buộc");
+        }
+        if (courseSectionRepository.existsBySectionCode(courseSection.getSectionCode().trim())) {
+            throw new ConflictException("Mã lớp học phần đã tồn tại");
+        }
+        courseSection.setSectionCode(courseSection.getSectionCode().trim());
+
+        if (courseSection.getCourse() == null || courseSection.getCourse().getId() == null) {
+            throw new BadRequestException("Môn học là bắt buộc");
+        }
+        Course course = courseRepository.findById(courseSection.getCourse().getId())
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy môn học"));
+        courseSection.setCourse(course);
+
+        if (courseSection.getSemester() == null || courseSection.getSemester().getId() == null) {
+            throw new BadRequestException("Học kỳ là bắt buộc");
+        }
+        Semester semester = semesterRepository.findById(courseSection.getSemester().getId())
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy học kỳ"));
+        courseSection.setSemester(semester);
+
+        if (courseSection.getLecturer() != null && courseSection.getLecturer().getId() != null) {
+            Lecturer lecturer = lecturerRepository.findById(courseSection.getLecturer().getId()).orElse(null);
+            courseSection.setLecturer(lecturer);
+        } else {
+            courseSection.setLecturer(null);
+        }
+
+        if (courseSection.getCapacity() == null || courseSection.getCapacity() < 1) {
+            courseSection.setCapacity(40);
+        }
+
+        if (courseSection.getStatus() == null) {
+            courseSection.setStatus(CourseSectionStatus.OPEN);
+        }
+
+        CourseSection saved = courseSectionRepository.save(courseSection);
+        return ResponseEntity.ok(saved);
     }
 
     @PutMapping("/{id}")
@@ -65,12 +114,26 @@ public class CourseSectionController {
     public ResponseEntity<CourseSection> update(@PathVariable Long id, @RequestBody CourseSection courseSection) {
         return courseSectionRepository.findById(id)
                 .map(existing -> {
-                    existing.setCourse(courseSection.getCourse());
-                    existing.setSemester(courseSection.getSemester());
-                    existing.setLecturer(courseSection.getLecturer());
-                    existing.setCapacity(courseSection.getCapacity());
-                    existing.setSchedule(courseSection.getSchedule());
-                    existing.setStatus(courseSection.getStatus());
+                    if (courseSection.getCourse() != null && courseSection.getCourse().getId() != null) {
+                        courseRepository.findById(courseSection.getCourse().getId()).ifPresent(existing::setCourse);
+                    }
+                    if (courseSection.getSemester() != null && courseSection.getSemester().getId() != null) {
+                        semesterRepository.findById(courseSection.getSemester().getId()).ifPresent(existing::setSemester);
+                    }
+                    if (courseSection.getLecturer() != null && courseSection.getLecturer().getId() != null) {
+                        lecturerRepository.findById(courseSection.getLecturer().getId()).ifPresent(existing::setLecturer);
+                    } else if (courseSection.getLecturer() == null) {
+                        existing.setLecturer(null);
+                    }
+                    if (courseSection.getCapacity() != null && courseSection.getCapacity() >= 1) {
+                        existing.setCapacity(courseSection.getCapacity());
+                    }
+                    if (courseSection.getSchedule() != null) {
+                        existing.setSchedule(courseSection.getSchedule());
+                    }
+                    if (courseSection.getStatus() != null) {
+                        existing.setStatus(courseSection.getStatus());
+                    }
                     return ResponseEntity.ok(courseSectionRepository.save(existing));
                 })
                 .orElse(ResponseEntity.notFound().build());
