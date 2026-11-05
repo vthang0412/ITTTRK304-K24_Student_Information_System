@@ -36,7 +36,21 @@ const StudentGrades = () => {
   const stats = useMemo(() => {
     const graded = items.filter((i) => i.finalScore !== null && i.finalScore !== undefined);
     const scores = graded.map((i) => Number(i.finalScore));
-    const average = scores.length ? (scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(2) : '—';
+    let totalScoreCredits = 0;
+    let totalCredits = 0;
+    graded.forEach((i) => {
+      const cr = Number(i.credits) || 0;
+      const sc = Number(i.finalScore);
+      if (cr > 0 && !Number.isNaN(sc)) {
+        totalScoreCredits += sc * cr;
+        totalCredits += cr;
+      }
+    });
+    const average = totalCredits > 0
+      ? (totalScoreCredits / totalCredits).toFixed(2)
+      : scores.length
+        ? (scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(2)
+        : '—';
     const passed = items.filter((i) => passesCourse(i.finalScore));
     const credits = passed.reduce((sum, i) => sum + Number(i.credits || 0), 0);
     return { average, credits, graded: graded.length, total: items.length };

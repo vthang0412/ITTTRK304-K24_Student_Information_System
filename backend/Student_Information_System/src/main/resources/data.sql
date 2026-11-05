@@ -8,25 +8,13 @@ SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 -- Bổ sung trạng thái mới cho các CSDL đã được tạo từ phiên bản trước.
 ALTER TABLE gradebooks MODIFY COLUMN status ENUM('OPEN', 'LOCKED', 'APPROVED', 'PUBLISHED') NOT NULL;
 
-SET FOREIGN_KEY_CHECKS = 0;
-TRUNCATE TABLE grade_audit_logs;
-TRUNCATE TABLE grade_component_scores;
-TRUNCATE TABLE grade_components;
-TRUNCATE TABLE grades;
-TRUNCATE TABLE gradebooks;
-TRUNCATE TABLE enrollments;
-TRUNCATE TABLE course_sections;
-TRUNCATE TABLE semesters;
-TRUNCATE TABLE courses;
-TRUNCATE TABLE lecturers;
-TRUNCATE TABLE students;
-TRUNCATE TABLE users;
-SET FOREIGN_KEY_CHECKS = 1;
+-- Script này chỉ BỔ SUNG dữ liệu mẫu và có thể chạy lại nhiều lần.
+-- Tuyệt đối không TRUNCATE/DELETE để tránh xóa dữ liệu nghiệp vụ của người dùng.
 
 -- ------------------------------------------------------------
 -- TÀI KHOẢN NGƯỜI DÙNG
 -- ------------------------------------------------------------
-INSERT INTO users (username, email, full_name, password_hash, role, status, created_at, updated_at) VALUES
+INSERT IGNORE INTO users (username, email, full_name, password_hash, role, status, created_at, updated_at) VALUES
 ('admin', 'admin@sis.edu.vn', 'Quản Trị Viên', '$2a$10$IJcu1QMBRnYSR4w1nGfpyO.EHrQcxn0JZQkfNie1BKlUzC5CTOtd2', 'ADMIN', 'ACTIVE', NOW(), NOW()),
 ('lecturer', 'lecturer@sis.edu.vn', 'Trần Văn Giảng', '$2a$10$IJcu1QMBRnYSR4w1nGfpyO.EHrQcxn0JZQkfNie1BKlUzC5CTOtd2', 'LECTURER', 'ACTIVE', NOW(), NOW()),
 ('lecturer2', 'lecturer2@sis.edu.vn', 'Lê Thị Hương', '$2a$10$IJcu1QMBRnYSR4w1nGfpyO.EHrQcxn0JZQkfNie1BKlUzC5CTOtd2', 'LECTURER', 'ACTIVE', NOW(), NOW()),
@@ -50,7 +38,7 @@ INSERT INTO users (username, email, full_name, password_hash, role, status, crea
 -- ------------------------------------------------------------
 -- SINH VIÊN
 -- ------------------------------------------------------------
-INSERT INTO students (student_code, full_name, email, department, status, user_id) VALUES
+INSERT IGNORE INTO students (student_code, full_name, email, department, status, user_id) VALUES
 ('SV001', 'Nguyễn Văn Sinh', 'student@sis.edu.vn', 'CNTT', 'ACTIVE', (SELECT id FROM users WHERE username='student')),
 ('SV002', 'Phạm Minh Tuấn', 'student2@sis.edu.vn', 'CNTT', 'ACTIVE', (SELECT id FROM users WHERE username='student2')),
 ('SV003', 'Hoàng Thị Mai', 'student3@sis.edu.vn', 'KTPM', 'ACTIVE', (SELECT id FROM users WHERE username='student3')),
@@ -67,7 +55,7 @@ INSERT INTO students (student_code, full_name, email, department, status, user_i
 -- ------------------------------------------------------------
 -- GIẢNG VIÊN
 -- ------------------------------------------------------------
-INSERT INTO lecturers (lecturer_code, full_name, email, department, status, user_id) VALUES
+INSERT IGNORE INTO lecturers (lecturer_code, full_name, email, department, status, user_id) VALUES
 ('GV001', 'Trần Văn Giảng', 'lecturer@sis.edu.vn', 'CNTT', 'ACTIVE', (SELECT id FROM users WHERE username='lecturer')),
 ('GV002', 'Lê Thị Hương', 'lecturer2@sis.edu.vn', 'KTPM', 'ACTIVE', (SELECT id FROM users WHERE username='lecturer2')),
 ('GV003', 'Nguyễn Hoàng Nam', 'lecturer3@sis.edu.vn', 'HTTT', 'ACTIVE', (SELECT id FROM users WHERE username='lecturer3')),
@@ -78,7 +66,7 @@ INSERT INTO lecturers (lecturer_code, full_name, email, department, status, user
 -- ------------------------------------------------------------
 -- MÔN HỌC
 -- ------------------------------------------------------------
-INSERT INTO courses (course_code, course_name, credits, description, status) VALUES
+INSERT IGNORE INTO courses (course_code, course_name, credits, description, status) VALUES
 ('INT2204', 'Lập trình hướng đối tượng', 3, 'Ngôn ngữ Java, OOP cơ bản và nâng cao', 'ACTIVE'),
 ('INT3306', 'Cơ sở dữ liệu', 3, 'Thiết kế, mô hình hóa và truy vấn cơ sở dữ liệu', 'ACTIVE'),
 ('INT3401', 'Cấu trúc dữ liệu và giải thuật', 3, 'Cấu trúc dữ liệu cơ bản, thuật toán và độ phức tạp', 'ACTIVE'),
@@ -96,7 +84,7 @@ INSERT INTO courses (course_code, course_name, credits, description, status) VAL
 -- ------------------------------------------------------------
 -- HỌC KỲ
 -- ------------------------------------------------------------
-INSERT INTO semesters (semester_code, semester_name, start_date, end_date, registration_start, registration_end, status) VALUES
+INSERT IGNORE INTO semesters (semester_code, semester_name, start_date, end_date, registration_start, registration_end, status) VALUES
 ('HK1-2025-2026', 'Học kỳ 1 năm 2025-2026', DATE_SUB(CURDATE(), INTERVAL 420 DAY), DATE_SUB(CURDATE(), INTERVAL 300 DAY), DATE_SUB(NOW(), INTERVAL 450 DAY), DATE_SUB(NOW(), INTERVAL 420 DAY), 'COMPLETED'),
 ('HK2-2025-2026', 'Học kỳ 2 năm 2025-2026', DATE_SUB(CURDATE(), INTERVAL 290 DAY), DATE_SUB(CURDATE(), INTERVAL 170 DAY), DATE_SUB(NOW(), INTERVAL 320 DAY), DATE_SUB(NOW(), INTERVAL 290 DAY), 'COMPLETED'),
 ('HK3-2025-2026', 'Học kỳ hè năm 2025-2026', DATE_SUB(CURDATE(), INTERVAL 160 DAY), DATE_SUB(CURDATE(), INTERVAL 140 DAY), DATE_SUB(NOW(), INTERVAL 180 DAY), DATE_SUB(NOW(), INTERVAL 160 DAY), 'COMPLETED'),
@@ -106,7 +94,7 @@ INSERT INTO semesters (semester_code, semester_name, start_date, end_date, regis
 -- ------------------------------------------------------------
 -- LỚP HỌC PHẦN
 -- ------------------------------------------------------------
-INSERT INTO course_sections (section_code, course_id, semester_id, lecturer_id, capacity, schedule, status) VALUES
+INSERT IGNORE INTO course_sections (section_code, course_id, semester_id, lecturer_id, capacity, schedule, status) VALUES
 ('INT2204-01', (SELECT id FROM courses WHERE course_code='INT2204'), (SELECT id FROM semesters WHERE semester_code='HK1-2025-2026'), (SELECT id FROM lecturers WHERE lecturer_code='GV001'), 40, 'Thứ 2, 07:30 - 09:30, Phòng A2-301', 'COMPLETED'),
 ('INT3306-01', (SELECT id FROM courses WHERE course_code='INT3306'), (SELECT id FROM semesters WHERE semester_code='HK1-2025-2026'), (SELECT id FROM lecturers WHERE lecturer_code='GV002'), 40, 'Thứ 4, 09:00 - 11:00, Phòng B1-205', 'COMPLETED'),
 ('INT3401-01', (SELECT id FROM courses WHERE course_code='INT3401'), (SELECT id FROM semesters WHERE semester_code='HK1-2025-2026'), (SELECT id FROM lecturers WHERE lecturer_code='GV003'), 35, 'Thứ 3, 13:00 - 15:00, Phòng A1-102', 'COMPLETED'),
@@ -142,7 +130,7 @@ INSERT INTO course_sections (section_code, course_id, semester_id, lecturer_id, 
 -- ------------------------------------------------------------
 -- ĐĂNG KÝ HỌC PHẦN
 -- ------------------------------------------------------------
-INSERT INTO enrollments (student_id, section_id, status, registered_at, withdrawn_at) VALUES
+INSERT IGNORE INTO enrollments (student_id, section_id, status, registered_at, withdrawn_at) VALUES
 ((SELECT id FROM students WHERE student_code='SV001'), (SELECT id FROM course_sections WHERE section_code='INT2204-01'), 'ENROLLED', DATE_SUB(NOW(), INTERVAL 430 DAY), NULL),
 ((SELECT id FROM students WHERE student_code='SV001'), (SELECT id FROM course_sections WHERE section_code='INT3306-01'), 'ENROLLED', DATE_SUB(NOW(), INTERVAL 430 DAY), NULL),
 ((SELECT id FROM students WHERE student_code='SV002'), (SELECT id FROM course_sections WHERE section_code='INT2204-01'), 'ENROLLED', DATE_SUB(NOW(), INTERVAL 429 DAY), NULL),
@@ -209,7 +197,7 @@ INSERT INTO enrollments (student_id, section_id, status, registered_at, withdraw
 -- ------------------------------------------------------------
 -- ĐIỂM SỐ
 -- ------------------------------------------------------------
-INSERT INTO grades (enrollment_id, component_score, final_score, updated_by, updated_at) VALUES
+INSERT IGNORE INTO grades (enrollment_id, component_score, final_score, updated_by, updated_at) VALUES
 ((SELECT e.id FROM enrollments e JOIN students s ON e.student_id=s.id JOIN course_sections cs ON e.section_id=cs.id WHERE s.student_code='SV001' AND cs.section_code='INT2204-01'), 8.00, 8.50, 'lecturer', DATE_SUB(NOW(), INTERVAL 310 DAY)),
 ((SELECT e.id FROM enrollments e JOIN students s ON e.student_id=s.id JOIN course_sections cs ON e.section_id=cs.id WHERE s.student_code='SV001' AND cs.section_code='INT3306-01'), 9.00, 9.20, 'lecturer2', DATE_SUB(NOW(), INTERVAL 310 DAY)),
 ((SELECT e.id FROM enrollments e JOIN students s ON e.student_id=s.id JOIN course_sections cs ON e.section_id=cs.id WHERE s.student_code='SV002' AND cs.section_code='INT2204-01'), 7.50, 8.00, 'lecturer', DATE_SUB(NOW(), INTERVAL 310 DAY)),
@@ -259,50 +247,43 @@ INSERT INTO grades (enrollment_id, component_score, final_score, updated_by, upd
 -- ------------------------------------------------------------
 -- SỔ ĐIỂM (GRADEBOOK)
 -- ------------------------------------------------------------
-INSERT INTO gradebooks (section_id, status, locked_at, locked_by) VALUES
-((SELECT id FROM course_sections WHERE section_code='INT2204-01'), 'LOCKED', DATE_SUB(NOW(), INTERVAL 295 DAY), 'admin'),
-((SELECT id FROM course_sections WHERE section_code='INT3306-01'), 'LOCKED', DATE_SUB(NOW(), INTERVAL 295 DAY), 'admin'),
-((SELECT id FROM course_sections WHERE section_code='INT3401-01'), 'LOCKED', DATE_SUB(NOW(), INTERVAL 295 DAY), 'admin'),
-((SELECT id FROM course_sections WHERE section_code='MAT1013-01'), 'LOCKED', DATE_SUB(NOW(), INTERVAL 295 DAY), 'admin'),
-((SELECT id FROM course_sections WHERE section_code='INT3102-01'), 'LOCKED', DATE_SUB(NOW(), INTERVAL 295 DAY), 'admin'),
-((SELECT id FROM course_sections WHERE section_code='INT3305-01'), 'LOCKED', DATE_SUB(NOW(), INTERVAL 295 DAY), 'admin'),
-((SELECT id FROM course_sections WHERE section_code='INT2204-02'), 'LOCKED', DATE_SUB(NOW(), INTERVAL 160 DAY), 'admin'),
-((SELECT id FROM course_sections WHERE section_code='INT3306-02'), 'LOCKED', DATE_SUB(NOW(), INTERVAL 160 DAY), 'admin'),
-((SELECT id FROM course_sections WHERE section_code='INT3507-01'), 'LOCKED', DATE_SUB(NOW(), INTERVAL 160 DAY), 'admin'),
-((SELECT id FROM course_sections WHERE section_code='INT3405-01'), 'LOCKED', DATE_SUB(NOW(), INTERVAL 160 DAY), 'admin'),
-((SELECT id FROM course_sections WHERE section_code='INT3202-01'), 'LOCKED', DATE_SUB(NOW(), INTERVAL 160 DAY), 'admin'),
-((SELECT id FROM course_sections WHERE section_code='INT3303-01'), 'LOCKED', DATE_SUB(NOW(), INTERVAL 135 DAY), 'admin'),
-((SELECT id FROM course_sections WHERE section_code='INT3304-01'), 'LOCKED', DATE_SUB(NOW(), INTERVAL 135 DAY), 'admin'),
-((SELECT id FROM course_sections WHERE section_code='INT2204-03'), 'OPEN', NULL, NULL),
-((SELECT id FROM course_sections WHERE section_code='INT3306-03'), 'OPEN', NULL, NULL),
-((SELECT id FROM course_sections WHERE section_code='INT3401-02'), 'OPEN', NULL, NULL),
-((SELECT id FROM course_sections WHERE section_code='INT3507-02'), 'OPEN', NULL, NULL),
-((SELECT id FROM course_sections WHERE section_code='MAT1013-02'), 'OPEN', NULL, NULL),
-((SELECT id FROM course_sections WHERE section_code='INT3102-02'), 'OPEN', NULL, NULL),
-((SELECT id FROM course_sections WHERE section_code='INT3405-02'), 'OPEN', NULL, NULL),
-((SELECT id FROM course_sections WHERE section_code='INT3301-01'), 'OPEN', NULL, NULL),
-((SELECT id FROM course_sections WHERE section_code='INT3303-02'), 'OPEN', NULL, NULL),
-((SELECT id FROM course_sections WHERE section_code='INT3304-02'), 'OPEN', NULL, NULL),
-((SELECT id FROM course_sections WHERE section_code='INT3305-02'), 'OPEN', NULL, NULL),
-((SELECT id FROM course_sections WHERE section_code='INT3501-01'), 'OPEN', NULL, NULL);
-
--- Các bảng điểm của học kỳ đã kết thúc được duyệt và công bố để sinh viên tra cứu.
-UPDATE gradebooks
-SET status = 'PUBLISHED',
-    approved_at = DATE_SUB(NOW(), INTERVAL 290 DAY),
-    approved_by = 'admin',
-    published_at = DATE_SUB(NOW(), INTERVAL 289 DAY),
-    published_by = 'admin'
-WHERE status = 'LOCKED';
+-- Các bảng điểm của học kỳ đã kết thúc được tạo trực tiếp ở trạng thái PUBLISHED
+-- để script có thể chạy lại mà không cần UPDATE đè lên trạng thái hiện có.
+INSERT IGNORE INTO gradebooks (section_id, status, locked_at, locked_by, approved_at, approved_by, published_at, published_by) VALUES
+((SELECT id FROM course_sections WHERE section_code='INT2204-01'), 'PUBLISHED', DATE_SUB(NOW(), INTERVAL 295 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 290 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 289 DAY), 'admin'),
+((SELECT id FROM course_sections WHERE section_code='INT3306-01'), 'PUBLISHED', DATE_SUB(NOW(), INTERVAL 295 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 290 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 289 DAY), 'admin'),
+((SELECT id FROM course_sections WHERE section_code='INT3401-01'), 'PUBLISHED', DATE_SUB(NOW(), INTERVAL 295 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 290 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 289 DAY), 'admin'),
+((SELECT id FROM course_sections WHERE section_code='MAT1013-01'), 'PUBLISHED', DATE_SUB(NOW(), INTERVAL 295 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 290 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 289 DAY), 'admin'),
+((SELECT id FROM course_sections WHERE section_code='INT3102-01'), 'PUBLISHED', DATE_SUB(NOW(), INTERVAL 295 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 290 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 289 DAY), 'admin'),
+((SELECT id FROM course_sections WHERE section_code='INT3305-01'), 'PUBLISHED', DATE_SUB(NOW(), INTERVAL 295 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 290 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 289 DAY), 'admin'),
+((SELECT id FROM course_sections WHERE section_code='INT2204-02'), 'PUBLISHED', DATE_SUB(NOW(), INTERVAL 160 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 155 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 154 DAY), 'admin'),
+((SELECT id FROM course_sections WHERE section_code='INT3306-02'), 'PUBLISHED', DATE_SUB(NOW(), INTERVAL 160 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 155 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 154 DAY), 'admin'),
+((SELECT id FROM course_sections WHERE section_code='INT3507-01'), 'PUBLISHED', DATE_SUB(NOW(), INTERVAL 160 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 155 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 154 DAY), 'admin'),
+((SELECT id FROM course_sections WHERE section_code='INT3405-01'), 'PUBLISHED', DATE_SUB(NOW(), INTERVAL 160 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 155 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 154 DAY), 'admin'),
+((SELECT id FROM course_sections WHERE section_code='INT3202-01'), 'PUBLISHED', DATE_SUB(NOW(), INTERVAL 160 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 155 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 154 DAY), 'admin'),
+((SELECT id FROM course_sections WHERE section_code='INT3303-01'), 'PUBLISHED', DATE_SUB(NOW(), INTERVAL 135 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 130 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 129 DAY), 'admin'),
+((SELECT id FROM course_sections WHERE section_code='INT3304-01'), 'PUBLISHED', DATE_SUB(NOW(), INTERVAL 135 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 130 DAY), 'admin', DATE_SUB(NOW(), INTERVAL 129 DAY), 'admin'),
+((SELECT id FROM course_sections WHERE section_code='INT2204-03'), 'OPEN', NULL, NULL, NULL, NULL, NULL, NULL),
+((SELECT id FROM course_sections WHERE section_code='INT3306-03'), 'OPEN', NULL, NULL, NULL, NULL, NULL, NULL),
+((SELECT id FROM course_sections WHERE section_code='INT3401-02'), 'OPEN', NULL, NULL, NULL, NULL, NULL, NULL),
+((SELECT id FROM course_sections WHERE section_code='INT3507-02'), 'OPEN', NULL, NULL, NULL, NULL, NULL, NULL),
+((SELECT id FROM course_sections WHERE section_code='MAT1013-02'), 'OPEN', NULL, NULL, NULL, NULL, NULL, NULL),
+((SELECT id FROM course_sections WHERE section_code='INT3102-02'), 'OPEN', NULL, NULL, NULL, NULL, NULL, NULL),
+((SELECT id FROM course_sections WHERE section_code='INT3405-02'), 'OPEN', NULL, NULL, NULL, NULL, NULL, NULL),
+((SELECT id FROM course_sections WHERE section_code='INT3301-01'), 'OPEN', NULL, NULL, NULL, NULL, NULL, NULL),
+((SELECT id FROM course_sections WHERE section_code='INT3303-02'), 'OPEN', NULL, NULL, NULL, NULL, NULL, NULL),
+((SELECT id FROM course_sections WHERE section_code='INT3304-02'), 'OPEN', NULL, NULL, NULL, NULL, NULL, NULL),
+((SELECT id FROM course_sections WHERE section_code='INT3305-02'), 'OPEN', NULL, NULL, NULL, NULL, NULL, NULL),
+((SELECT id FROM course_sections WHERE section_code='INT3501-01'), 'OPEN', NULL, NULL, NULL, NULL, NULL, NULL);
 
 
--- Cấu hình thành phần điểm cho bảng điểm đã công bố (mẫu 10%/20%/70%)
+-- Cấu hình thành phần điểm cho tất cả bảng điểm (mẫu 10%/20%/70%)
 INSERT IGNORE INTO grade_components (gradebook_id, component_name, weight, max_score, component_type, display_order, is_required, created_at, updated_at)
-SELECT g.id, 'Chuyên cần', 10.00, 10.00, 'ATTENDANCE', 1, 1, NOW(), NOW() FROM gradebooks g WHERE g.status = 'PUBLISHED';
+SELECT g.id, 'Chuyên cần', 10.00, 10.00, 'ATTENDANCE', 1, 1, NOW(), NOW() FROM gradebooks g;
 INSERT IGNORE INTO grade_components (gradebook_id, component_name, weight, max_score, component_type, display_order, is_required, created_at, updated_at)
-SELECT g.id, 'Giữa kỳ', 20.00, 10.00, 'MIDTERM', 2, 1, NOW(), NOW() FROM gradebooks g WHERE g.status = 'PUBLISHED';
+SELECT g.id, 'Giữa kỳ', 20.00, 10.00, 'MIDTERM', 2, 1, NOW(), NOW() FROM gradebooks g;
 INSERT IGNORE INTO grade_components (gradebook_id, component_name, weight, max_score, component_type, display_order, is_required, created_at, updated_at)
-SELECT g.id, 'Cuối kỳ', 70.00, 10.00, 'FINAL', 3, 1, NOW(), NOW() FROM gradebooks g WHERE g.status = 'PUBLISHED';
+SELECT g.id, 'Cuối kỳ', 70.00, 10.00, 'FINAL', 3, 1, NOW(), NOW() FROM gradebooks g;
 
 -- Điểm thành phần mẫu cho sinh viên đang học ở lớp công bố
 INSERT IGNORE INTO grade_component_scores (grade_component_id, enrollment_id, score, updated_by, updated_at)
@@ -312,7 +293,8 @@ SELECT gc.id, e.id,
 FROM grade_components gc
 JOIN gradebooks g ON gc.gradebook_id = g.id
 JOIN enrollments e ON e.section_id = g.section_id
-WHERE g.status = 'PUBLISHED' AND e.status = 'ENROLLED' AND gc.component_name = 'Chuyên cần';
+WHERE g.status = 'PUBLISHED' AND e.status = 'ENROLLED' AND gc.component_name = 'Chuyên cần'
+  AND g.section_id IN (SELECT id FROM course_sections WHERE section_code IN ('INT2204-01','INT3306-01','INT3401-01','MAT1013-01','INT3102-01','INT3305-01','INT2204-02','INT3306-02','INT3507-01','INT3405-01','INT3202-01','INT3303-01','INT3304-01'));
 
 INSERT IGNORE INTO grade_component_scores (grade_component_id, enrollment_id, score, updated_by, updated_at)
 SELECT gc.id, e.id,
@@ -321,7 +303,8 @@ SELECT gc.id, e.id,
 FROM grade_components gc
 JOIN gradebooks g ON gc.gradebook_id = g.id
 JOIN enrollments e ON e.section_id = g.section_id
-WHERE g.status = 'PUBLISHED' AND e.status = 'ENROLLED' AND gc.component_name = 'Giữa kỳ';
+WHERE g.status = 'PUBLISHED' AND e.status = 'ENROLLED' AND gc.component_name = 'Giữa kỳ'
+  AND g.section_id IN (SELECT id FROM course_sections WHERE section_code IN ('INT2204-01','INT3306-01','INT3401-01','MAT1013-01','INT3102-01','INT3305-01','INT2204-02','INT3306-02','INT3507-01','INT3405-01','INT3202-01','INT3303-01','INT3304-01'));
 
 INSERT IGNORE INTO grade_component_scores (grade_component_id, enrollment_id, score, updated_by, updated_at)
 SELECT gc.id, e.id,
@@ -330,29 +313,11 @@ SELECT gc.id, e.id,
 FROM grade_components gc
 JOIN gradebooks g ON gc.gradebook_id = g.id
 JOIN enrollments e ON e.section_id = g.section_id
-WHERE g.status = 'PUBLISHED' AND e.status = 'ENROLLED' AND gc.component_name = 'Cuối kỳ';
+WHERE g.status = 'PUBLISHED' AND e.status = 'ENROLLED' AND gc.component_name = 'Cuối kỳ'
+  AND g.section_id IN (SELECT id FROM course_sections WHERE section_code IN ('INT2204-01','INT3306-01','INT3401-01','MAT1013-01','INT3102-01','INT3305-01','INT2204-02','INT3306-02','INT3507-01','INT3405-01','INT3202-01','INT3303-01','INT3304-01'));
 
--- Cập nhật điểm tổng kết theo trọng số (thang 10)
-UPDATE grades gr
-JOIN enrollments e ON gr.enrollment_id = e.id
-JOIN gradebooks g ON e.section_id = g.section_id
-JOIN (
-  SELECT e2.id AS enrollment_id,
-         SUM(CASE WHEN gc.max_score = 0 THEN 0 ELSE gcs.score * gc.weight / gc.max_score / 100.0 END) * 10 AS calc_final,
-         SUM(CASE WHEN gc.max_score = 0 THEN 0 ELSE gcs.score * gc.weight / gc.max_score / 100.0 END) * 10 AS calc_comp
-  FROM enrollments e2
-  JOIN gradebooks g2 ON e2.section_id = g2.section_id
-  JOIN grade_components gc ON gc.gradebook_id = g2.id
-  JOIN grade_component_scores gcs ON gcs.grade_component_id = gc.id AND gcs.enrollment_id = e2.id
-  WHERE g2.status = 'PUBLISHED' AND e2.status = 'ENROLLED'
-  GROUP BY e2.id
-  HAVING COUNT(DISTINCT gc.id) = 3
-) calc ON calc.enrollment_id = e.id
-SET gr.component_score = ROUND(calc.calc_comp, 2),
-    gr.final_score = ROUND(calc.calc_final, 2),
-    gr.updated_by = 'system',
-    gr.updated_at = NOW()
-WHERE g.status = 'PUBLISHED';
+-- Không tính lại/ghi đè điểm đã có ở đây: điểm do giảng viên nhập phải được giữ nguyên
+-- sau mỗi lần Backend khởi động.
 
 
 -- ------------------------------------------------------------
@@ -372,14 +337,14 @@ CREATE TABLE IF NOT EXISTS notifications (
     CONSTRAINT fk_notification_sender FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
-INSERT INTO notifications (title, content, type, recipient_id, sender_id, target_role, is_read, created_at)
+INSERT IGNORE INTO notifications (title, content, type, recipient_id, sender_id, target_role, is_read, created_at)
 SELECT 'Chào mừng đến với Hệ thống Thông tin Sinh viên', 'Chào mừng bạn đến với cổng thông tin đào tạo trực tuyến.', 'SYSTEM', NULL, 1, NULL, FALSE, NOW()
 WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE title = 'Chào mừng đến với Hệ thống Thông tin Sinh viên');
 
-INSERT INTO notifications (title, content, type, recipient_id, sender_id, target_role, is_read, created_at)
+INSERT IGNORE INTO notifications (title, content, type, recipient_id, sender_id, target_role, is_read, created_at)
 SELECT 'Thông báo đăng ký học phần Học kỳ 1', 'Cổng đăng ký học phần cho học kỳ mới sẽ mở từ ngày 15/08.', 'ACADEMIC', NULL, 1, 'STUDENT', FALSE, NOW()
 WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE title = 'Thông báo đăng ký học phần Học kỳ 1');
 
-INSERT INTO notifications (title, content, type, recipient_id, sender_id, target_role, is_read, created_at)
+INSERT IGNORE INTO notifications (title, content, type, recipient_id, sender_id, target_role, is_read, created_at)
 SELECT 'Nhắc nhở nộp bảng điểm', 'Kính gửi quý thầy cô, vui lòng hoàn tất nhập điểm trước ngày kết thúc học kỳ.', 'ACADEMIC', NULL, 1, 'LECTURER', FALSE, NOW()
 WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE title = 'Nhắc nhở nộp bảng điểm');

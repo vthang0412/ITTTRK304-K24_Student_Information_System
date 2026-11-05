@@ -7,7 +7,7 @@ import { notificationApi } from '../api';
 import {
   AwardIcon, BellIcon, BookIcon, CalendarIcon, ChevronRightIcon,
   ClipboardIcon, DashboardIcon, LayersIcon, LogoutIcon, MenuIcon, PanelIcon,
-  StudentsIcon, UserIcon, UsersIcon,
+  StudentsIcon, SupportIcon, UserIcon, UsersIcon,
 } from './Icons';
 
 const MENUS = {
@@ -16,7 +16,9 @@ const MENUS = {
     { label: 'Hồ sơ cá nhân', to: '/student/profile', icon: UserIcon },
     { label: 'Đăng ký học phần', to: '/student/courses', icon: BookIcon },
     { label: 'Học phần đã đăng ký', to: '/student/enrollments', icon: ClipboardIcon },
+    { label: 'Thời khóa biểu', to: '/student/timetable', icon: CalendarIcon },
     { label: 'Kết quả học tập', to: '/student/grades', icon: AwardIcon },
+    { label: 'Phản ánh & Ticket', to: '/student/feedbacks', icon: SupportIcon },
     { label: 'Thông báo', to: '/student/notifications', icon: BellIcon },
   ],
   LECTURER: [
@@ -24,6 +26,7 @@ const MENUS = {
     { label: 'Hồ sơ cá nhân', to: '/lecturer/profile', icon: UserIcon },
     { label: 'Lớp học phần', to: '/lecturer/sections', icon: LayersIcon },
     { label: 'Nhập điểm', to: '/lecturer/grades', icon: ClipboardIcon },
+    { label: 'Ticket được giao', to: '/lecturer/feedbacks', icon: SupportIcon },
     { label: 'Thông báo', to: '/lecturer/notifications', icon: BellIcon },
   ],
   ADMIN: [
@@ -35,6 +38,7 @@ const MENUS = {
     { label: 'Học kỳ', to: '/admin/semesters', icon: CalendarIcon },
     { label: 'Lớp học phần', to: '/admin/sections', icon: LayersIcon },
     { label: 'Bảng điểm', to: '/admin/gradebooks', icon: AwardIcon },
+    { label: 'Phản ánh & Ticket', to: '/admin/feedbacks', icon: SupportIcon },
     { label: 'Thông báo', to: '/admin/notifications', icon: BellIcon },
   ],
 };
@@ -43,11 +47,14 @@ const TITLES = {
   '/student/profile': 'Hồ sơ cá nhân',
   '/student/courses': 'Đăng ký học phần',
   '/student/enrollments': 'Học phần đã đăng ký',
+  '/student/timetable': 'Thời khóa biểu',
   '/student/grades': 'Kết quả học tập',
+  '/student/feedbacks': 'Phản ánh & Ticket',
   '/student/notifications': 'Thông báo',
   '/lecturer/profile': 'Hồ sơ cá nhân',
   '/lecturer/sections': 'Lớp học phần',
   '/lecturer/grades': 'Nhập điểm',
+  '/lecturer/feedbacks': 'Ticket được giao',
   '/lecturer/notifications': 'Thông báo',
   '/admin/profile': 'Hồ sơ cá nhân',
   '/admin/students': 'Quản lý sinh viên',
@@ -57,6 +64,7 @@ const TITLES = {
   '/admin/sections': 'Quản lý lớp học phần',
   '/admin/gradebooks': 'Quản lý bảng điểm',
   '/admin/gradebook-config': 'Cấu hình thành phần điểm',
+  '/admin/feedbacks': 'Quản lý phản ánh',
   '/admin/notifications': 'Quản lý thông báo',
 };
 
@@ -308,7 +316,7 @@ const Layout = ({ children }) => {
             <button
               className="icon-btn"
               aria-label="Thông báo"
-              onClick={() => navigate(user?.role === 'ADMIN' ? '/admin/notifications' : '/student/notifications')}
+              onClick={() => navigate(user?.role === 'ADMIN' ? '/admin/notifications' : user?.role === 'LECTURER' ? '/lecturer/notifications' : '/student/notifications')}
               style={{ position: 'relative' }}
             >
               <BellIcon />

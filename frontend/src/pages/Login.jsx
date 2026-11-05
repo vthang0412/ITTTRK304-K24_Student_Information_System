@@ -14,6 +14,10 @@ const DEMO = [
   { role: 'Sinh viên', username: 'student', password: '123456' },
 ];
 
+// Demo credentials are only rendered by the Vite dev server.
+// Production builds (import.meta.env.PROD) never expose them in the UI.
+const SHOW_DEMO_ACCOUNTS = import.meta.env.DEV;
+
 const Login = () => {
   const [form, setForm] = useState({ username: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
@@ -42,7 +46,11 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!form.username.trim() || !form.password) {
+
+    const rawUsername = form.username;
+    const rawPassword = form.password;
+
+    if (!rawUsername || !rawPassword) {
       setError('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.');
       toast.showAuthModal({
         icon: 'error',
@@ -52,9 +60,32 @@ const Login = () => {
       });
       return;
     }
+
+    if (/\s/.test(rawUsername)) {
+      setError('Tên đăng nhập không được chứa khoảng trắng.');
+      toast.showAuthModal({
+        icon: 'error',
+        title: 'Thông tin đăng nhập chưa hợp lệ',
+        message: 'Tên đăng nhập không được chứa khoảng trắng.',
+        duration: 2200,
+      });
+      return;
+    }
+
+    if (rawPassword.startsWith(' ') || rawPassword.endsWith(' ')) {
+      setError('Mật khẩu không được chứa khoảng trắng ở đầu hoặc cuối.');
+      toast.showAuthModal({
+        icon: 'error',
+        title: 'Thông tin đăng nhập chưa hợp lệ',
+        message: 'Mật khẩu không được chứa khoảng trắng ở đầu hoặc cuối.',
+        duration: 2200,
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await authApi.login({ username: form.username.trim(), password: form.password });
+      const res = await authApi.login({ username: rawUsername, password: rawPassword });
       setSkipAutoRedirect(true);
       login(res.data);
       toast.showAuthModal({
@@ -151,23 +182,25 @@ const Login = () => {
         </button>
       </form>
 
-      <div style={{ marginTop: 18, padding: 12, border: '1px dashed var(--border-strong)', borderRadius: 10, background: 'var(--surface-2)' }}>
-        <div className="small" style={{ fontWeight: 600, marginBottom: 8 }}>Tài khoản demo</div>
-        <div style={{ display: 'grid', gap: 6 }}>
-          {DEMO.map((d) => (
-            <button
-              key={d.username}
-              type="button"
-              onClick={() => fillDemo(d)}
-              className="flex-between"
-              style={{ border: 'none', background: 'none', padding: '2px 0', textAlign: 'left' }}
-            >
-              <span className="small muted">{d.role}</span>
-              <span className="chip" style={{ fontSize: 11 }}>{d.username} / {d.password}</span>
-            </button>
-          ))}
+      {SHOW_DEMO_ACCOUNTS && (
+        <div style={{ marginTop: 18, padding: 12, border: '1px dashed var(--border-strong)', borderRadius: 10, background: 'var(--surface-2)' }}>
+          <div className="small" style={{ fontWeight: 600, marginBottom: 8 }}>Tài khoản demo</div>
+          <div style={{ display: 'grid', gap: 6 }}>
+            {DEMO.map((d) => (
+              <button
+                key={d.username}
+                type="button"
+                onClick={() => fillDemo(d)}
+                className="flex-between"
+                style={{ border: 'none', background: 'none', padding: '2px 0', textAlign: 'left' }}
+              >
+                <span className="small muted">{d.role}</span>
+                <span className="chip" style={{ fontSize: 11 }}>{d.username} / {d.password}</span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="auth-foot">
         Tài khoản người dùng được cấp bởi quản trị viên.

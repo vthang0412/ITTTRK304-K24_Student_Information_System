@@ -1,0 +1,14 @@
+.git
+.gitignore
+.gradle
+build
+out
+bin
+uploads
+*.log
+.idea
+.vscode
+README.md
+postman_test_payloads.json
+Student_Information_System_Postman_Collection.json
+debug_avatar_check.js

@@ -1,0 +1,63 @@
+# ---------- Secrets / environment ----------
+.env
+.env.*
+!.env.example
+*.local
+
+# ---------- Node / frontend ----------
+node_modules/
+dist/
+dist-ssr/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ---------- Java / Gradle / Maven ----------
+.gradle/
+**/build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+**/target/
+out/
+bin/
+*.class
+hs_err_pid*
+replay_pid*
+
+# ---------- Runtime data ----------
+backend/Student_Information_System/uploads/
+*.log
+
+# ---------- Frontend local env ----------
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# ---------- Debug / test artifacts (kept locally, not in Git) ----------
+backend/Student_Information_System/backend_test.log
+backend/Student_Information_System/build_compile.log
+backend/Student_Information_System/debug_avatar_check.js
+backend/Student_Information_System/postman_test_payloads.json
+backend/Student_Information_System/Student_Information_System_Postman_Collection.json
+
+# ---------- Deployment runtime state (created on the VPS) ----------
+deploy/.current_tag
+deploy/.previous_tag
+deploy/.images.env
+deploy/backups/
+
+# ---------- IDE / OS ----------
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+Thumbs.db
+
+# ---------- Temporary ----------
+*.tmp
+*.swp
+*.swo
