@@ -49,11 +49,11 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/login", "/api/auth/forgot-password", "/swagger-ui/**",
+                        .requestMatchers("/api/auth/login", "/api/auth/forgot-password", "/api/auth/logout", "/swagger-ui/**",
                                 "/swagger-ui.html", "/v3/api-docs", "/v3/api-docs/**", "/uploads/**",
                                 "/actuator/health", "/actuator/health/**")
                         .permitAll()
-                        .requestMatchers("/api/auth/register", "/api/auth/logout").hasRole("ADMIN")
+                        .requestMatchers("/api/auth/register").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

@@ -1,6 +1,5 @@
 package com.example.student_management.service.academic.impl;
 
-
 import com.example.student_management.entity.academic.*;
 import com.example.student_management.entity.auth.AccountStatus;
 import com.example.student_management.entity.auth.Student;
@@ -57,18 +56,13 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             throw new BadRequestException("Course section is not open for registration");
         }
         Semester semester = section.getSemester();
-        if (semester == null || semester.getStatus() != SemesterStatus.REGISTRATION_OPEN) {
-            throw new BadRequestException("Registration is not open for this semester");
+        if (semester != null && semester.getStatus() == SemesterStatus.COMPLETED) {
+            throw new BadRequestException("Học kỳ này đã kết thúc, không thể đăng ký học phần");
         }
         LocalDateTime now = LocalDateTime.now();
-        if (semester.getRegistrationStart() != null && now.isBefore(semester.getRegistrationStart())) {
-            throw new BadRequestException("Registration period has not started");
-        }
-        if (semester.getRegistrationEnd() != null && now.isAfter(semester.getRegistrationEnd())) {
-            throw new BadRequestException("Registration period has ended");
-        }
+        int capacity = section.getCapacity() != null ? section.getCapacity() : 40;
         long enrolledCount = enrollmentRepository.countByCourseSectionIdAndStatus(sectionId, EnrollmentStatus.ENROLLED);
-        if (enrolledCount >= section.getCapacity()) {
+        if (enrolledCount >= capacity) {
             throw new ConflictException("Course section is full");
         }
         return enrollmentRepository.findByStudentIdAndCourseSectionId(student.getId(), sectionId)
