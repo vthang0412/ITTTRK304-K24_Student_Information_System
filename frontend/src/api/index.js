@@ -81,6 +81,23 @@ export const gradebookApi = {
   updateComponents: (sectionId, components) => httpClient.put(`/api/course-sections/${sectionId}/grade-components`, { components }),
 };
 
+export const feedbackApi = {
+  getMy: () => httpClient.get('/api/feedbacks/my'),
+  getAssigned: () => httpClient.get('/api/feedbacks/assigned'),
+  getAll: (status, type) => {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (type) params.append('type', type);
+    const query = params.toString();
+    return httpClient.get(`/api/feedbacks${query ? `?${query}` : ''}`);
+  },
+  getById: (id) => httpClient.get(`/api/feedbacks/${id}`),
+  create: (data) => httpClient.post('/api/feedbacks', data),
+  assign: (id, data) => httpClient.put(`/api/feedbacks/${id}/assign`, data),
+  updateStatus: (id, data) => httpClient.put(`/api/feedbacks/${id}/status`, data),
+  addMessage: (id, data) => httpClient.post(`/api/feedbacks/${id}/messages`, data),
+};
+
 export const reportApi = {
   getDashboard: () => httpClient.get('/api/reports/dashboard'),
 };
