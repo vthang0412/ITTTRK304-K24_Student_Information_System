@@ -111,15 +111,44 @@ const loadStudent = async () => {
 
   const active = merged.filter((e) => e.status === 'ENROLLED');
   const totalCredits = active.reduce((sum, e) => sum + numberOrZero(e.courseSection?.course?.credits), 0);
-  const graded = active.filter((e) => e.grade?.finalScore !== null && e.grade?.finalScore !== undefined);
+  const graded = active.filter((e) => e.grade?.finalScore !== null && e.grade?.finalScore !== undefined && e.grade?.finalScore !== '');
+  const validScores = graded.map((e) => Number(e.grade.finalScore)).filter((n) => Number.isFinite(n));
+  const currentGpa = validScores.length ? (validScores.reduce((sum, value) => sum + value, 0) / validScores.length).toFixed(2) : null;
+  const passed = graded.filter((e) => Number(e.grade.finalScore) >= 4);
+  const failed = graded.filter((e) => Number(e.grade.finalScore) < 4);
+  const completedCredits = passed.reduce((sum, e) => sum + numberOrZero(e.courseSection?.course?.credits), 0);
+
+  const semesterMap = new Map();
+  graded.forEach((entry) => {
+    const semesterName = entry.courseSection?.semester?.semesterName || 'Chưa xác định';
+    const score = Number(entry.grade.finalScore);
+    if (!Number.isFinite(score)) return;
+    const existing = semesterMap.get(semesterName) || { total: 0, count: 0 };
+    existing.total += score;
+    existing.count += 1;
+    semesterMap.set(semesterName, existing);
+  });
+
+  const gpaTrend = Array.from(semesterMap.entries()).map(([semester, values]) => ({
+    semester,
+    gpa: Number((values.total / values.count).toFixed(2)),
+  }));
 
   return {
     enrollments: active,
     graded,
     enrolledCount: active.length,
     totalCredits,
-    averageScore: average(graded.map((e) => e.grade.finalScore)),
+    completedCredits,
+    currentGpa,
+    passedCourseCount: passed.length,
+    failedCourseCount: failed.length,
+    totalCompletedCourses: graded.length,
+    passRate: graded.length ? Math.round((passed.length / graded.length) * 100) : 0,
+    averageScore: average(validScores),
     openSections: sections.filter((s) => s.status === 'OPEN').length,
+    gpaTrend,
+    requiredCredits: null,
   };
 };
 

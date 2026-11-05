@@ -1,6 +1,9 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
+import {
+  CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart,
+  ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import {
@@ -281,89 +284,224 @@ const LecturerDashboard = ({ data }) => (
   </>
 );
 
-const StudentDashboard = ({ data }) => (
-  <>
-    <div className="stats-grid">
-      <StatCard label="Học phần đã đăng ký" value={data.enrolledCount} icon={<BookIcon />} tone="blue" />
-      <StatCard label="Tín chỉ tích luỹ" value={data.totalCredits} icon={<AwardIcon />} tone="green" />
-      <StatCard label="Điểm trung bình" value={data.averageScore || '—'} icon={<TrendingIcon />} tone="amber" />
-      <StatCard label="Lớp đang mở" value={data.openSections} icon={<LayersIcon />} tone="indigo" />
-    </div>
+const StudentDashboard = ({ data }) => {
+  const gpaTrend = Array.isArray(data?.gpaTrend) && data.gpaTrend.length > 0 ? data.gpaTrend : [];
+  const passRatioData = [
+    { name: 'Đạt', value: Number(data?.passedCourseCount || 0), color: '#16a34a' },
+    { name: 'Không đạt', value: Number(data?.failedCourseCount || 0), color: '#f97316' },
+  ].filter((item) => item.value > 0);
 
-    <div className="split">
-      <div className="card">
-        <div className="card-head">
-          <div><h2>Học phần đã đăng ký</h2><p>Lịch học và trạng thái đăng ký của bạn</p></div>
-          <Link to="/student/enrollments" className="btn btn-secondary btn-sm">Xem tất cả</Link>
-        </div>
-        {data.enrollments.length === 0 ? (
-          <EmptyState
-            title="Chưa đăng ký học phần nào"
-            description="Khám phá các lớp học phần đang mở và đăng ký ngay."
-            action={<Link to="/student/courses" className="btn btn-primary">Đăng ký học phần</Link>}
-          />
-        ) : (
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead><tr><th>Môn học</th><th>Mã lớp</th><th>Lịch học</th><th>Trạng thái</th></tr></thead>
-              <tbody>
-                {data.enrollments.slice(0, 6).map((e) => (
-                  <tr key={e.id}>
-                    <td className="cell-strong">{e.courseSection?.course?.courseName || '—'}</td>
-                    <td>{e.courseSection?.sectionCode || '—'}</td>
-                    <td className="cell-muted">{e.courseSection?.schedule || '—'}</td>
-                    <td><StatusBadge status={e.status} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+  const totalRequiredCredits = data?.requiredCredits ?? null;
+  const completeCredits = Number(data?.completedCredits || 0);
+  const totalCredits = Number(data?.totalCredits || 0);
+  const progressPercent = totalRequiredCredits ? Math.min(100, (completeCredits / totalRequiredCredits) * 100) : (totalCredits ? Math.min(100, (completeCredits / Math.max(totalCredits, 1)) * 100) : 0);
+  const missingCredits = totalRequiredCredits ? Math.max(0, totalRequiredCredits - completeCredits) : 0;
+
+  return (
+    <>
+      <div className="stats-grid">
+        <StatCard label="Học phần đã đăng ký" value={data.enrolledCount} icon={<BookIcon />} tone="blue" />
+        <StatCard label="Tín chỉ tích luỹ" value={data.totalCredits} icon={<AwardIcon />} tone="green" />
+        <StatCard label="GPA hiện tại" value={data.currentGpa ? Number(data.currentGpa).toFixed(2) : '—'} icon={<TrendingIcon />} tone="amber" />
+        <StatCard label="Lớp đang mở" value={data.openSections} icon={<LayersIcon />} tone="indigo" />
       </div>
 
-      <div className="stack">
+      <div className="stats-grid chart-stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+        <StatCard label="Môn đã hoàn thành" value={data.totalCompletedCourses} icon={<BookIcon />} tone="blue" />
+        <StatCard label="Môn đạt" value={data.passedCourseCount} icon={<AwardIcon />} tone="green" />
+        <StatCard label="Môn không đạt" value={data.failedCourseCount} icon={<TrendingIcon />} tone="amber" />
+        <StatCard label="Tỉ lệ đạt" value={data.totalCompletedCourses ? `${data.passRate}%` : '—'} icon={<LayersIcon />} tone="indigo" />
+      </div>
+
+      <div className="split" style={{ marginBottom: 18 }}>
         <div className="card">
           <div className="card-head">
-            <h2>Kết quả gần đây</h2>
-            <Link to="/student/grades" className="small" style={{ color: 'var(--blue-600)', fontWeight: 600 }}>Chi tiết</Link>
+            <div>
+              <h2>GPA theo học kỳ</h2>
+              <p>Điểm GPA được tính từ các học phần đã được công bố</p>
+            </div>
           </div>
           <div className="card-body">
-            {data.graded.length === 0 ? (
-              <p className="muted small">Chưa có điểm được cập nhật.</p>
+            {gpaTrend.length === 0 ? (
+              <EmptyState
+                title="Chưa có dữ liệu GPA"
+                description="Kết quả học tập sẽ xuất hiện sau khi nhà trường công bố điểm của học kỳ."
+              />
             ) : (
-              <div className="stack" style={{ gap: 12 }}>
-                {data.graded.slice(0, 4).map((e) => {
-                  const score = e.grade?.finalScore;
-                  const gl = gradeLabel(score);
-                  return (
-                    <div key={e.id} className="flex-between">
-                      <div style={{ minWidth: 0 }}>
-                        <div className="small" style={{ fontWeight: 600 }}>{e.courseSection?.course?.courseName || '—'}</div>
-                        <div className="small muted">{e.courseSection?.sectionCode}</div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontWeight: 700 }}>{formatScore(score)}</div>
-                        <span className={`badge badge-${gl.tone}`}>{gl.label}</span>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div style={{ height: 260 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={gpaTrend} margin={{ top: 10, right: 10, left: -18, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                    <XAxis dataKey="semester" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                    <YAxis domain={[0, 10]} tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                    <Tooltip
+                      formatter={(value) => [`${Number(value).toFixed(2)}`, 'GPA']}
+                      contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: 'var(--shadow-sm)' }}
+                    />
+                    <Line type="monotone" dataKey="gpa" stroke="#2563eb" strokeWidth={3} dot={{ r: 5, fill: '#2563eb', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
             )}
           </div>
         </div>
 
         <div className="card">
-          <div className="card-head"><h2>Lối tắt</h2></div>
-          <div className="card-body" style={{ display: 'grid', gap: 10 }}>
-            <Link to="/student/courses" className="btn btn-primary" style={{ justifyContent: 'flex-start' }}><BookIcon size={17} /> Đăng ký học phần</Link>
-            <Link to="/student/grades" className="btn btn-secondary" style={{ justifyContent: 'flex-start' }}><AwardIcon size={17} /> Kết quả học tập</Link>
-            <Link to="/student/profile" className="btn btn-secondary" style={{ justifyContent: 'flex-start' }}><UserIcon size={17} /> Hồ sơ cá nhân</Link>
+          <div className="card-head">
+            <div>
+              <h2>Tỷ lệ môn đạt và không đạt</h2>
+              <p>Đánh giá theo học phần đã có điểm</p>
+            </div>
+          </div>
+          <div className="card-body">
+            {data.totalCompletedCourses === 0 ? (
+              <EmptyState title="Chưa có điểm môn học" description="Các môn học sẽ xuất hiện sau khi có điểm công bố trên hệ thống." />
+            ) : (
+              <div className="chart-layout" style={{ gridTemplateColumns: 'minmax(0, 1.1fr) minmax(200px, 0.9fr)' }}>
+                <div style={{ height: 220 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={passRatioData.length ? passRatioData : [{ name: 'Không có dữ liệu', value: 1, color: '#e2e8f0' }]} dataKey="value" nameKey="name" innerRadius={52} outerRadius={82} paddingAngle={3}>
+                        {(passRatioData.length ? passRatioData : [{ name: 'Không có dữ liệu', value: 1, color: '#e2e8f0' }]).map((entry) => (
+                          <Cell key={entry.name} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => [`${value}`, 'Số môn']} contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="chart-legend">
+                  {(passRatioData.length ? passRatioData : [{ name: 'Không có dữ liệu', value: 0, color: '#e2e8f0' }]).map((item) => (
+                    <div key={item.name} className="chart-legend-item">
+                      <span className="chart-dot" style={{ background: item.color }} />
+                      <div style={{ flex: 1 }}>
+                        <span>{item.name}</span>
+                      </div>
+                      <strong>{item.value}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
-    </div>
-  </>
-);
+
+      <div className="split">
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <h2>Tín chỉ tích lũy</h2>
+              <p>Tiến độ hoàn thành theo chương trình học</p>
+            </div>
+          </div>
+          <div className="card-body">
+            <div style={{ display: 'grid', gap: 18 }}>
+              <div className="flex-between">
+                <span className="small muted">Đã tích lũy</span>
+                <strong>{completeCredits} / {totalRequiredCredits ?? totalCredits} tín chỉ</strong>
+              </div>
+              <div style={{ height: 16, background: '#eef2f7', borderRadius: 999, overflow: 'hidden' }}>
+                <div style={{ width: `${Math.max(0, Math.min(100, progressPercent))}%`, height: '100%', background: 'linear-gradient(90deg, #22c55e, #16a34a)', borderRadius: 999 }} />
+              </div>
+              <div className="flex-between small muted">
+                <span>Tiến độ hoàn thành</span>
+                <strong style={{ color: 'var(--text)' }}>{Math.round(progressPercent)}%</strong>
+              </div>
+              <div className="info-row"><span>Tín chỉ còn thiếu</span><strong>{missingCredits}</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-head">
+            <div><h2>Tổng quan kết quả học tập</h2><p>Những chỉ số quan trọng nhất của bạn</p></div>
+          </div>
+          <div className="card-body" style={{ display: 'grid', gap: 12 }}>
+            <div className="info-row"><span>GPA hiện tại</span><strong>{data.currentGpa ? Number(data.currentGpa).toFixed(2) : '—'}</strong></div>
+            <div className="info-row"><span>Tổng số tín chỉ tích lũy</span><strong>{data.totalCredits}</strong></div>
+            <div className="info-row"><span>Tổng số môn đã hoàn thành</span><strong>{data.totalCompletedCourses}</strong></div>
+            <div className="info-row"><span>Số môn chưa đạt</span><strong>{data.failedCourseCount}</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <div className="split" style={{ marginTop: 18 }}>
+        <div className="card">
+          <div className="card-head">
+            <div><h2>Học phần đã đăng ký</h2><p>Lịch học và trạng thái đăng ký của bạn</p></div>
+            <Link to="/student/enrollments" className="btn btn-secondary btn-sm">Xem tất cả</Link>
+          </div>
+          {data.enrollments.length === 0 ? (
+            <EmptyState
+              title="Chưa đăng ký học phần nào"
+              description="Khám phá các lớp học phần đang mở và đăng ký ngay."
+              action={<Link to="/student/courses" className="btn btn-primary">Đăng ký học phần</Link>}
+            />
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead><tr><th>Môn học</th><th>Mã lớp</th><th>Lịch học</th><th>Trạng thái</th></tr></thead>
+                <tbody>
+                  {data.enrollments.slice(0, 6).map((e) => (
+                    <tr key={e.id}>
+                      <td className="cell-strong">{e.courseSection?.course?.courseName || '—'}</td>
+                      <td>{e.courseSection?.sectionCode || '—'}</td>
+                      <td className="cell-muted">{e.courseSection?.schedule || '—'}</td>
+                      <td><StatusBadge status={e.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="stack">
+          <div className="card">
+            <div className="card-head">
+              <h2>Kết quả gần đây</h2>
+              <Link to="/student/grades" className="small" style={{ color: 'var(--blue-600)', fontWeight: 600 }}>Chi tiết</Link>
+            </div>
+            <div className="card-body">
+              {data.graded.length === 0 ? (
+                <p className="muted small">Chưa có điểm được cập nhật.</p>
+              ) : (
+                <div className="stack" style={{ gap: 12 }}>
+                  {data.graded.slice(0, 4).map((e) => {
+                    const score = e.grade?.finalScore;
+                    const gl = gradeLabel(score);
+                    return (
+                      <div key={e.id} className="flex-between">
+                        <div style={{ minWidth: 0 }}>
+                          <div className="small" style={{ fontWeight: 600 }}>{e.courseSection?.course?.courseName || '—'}</div>
+                          <div className="small muted">{e.courseSection?.sectionCode}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontWeight: 700 }}>{formatScore(score)}</div>
+                          <span className={`badge badge-${gl.tone}`}>{gl.label}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-head"><h2>Lối tắt</h2></div>
+            <div className="card-body" style={{ display: 'grid', gap: 10 }}>
+              <Link to="/student/courses" className="btn btn-primary" style={{ justifyContent: 'flex-start' }}><BookIcon size={17} /> Đăng ký học phần</Link>
+              <Link to="/student/timetable" className="btn btn-secondary" style={{ justifyContent: 'flex-start' }}><CalendarIcon size={17} /> Thời khóa biểu</Link>
+              <Link to="/student/grades" className="btn btn-secondary" style={{ justifyContent: 'flex-start' }}><AwardIcon size={17} /> Kết quả học tập</Link>
+              <Link to="/student/profile" className="btn btn-secondary" style={{ justifyContent: 'flex-start' }}><UserIcon size={17} /> Hồ sơ cá nhân</Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
 
 export default Dashboard;

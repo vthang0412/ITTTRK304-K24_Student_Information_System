@@ -13,6 +13,7 @@ import NotFound from './pages/NotFound';
 import Profile from './pages/Profile';
 import StudentCourses from './pages/student/StudentCourses';
 import StudentEnrollments from './pages/student/StudentEnrollments';
+import StudentTimetable from './pages/student/StudentTimetable';
 import StudentGrades from './pages/student/StudentGrades';
 import LecturerSections from './pages/lecturer/LecturerSections';
 import LecturerGrades from './pages/lecturer/LecturerGrades';
@@ -26,6 +27,9 @@ import AdminGradebooks from './pages/admin/AdminGradebooks';
 import AdminGradebookConfig from './pages/admin/AdminGradebookConfig';
 import AdminNotifications from './pages/admin/AdminNotifications';
 import StudentNotifications from './pages/student/StudentNotifications';
+import StudentFeedbacks from './pages/student/StudentFeedbacks';
+import LecturerFeedbacks from './pages/lecturer/LecturerFeedbacks';
+import AdminFeedbacks from './pages/admin/AdminFeedbacks';
 
 const withLayout = (element, roles) => (
   <ProtectedRoute allowedRoles={roles}>
@@ -49,13 +53,16 @@ function App() {
             <Route path="/student/profile" element={withLayout(<Profile />, ['STUDENT'])} />
             <Route path="/student/courses" element={withLayout(<StudentCourses />, ['STUDENT'])} />
             <Route path="/student/enrollments" element={withLayout(<StudentEnrollments />, ['STUDENT'])} />
+            <Route path="/student/timetable" element={withLayout(<StudentTimetable />, ['STUDENT'])} />
             <Route path="/student/grades" element={withLayout(<StudentGrades />, ['STUDENT'])} />
             <Route path="/student/notifications" element={withLayout(<StudentNotifications />, ['STUDENT'])} />
+            <Route path="/student/feedbacks" element={withLayout(<StudentFeedbacks />, ['STUDENT'])} />
 
             <Route path="/lecturer/profile" element={withLayout(<Profile />, ['LECTURER'])} />
             <Route path="/lecturer/sections" element={withLayout(<LecturerSections />, ['LECTURER'])} />
             <Route path="/lecturer/grades" element={withLayout(<LecturerGrades />, ['LECTURER'])} />
             <Route path="/lecturer/notifications" element={withLayout(<LecturerNotifications />, ['LECTURER'])} />
+            <Route path="/lecturer/feedbacks" element={withLayout(<LecturerFeedbacks />, ['LECTURER'])} />
 
             <Route path="/admin/profile" element={withLayout(<Profile />, ['ADMIN'])} />
             <Route path="/admin/students" element={withLayout(<AdminStudents />, ['ADMIN'])} />
@@ -66,6 +73,7 @@ function App() {
             <Route path="/admin/gradebooks" element={withLayout(<AdminGradebooks />, ['ADMIN'])} />
             <Route path="/admin/gradebook-config" element={withLayout(<AdminGradebookConfig />, ['ADMIN'])} />
             <Route path="/admin/notifications" element={withLayout(<AdminNotifications />, ['ADMIN'])} />
+            <Route path="/admin/feedbacks" element={withLayout(<AdminFeedbacks />, ['ADMIN'])} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>
