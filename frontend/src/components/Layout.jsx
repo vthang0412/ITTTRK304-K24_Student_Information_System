@@ -308,7 +308,7 @@ const Layout = ({ children }) => {
             <button
               className="icon-btn"
               aria-label="Thông báo"
-              onClick={() => navigate(user?.role === 'ADMIN' ? '/admin/notifications' : '/student/notifications')}
+              onClick={() => navigate(user?.role === 'ADMIN' ? '/admin/notifications' : user?.role === 'LECTURER' ? '/lecturer/notifications' : '/student/notifications')}
               style={{ position: 'relative' }}
             >
               <BellIcon />
