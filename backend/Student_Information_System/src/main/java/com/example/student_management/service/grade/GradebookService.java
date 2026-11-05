@@ -78,8 +78,7 @@ public class GradebookService {
         requireSectionAccess(section, user);
         Gradebook gradebook = getOrCreateGradebook(section);
 
-        List<GradeComponent> components = gradeComponentRepository
-                .findByGradebookIdOrderByDisplayOrderAscIdAsc(gradebook.getId());
+        List<GradeComponent> components = getComponentsOrDefaults(gradebook);
         List<Enrollment> enrollments = enrolledEnrollments(sectionId);
         Map<Long, Map<Long, BigDecimal>> scores = scoresByEnrollment(gradebook.getId());
         Map<Long, Grade> grades = gradesByEnrollment(enrollments);
@@ -119,8 +118,7 @@ public class GradebookService {
         CourseSection section = requireSection(sectionId);
         requireSectionAccess(section, user);
         Gradebook gradebook = getOrCreateGradebook(section);
-        return gradeComponentRepository.findByGradebookIdOrderByDisplayOrderAscIdAsc(gradebook.getId())
-                .stream().map(this::toComponentDto).collect(Collectors.toList());
+        return getComponentsOrDefaults(gradebook).stream().map(this::toComponentDto).collect(Collectors.toList());
     }
 
     @Transactional
@@ -194,8 +192,7 @@ public class GradebookService {
             throw new ConflictException("Gradebook is locked or not editable");
         }
 
-        List<GradeComponent> components = gradeComponentRepository
-                .findByGradebookIdOrderByDisplayOrderAscIdAsc(gradebook.getId());
+        List<GradeComponent> components = getComponentsOrDefaults(gradebook);
         Grade grade = gradeRepository.findByEnrollmentId(enrollmentId)
                 .orElseGet(() -> Grade.builder().enrollment(enrollment).build());
 
@@ -284,8 +281,7 @@ public class GradebookService {
             }
             Gradebook gradebook = gradebookOpt.get();
             Grade grade = gradeRepository.findByEnrollmentId(enrollment.getId()).orElse(null);
-            List<GradeComponent> components = gradeComponentRepository
-                    .findByGradebookIdOrderByDisplayOrderAscIdAsc(gradebook.getId());
+            List<GradeComponent> components = getComponentsOrDefaults(gradebook);
             Map<Long, BigDecimal> scores = gradeComponentScoreRepository.findByEnrollmentId(enrollment.getId())
                     .stream().collect(Collectors.toMap(s -> s.getGradeComponent().getId(), GradeComponentScore::getScore));
             CourseSection section = enrollment.getCourseSection();
@@ -424,7 +420,7 @@ public class GradebookService {
     private GradebookSummaryDto summarizeSection(CourseSection section) {
         Gradebook gradebook = getOrCreateGradebook(section);
         Progress progress = progress(gradebook);
-        int componentCount = (int) gradeComponentRepository.countByGradebookId(gradebook.getId());
+        int componentCount = getComponentsOrDefaults(gradebook).size();
         return GradebookSummaryDto.builder()
                 .gradebookId(gradebook.getId())
                 .sectionId(section.getId())
@@ -453,8 +449,7 @@ public class GradebookService {
 
     private Progress progress(Gradebook gradebook) {
         List<Enrollment> enrollments = enrolledEnrollments(gradebook.getCourseSection().getId());
-        List<GradeComponent> components = gradeComponentRepository
-                .findByGradebookIdOrderByDisplayOrderAscIdAsc(gradebook.getId());
+        List<GradeComponent> components = getComponentsOrDefaults(gradebook);
         Map<Long, Map<Long, BigDecimal>> scoreMap = scoresByEnrollment(gradebook.getId());
         Map<Long, Grade> grades = gradesByEnrollment(enrollments);
         long complete = enrollments.stream()
@@ -510,9 +505,13 @@ public class GradebookService {
             if (score == null) {
                 return null;
             }
+            BigDecimal maxScore = (component.getMaxScore() != null && component.getMaxScore().compareTo(BigDecimal.ZERO) > 0)
+                    ? component.getMaxScore()
+                    : TEN;
+            BigDecimal weight = component.getWeight() != null ? component.getWeight() : BigDecimal.ZERO;
             BigDecimal normalized = score.multiply(TEN)
-                    .divide(component.getMaxScore(), 6, RoundingMode.HALF_UP);
-            total = total.add(normalized.multiply(component.getWeight()).divide(HUNDRED, 6, RoundingMode.HALF_UP));
+                    .divide(maxScore, 6, RoundingMode.HALF_UP);
+            total = total.add(normalized.multiply(weight).divide(HUNDRED, 6, RoundingMode.HALF_UP));
         }
         return total.setScale(2, RoundingMode.HALF_UP);
     }
@@ -586,6 +585,52 @@ public class GradebookService {
                 .oldValue(oldValue == null ? null : String.valueOf(oldValue))
                 .newValue(newValue == null ? null : String.valueOf(newValue))
                 .build());
+    }
+
+    private List<GradeComponent> getComponentsOrDefaults(Gradebook gradebook) {
+        List<GradeComponent> components = gradeComponentRepository
+                .findByGradebookIdOrderByDisplayOrderAscIdAsc(gradebook.getId());
+        if (components.isEmpty()) {
+            components = createDefaultComponents(gradebook);
+        }
+        return components;
+    }
+
+    private List<GradeComponent> createDefaultComponents(Gradebook gradebook) {
+        List<GradeComponent> defaults = List.of(
+                GradeComponent.builder()
+                        .gradebook(gradebook)
+                        .componentName("Chuyên cần")
+                        .weight(new BigDecimal("10.00"))
+                        .maxScore(TEN)
+                        .componentType("ATTENDANCE")
+                        .displayOrder(1)
+                        .required(true)
+                        .build(),
+                GradeComponent.builder()
+                        .gradebook(gradebook)
+                        .componentName("Giữa kỳ")
+                        .weight(new BigDecimal("20.00"))
+                        .maxScore(TEN)
+                        .componentType("MIDTERM")
+                        .displayOrder(2)
+                        .required(true)
+                        .build(),
+                GradeComponent.builder()
+                        .gradebook(gradebook)
+                        .componentName("Cuối kỳ")
+                        .weight(new BigDecimal("70.00"))
+                        .maxScore(TEN)
+                        .componentType("FINAL")
+                        .displayOrder(3)
+                        .required(true)
+                        .build()
+        );
+        try {
+            return gradeComponentRepository.saveAll(defaults);
+        } catch (Exception e) {
+            return defaults;
+        }
     }
 
     private Gradebook getOrCreateGradebook(CourseSection section) {

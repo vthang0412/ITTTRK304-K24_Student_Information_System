@@ -10,37 +10,40 @@ import { formatScore, getErrorMessage, gradeLabel } from '../../utils/format';
 
 const PAGE_SIZE = 10;
 
+const DEFAULT_COMPONENTS = [
+  { id: 'fallback-att', componentName: 'Chuyên cần', weight: 10, maxScore: 10, componentType: 'ATTENDANCE' },
+  { id: 'fallback-mid', componentName: 'Giữa kỳ', weight: 20, maxScore: 10, componentType: 'MIDTERM' },
+  { id: 'fallback-fin', componentName: 'Cuối kỳ', weight: 70, maxScore: 10, componentType: 'FINAL' },
+];
+
 const buildDraft = (detail) => {
   const next = {};
+  const comps = (detail?.components && detail.components.length > 0) ? detail.components : DEFAULT_COMPONENTS;
   (detail?.enrollments || []).forEach((row) => {
-    if (detail.components?.length) {
-      const scores = {};
-      detail.components.forEach((component) => {
-        const value = row.componentScores?.[component.id];
-        scores[component.id] = value === null || value === undefined ? '' : String(value);
-      });
-      next[row.enrollmentId] = scores;
-    } else {
-      next[row.enrollmentId] = row.finalScore === null || row.finalScore === undefined ? '' : String(row.finalScore);
-    }
+    const scores = {};
+    comps.forEach((component) => {
+      const value = row.componentScores?.[component.id];
+      scores[component.id] = value === null || value === undefined ? '' : String(value);
+    });
+    next[row.enrollmentId] = scores;
   });
   return next;
 };
 
-const previewFinal = (detail, draftRow) => {
-  if (!detail?.components?.length || !draftRow) return null;
+const previewFinal = (components, draftRow) => {
+  if (!components?.length || !draftRow) return null;
   let sum = 0;
-  for (const component of detail.components) {
+  for (const component of components) {
     const required = component.required !== false;
     const raw = draftRow[component.id];
     if (raw === '' || raw === null || raw === undefined) {
       if (required) return null;
       continue;
     }
-    const score = Number(raw);
+    const score = Number(String(raw).replace(',', '.'));
     const max = Number(component.maxScore) || 10;
     if (Number.isNaN(score)) return null;
-    sum += (score / max) * Number(component.weight);
+    sum += ((score / max) * 10) * (Number(component.weight) / 100);
   }
   return sum;
 };
@@ -101,8 +104,9 @@ const LecturerGrades = () => {
   }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const currentSection = sections.find((s) => String(s.id) === String(selected));
-  const components = detail?.components || [];
-  const componentMode = components.length > 0;
+  const components = (detail?.components && detail.components.length > 0)
+    ? detail.components
+    : DEFAULT_COMPONENTS;
   const editable = detail?.status === 'OPEN';
   const enrollments = detail?.enrollments || [];
   const pageItems = enrollments.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -111,27 +115,17 @@ const LecturerGrades = () => {
 
   const handleChange = (enrollmentId, field, value) => {
     setDraft((prev) => {
-      const current = prev[enrollmentId];
-      if (componentMode) {
-        return { ...prev, [enrollmentId]: { ...(current || {}), [field]: value } };
-      }
-      return { ...prev, [enrollmentId]: value };
+      const current = prev[enrollmentId] || {};
+      return { ...prev, [enrollmentId]: { ...current, [field]: value } };
     });
   };
 
   const validateRow = (row) => {
-    if (!componentMode) {
-      const value = draft[row.enrollmentId];
-      if (value === '' || value === null || value === undefined) return 'Vui lòng nhập điểm trước khi lưu.';
-      const num = Number(value);
-      if (Number.isNaN(num) || num < 0 || num > 10) return 'Điểm phải nằm trong khoảng từ 0 đến 10.';
-      return '';
-    }
     const values = draft[row.enrollmentId] || {};
     for (const component of components) {
       const value = values[component.id];
       if (value === '' || value === null || value === undefined) continue;
-      const num = Number(value);
+      const num = Number(String(value).replace(',', '.'));
       const max = Number(component.maxScore) || 10;
       if (Number.isNaN(num) || num < 0 || num > max) {
         return `Điểm "${component.componentName}" phải nằm trong khoảng 0 đến ${max}.`;
@@ -153,16 +147,16 @@ const LecturerGrades = () => {
     }
     setSavingId(row.enrollmentId);
     try {
-      const values = draft[row.enrollmentId];
-      const payload = componentMode
-        ? {
-          componentScores: components.reduce((acc, component) => {
-            const value = values?.[component.id];
-            if (value !== '' && value !== null && value !== undefined) acc[component.id] = Number(value);
-            return acc;
-          }, {}),
-        }
-        : { finalScore: Number(values) };
+      const values = draft[row.enrollmentId] || {};
+      const payload = {
+        componentScores: components.reduce((acc, component) => {
+          const value = values?.[component.id];
+          if (value !== '' && value !== null && value !== undefined) {
+            acc[component.id] = Number(String(value).replace(',', '.'));
+          }
+          return acc;
+        }, {}),
+      };
       await gradeApi.updateGrade(row.enrollmentId, payload);
       const res = await gradebookApi.getSectionDetail(selected);
       setDetail(res.data);
@@ -218,15 +212,17 @@ const LecturerGrades = () => {
           <EmptyState
             icon={<AwardIcon />}
             title="Chưa chọn lớp học phần"
-            description="Vui lòng chọn một lớp học phần để xem danh sách sinh viên và nhập điểm."
+            description="Vui lòng chọn một lớp học phần ở thanh chọn phía trên để bắt đầu nhập điểm."
           />
         </div>
+      ) : loadingList ? (
+        <LoadingBlock />
       ) : (
         <div className="card">
-          {loadingList ? <LoadingBlock /> : enrollments.length === 0 ? (
+          {enrollments.length === 0 ? (
             <EmptyState
               icon={<UsersIcon />}
-              title="Chưa có sinh viên đăng ký"
+              title="Lớp chưa có sinh viên"
               description="Lớp học phần này chưa có sinh viên nào đang theo học."
             />
           ) : (
@@ -235,9 +231,7 @@ const LecturerGrades = () => {
                 <div>
                   <h2>Danh sách sinh viên</h2>
                   <p>
-                    {componentMode
-                      ? `Nhập điểm theo ${components.length} thành phần (tổng trọng số ${Number(totalWeight.toFixed(2))}%)`
-                      : 'Nhập điểm cuối kỳ trong thang điểm 0 – 10'}
+                    Nhập điểm theo {components.length} thành phần (tổng trọng số {Number(totalWeight.toFixed(2))}%)
                   </p>
                 </div>
                 <Alert tone="info" style={{ marginBottom: 0, padding: '8px 12px' }}>
@@ -256,7 +250,7 @@ const LecturerGrades = () => {
                 </div>
               )}
 
-              {componentMode && Math.abs(totalWeight - 100) > 0.001 && (
+              {Math.abs(totalWeight - 100) > 0.001 && (
                 <div style={{ padding: '0 20px 16px' }}>
                   <Alert tone="error">Tổng trọng số thành phần hiện tại là {Number(totalWeight.toFixed(2))}%, chưa bằng 100%. Vui lòng báo quản trị viên cấu hình lại.</Alert>
                 </div>
@@ -268,14 +262,14 @@ const LecturerGrades = () => {
                     <tr>
                       <th>STT</th>
                       <th>Sinh viên</th>
-                      {componentMode ? components.map((component) => (
+                      {components.map((component) => (
                         <th key={component.id}>
                           {component.componentName}
                           <div className="cell-muted" style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>
                             {component.weight}% · tối đa {formatScore(component.maxScore)}
                           </div>
                         </th>
-                      )) : <th>Điểm cuối kỳ</th>}
+                      ))}
                       <th>Điểm tổng kết</th>
                       <th>Xếp loại</th>
                       <th style={{ textAlign: 'right' }}>Thao tác</th>
@@ -284,7 +278,7 @@ const LecturerGrades = () => {
                   <tbody>
                     {pageItems.map((row, index) => {
                       const draftRow = draft[row.enrollmentId];
-                      const preview = componentMode ? previewFinal(detail, draftRow) : Number(draftRow);
+                      const preview = previewFinal(components, draftRow);
                       const finalValue = preview === null || Number.isNaN(preview) ? row.finalScore : preview;
                       const gl = gradeLabel(finalValue);
                       return (
@@ -297,7 +291,7 @@ const LecturerGrades = () => {
                               {row.complete ? <span className="badge badge-green">Đã đủ điểm</span> : <span className="badge badge-amber">Chưa đủ điểm</span>}
                             </div>
                           </td>
-                          {componentMode ? components.map((component) => (
+                          {components.map((component) => (
                             <td key={component.id}>
                               <input
                                 className="input"
@@ -312,22 +306,7 @@ const LecturerGrades = () => {
                                 disabled={!editable || savingId === row.enrollmentId}
                               />
                             </td>
-                          )) : (
-                            <td>
-                              <input
-                                className="input"
-                                type="number"
-                                min="0"
-                                max="10"
-                                step="0.01"
-                                value={draftRow ?? ''}
-                                onChange={(ev) => handleChange(row.enrollmentId, null, ev.target.value)}
-                                style={{ width: 110 }}
-                                placeholder="0.00"
-                                disabled={!editable || savingId === row.enrollmentId}
-                              />
-                            </td>
-                          )}
+                          ))}
                           <td><strong>{formatScore(finalValue)}</strong></td>
                           <td><span className={`badge badge-${gl.tone}`}>{gl.label}</span></td>
                           <td>

@@ -277,13 +277,13 @@ INSERT IGNORE INTO gradebooks (section_id, status, locked_at, locked_by, approve
 ((SELECT id FROM course_sections WHERE section_code='INT3501-01'), 'OPEN', NULL, NULL, NULL, NULL, NULL, NULL);
 
 
--- Cấu hình thành phần điểm cho bảng điểm đã công bố (mẫu 10%/20%/70%)
+-- Cấu hình thành phần điểm cho tất cả bảng điểm (mẫu 10%/20%/70%)
 INSERT IGNORE INTO grade_components (gradebook_id, component_name, weight, max_score, component_type, display_order, is_required, created_at, updated_at)
-SELECT g.id, 'Chuyên cần', 10.00, 10.00, 'ATTENDANCE', 1, 1, NOW(), NOW() FROM gradebooks g WHERE g.status = 'PUBLISHED' AND g.section_id IN (SELECT id FROM course_sections WHERE section_code IN ('INT2204-01','INT3306-01','INT3401-01','MAT1013-01','INT3102-01','INT3305-01','INT2204-02','INT3306-02','INT3507-01','INT3405-01','INT3202-01','INT3303-01','INT3304-01'));
+SELECT g.id, 'Chuyên cần', 10.00, 10.00, 'ATTENDANCE', 1, 1, NOW(), NOW() FROM gradebooks g;
 INSERT IGNORE INTO grade_components (gradebook_id, component_name, weight, max_score, component_type, display_order, is_required, created_at, updated_at)
-SELECT g.id, 'Giữa kỳ', 20.00, 10.00, 'MIDTERM', 2, 1, NOW(), NOW() FROM gradebooks g WHERE g.status = 'PUBLISHED' AND g.section_id IN (SELECT id FROM course_sections WHERE section_code IN ('INT2204-01','INT3306-01','INT3401-01','MAT1013-01','INT3102-01','INT3305-01','INT2204-02','INT3306-02','INT3507-01','INT3405-01','INT3202-01','INT3303-01','INT3304-01'));
+SELECT g.id, 'Giữa kỳ', 20.00, 10.00, 'MIDTERM', 2, 1, NOW(), NOW() FROM gradebooks g;
 INSERT IGNORE INTO grade_components (gradebook_id, component_name, weight, max_score, component_type, display_order, is_required, created_at, updated_at)
-SELECT g.id, 'Cuối kỳ', 70.00, 10.00, 'FINAL', 3, 1, NOW(), NOW() FROM gradebooks g WHERE g.status = 'PUBLISHED' AND g.section_id IN (SELECT id FROM course_sections WHERE section_code IN ('INT2204-01','INT3306-01','INT3401-01','MAT1013-01','INT3102-01','INT3305-01','INT2204-02','INT3306-02','INT3507-01','INT3405-01','INT3202-01','INT3303-01','INT3304-01'));
+SELECT g.id, 'Cuối kỳ', 70.00, 10.00, 'FINAL', 3, 1, NOW(), NOW() FROM gradebooks g;
 
 -- Điểm thành phần mẫu cho sinh viên đang học ở lớp công bố
 INSERT IGNORE INTO grade_component_scores (grade_component_id, enrollment_id, score, updated_by, updated_at)
