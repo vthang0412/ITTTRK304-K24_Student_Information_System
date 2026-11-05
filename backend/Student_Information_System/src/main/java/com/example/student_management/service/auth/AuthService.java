@@ -48,9 +48,19 @@ public class AuthService {
     private PasswordEncoder passwordEncoder;
 
     public AuthResponse login(LoginRequest request) {
+        if (request.getUsername() != null && request.getUsername().matches(".*\\s+.*")) {
+            throw new UnauthorizedException("Tên đăng nhập không được chứa khoảng trắng");
+        }
+        if (request.getEmail() != null && request.getEmail().matches(".*\\s+.*")) {
+            throw new UnauthorizedException("Email không được chứa khoảng trắng");
+        }
+        if (request.getPassword() != null && (request.getPassword().startsWith(" ") || request.getPassword().endsWith(" "))) {
+            throw new UnauthorizedException("Mật khẩu không được chứa khoảng trắng ở đầu hoặc cuối");
+        }
+
         String loginIdentifier = (request.getEmail() != null && !request.getEmail().isBlank())
-                ? request.getEmail().trim()
-                : (request.getUsername() == null ? "" : request.getUsername().trim());
+                ? request.getEmail()
+                : (request.getUsername() == null ? "" : request.getUsername());
 
         User user = userRepository.findByEmail(loginIdentifier)
                 .or(() -> userRepository.findByUsername(loginIdentifier))
@@ -94,6 +104,12 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
+        if (request.getUsername() != null && request.getUsername().matches(".*\\s+.*")) {
+            throw new BadRequestException("Tên đăng nhập không được chứa khoảng trắng");
+        }
+        if (request.getEmail() != null && request.getEmail().matches(".*\\s+.*")) {
+            throw new BadRequestException("Email không được chứa khoảng trắng");
+        }
         String username = request.getUsername() == null ? "" : request.getUsername().trim();
         String email = request.getEmail() == null ? "" : request.getEmail().trim();
         String fullName = request.getFullName() == null ? "" : request.getFullName().trim();
