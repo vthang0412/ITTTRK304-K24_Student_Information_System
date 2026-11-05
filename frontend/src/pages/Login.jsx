@@ -46,7 +46,11 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!form.username.trim() || !form.password) {
+
+    const rawUsername = form.username;
+    const rawPassword = form.password;
+
+    if (!rawUsername || !rawPassword) {
       setError('Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.');
       toast.showAuthModal({
         icon: 'error',
@@ -56,9 +60,32 @@ const Login = () => {
       });
       return;
     }
+
+    if (/\s/.test(rawUsername)) {
+      setError('Tên đăng nhập không được chứa khoảng trắng.');
+      toast.showAuthModal({
+        icon: 'error',
+        title: 'Thông tin đăng nhập chưa hợp lệ',
+        message: 'Tên đăng nhập không được chứa khoảng trắng.',
+        duration: 2200,
+      });
+      return;
+    }
+
+    if (rawPassword.startsWith(' ') || rawPassword.endsWith(' ')) {
+      setError('Mật khẩu không được chứa khoảng trắng ở đầu hoặc cuối.');
+      toast.showAuthModal({
+        icon: 'error',
+        title: 'Thông tin đăng nhập chưa hợp lệ',
+        message: 'Mật khẩu không được chứa khoảng trắng ở đầu hoặc cuối.',
+        duration: 2200,
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await authApi.login({ username: form.username.trim(), password: form.password });
+      const res = await authApi.login({ username: rawUsername, password: rawPassword });
       setSkipAutoRedirect(true);
       login(res.data);
       toast.showAuthModal({
