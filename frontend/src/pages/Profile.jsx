@@ -66,9 +66,9 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState({});
-  const [avatarDraft, setAvatarDraft] = useState(null);
   const avatarInputRef = useRef(null);
 
   const load = async () => {
@@ -208,36 +208,27 @@ const Profile = () => {
     }
   };
 
-  const handleAvatarSelect = (event) => {
+  const handleAvatarSelect = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
     if (!AVATAR_ALLOWED_TYPES.includes(file.type.toLowerCase())) {
       toast.error('Tệp không hợp lệ', 'Chỉ chấp nhận ảnh JPG, PNG hoặc WEBP.');
       event.target.value = '';
       return;
     }
+
     if (file.size > AVATAR_MAX_SIZE) {
       toast.error('Ảnh quá lớn', 'Dung lượng ảnh tối đa là 5MB.');
       event.target.value = '';
       return;
     }
 
-    const previewUrl = URL.createObjectURL(file);
-    setAvatarDraft({ file, previewUrl });
+    setUploadingAvatar(true);
     event.target.value = '';
-  };
 
-  const handleAvatarReset = () => {
-    if (avatarDraft?.previewUrl?.startsWith('blob:')) {
-      URL.revokeObjectURL(avatarDraft.previewUrl);
-    }
-    setAvatarDraft(null);
-  };
-
-  const handleAvatarSave = async () => {
-    if (!avatarDraft?.file) return;
     try {
-      const res = await authApi.uploadAvatar(avatarDraft.file);
+      const res = await authApi.uploadAvatar(file);
       const me = res.data || {};
       setProfile(me);
       updateUser({
@@ -249,21 +240,14 @@ const Profile = () => {
         department: me.department,
         role: me.role,
       });
-      handleAvatarReset();
-      toast.success('Cập nhật ảnh đại diện thành công', 'Ảnh của bạn đã được lưu và đồng bộ trên hệ thống.');
+      toast.success('Cập nhật ảnh đại diện thành công', 'Ảnh của bạn đã được lưu và đồng bộ ngay trên hệ thống.');
     } catch (err) {
       const message = err.response?.data?.message || 'Không thể cập nhật ảnh đại diện.';
       toast.error('Cập nhật ảnh thất bại', message);
+    } finally {
+      setUploadingAvatar(false);
     }
   };
-
-  useEffect(() => {
-    return () => {
-      if (avatarDraft?.previewUrl?.startsWith('blob:')) {
-        URL.revokeObjectURL(avatarDraft.previewUrl);
-      }
-    };
-  }, [avatarDraft]);
 
   return (
     <>
@@ -298,10 +282,14 @@ const Profile = () => {
               <div className="card-body">
                 <div className="profile-head">
                   <div className="profile-avatar-wrap">
-                    <div className="profile-avatar-shell">
+                    <div
+                      className="profile-avatar-shell"
+                      onClick={() => !uploadingAvatar && avatarInputRef.current?.click()}
+                      style={{ cursor: uploadingAvatar ? 'not-allowed' : 'pointer' }}
+                    >
                       <div className="avatar avatar-lg avatar-image profile-avatar">
                         <img
-                          src={avatarDraft?.previewUrl ? avatarDraft.previewUrl : avatarUrl}
+                          src={avatarUrl}
                           alt={displayName}
                           onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = DEFAULT_AVATAR; }}
                         />
@@ -311,8 +299,10 @@ const Profile = () => {
                       type="button"
                       className="profile-avatar-button"
                       onClick={() => avatarInputRef.current?.click()}
+                      disabled={uploadingAvatar}
+                      style={{ opacity: uploadingAvatar ? 0.7 : 1 }}
                     >
-                      <PencilIcon size={14} /> Đổi ảnh
+                      <PencilIcon size={14} /> {uploadingAvatar ? 'Đang tải...' : 'Đổi ảnh'}
                     </button>
                     <input
                       ref={avatarInputRef}
@@ -320,6 +310,7 @@ const Profile = () => {
                       accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
                       hidden
                       onChange={handleAvatarSelect}
+                      disabled={uploadingAvatar}
                     />
                   </div>
                   <div>
@@ -328,16 +319,6 @@ const Profile = () => {
                     <div style={{ marginTop: 8 }}><StatusBadge status={profile?.status || 'ACTIVE'} /></div>
                   </div>
                 </div>
-                {avatarDraft && (
-                  <div className="profile-avatar-actions" style={{ marginBottom: 18 }}>
-                    <button type="button" className="btn btn-primary btn-sm" onClick={handleAvatarSave}>
-                      Lưu ảnh
-                    </button>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={handleAvatarReset}>
-                      Hủy
-                    </button>
-                  </div>
-                )}
                 <div className="info-list">
                   <InfoRow label="Tên đăng nhập" value={profile?.username || user?.username} />
                   <InfoRow label="Email" value={profile?.email || user?.email} />
