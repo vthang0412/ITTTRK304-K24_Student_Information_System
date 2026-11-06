@@ -143,9 +143,9 @@ run_stack() {
   # frontend container. /actuator/health returns a real application status.
   log "Running smoke tests"
   docker compose -f "$COMPOSE_FILE" --env-file .env exec -T frontend \
-    wget -q -O /dev/null http://127.0.0.1/ || return 1
+    wget -q -O /dev/null http://127.0.0.1:8080/ || return 1
   docker compose -f "$COMPOSE_FILE" --env-file .env exec -T frontend \
-    wget -q -O /dev/null http://127.0.0.1/actuator/health || return 1
+    wget -q -O /dev/null http://127.0.0.1:8080/actuator/health || return 1
 }
 
 record_success() {
