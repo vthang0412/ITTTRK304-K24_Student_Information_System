@@ -24,6 +24,8 @@ public class StudentGradeDto {
     private String semesterName;
     private BigDecimal componentScore;
     private BigDecimal finalScore;
+    private String classification;
+    private Boolean passed;
     private List<StudentComponentScoreDto> componentScores;
     private LocalDateTime publishedAt;
 }

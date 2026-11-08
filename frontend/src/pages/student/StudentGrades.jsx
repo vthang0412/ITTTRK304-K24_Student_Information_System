@@ -51,7 +51,12 @@ const StudentGrades = () => {
       : scores.length
         ? (scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(2)
         : '—';
-    const passed = items.filter((i) => passesCourse(i.finalScore));
+    const passed = items.filter((i) => {
+      const attComp = (i.componentScores || []).find((c) =>
+        c.componentName && c.componentName.toLowerCase().includes('chuyên cần')
+      );
+      return passesCourse(i.finalScore, attComp?.score);
+    });
     const credits = passed.reduce((sum, i) => sum + Number(i.credits || 0), 0);
     return { average, credits, graded: graded.length, total: items.length };
   }, [items]);
@@ -111,7 +116,10 @@ const StudentGrades = () => {
                 </thead>
                 <tbody>
                   {pageItems.map((item) => {
-                    const gl = gradeLabel(item.finalScore);
+                    const attComp = (item.componentScores || []).find((c) =>
+                      c.componentName && c.componentName.toLowerCase().includes('chuyên cần')
+                    );
+                    const gl = gradeLabel(item.finalScore, attComp?.score);
                     return (
                       <tr key={item.enrollmentId}>
                         <td>
@@ -127,7 +135,16 @@ const StudentGrades = () => {
                             : formatScore(item.componentScore)}
                         </td>
                         <td><strong>{formatScore(item.finalScore)}</strong></td>
-                        <td><span className={`badge badge-${gl.tone}`}>{gl.label}</span></td>
+                        <td>
+                          <span className={`badge badge-${gl.tone}`} title={gl.reason || ''}>
+                            {gl.label}
+                          </span>
+                          {gl.reason && (
+                            <div className="cell-muted" style={{ fontSize: 11, color: '#dc2626', marginTop: 2, fontWeight: 500 }}>
+                              {gl.reason}
+                            </div>
+                          )}
+                        </td>
                         <td className="cell-muted">{formatDateTime(item.publishedAt)}</td>
                         <td>
                           <div className="row-actions">
@@ -185,7 +202,20 @@ const StudentGrades = () => {
             )}
             <div className="mt-16" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span className="muted">Công bố lúc: {formatDateTime(detail.publishedAt)}</span>
-              <span className="chip">Điểm tổng kết: <strong>{formatScore(detail.finalScore)}</strong></span>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span className="chip">Điểm tổng kết: <strong>{formatScore(detail.finalScore)}</strong></span>
+                {(() => {
+                  const detailAtt = (detail.componentScores || []).find((c) =>
+                    c.componentName && c.componentName.toLowerCase().includes('chuyên cần')
+                  );
+                  const detailGl = gradeLabel(detail.finalScore, detailAtt?.score);
+                  return (
+                    <span className={`badge badge-${detailGl.tone}`} title={detailGl.reason || ''}>
+                      {detailGl.label}
+                    </span>
+                  );
+                })()}
+              </div>
             </div>
           </>
         )}

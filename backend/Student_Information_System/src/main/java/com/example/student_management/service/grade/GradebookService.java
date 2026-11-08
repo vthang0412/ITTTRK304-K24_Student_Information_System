@@ -86,6 +86,8 @@ public class GradebookService {
         List<GradebookEnrollmentDto> items = enrollments.stream().map(enrollment -> {
             Map<Long, BigDecimal> componentScores = scores.getOrDefault(enrollment.getId(), Map.of());
             Grade grade = grades.get(enrollment.getId());
+            BigDecimal finalScore = grade == null ? null : grade.getFinalScore();
+            BigDecimal attScore = findAttendanceScore(components, componentScores);
             return GradebookEnrollmentDto.builder()
                     .enrollmentId(enrollment.getId())
                     .studentId(enrollment.getStudent().getId())
@@ -94,7 +96,9 @@ public class GradebookService {
                     .email(enrollment.getStudent().getEmail())
                     .componentScores(componentScores)
                     .componentScore(grade == null ? null : grade.getComponentScore())
-                    .finalScore(grade == null ? null : grade.getFinalScore())
+                    .finalScore(finalScore)
+                    .classification(calculateClassification(finalScore, attScore))
+                    .passed(calculatePassed(finalScore, attScore))
                     .complete(isComplete(components, componentScores, grade))
                     .build();
         }).collect(Collectors.toList());
@@ -286,6 +290,8 @@ public class GradebookService {
                     .stream().collect(Collectors.toMap(s -> s.getGradeComponent().getId(), GradeComponentScore::getScore));
             CourseSection section = enrollment.getCourseSection();
             Course course = section.getCourse();
+            BigDecimal finalScore = grade == null ? null : grade.getFinalScore();
+            BigDecimal attScore = findAttendanceScore(components, scores);
             result.add(StudentGradeDto.builder()
                     .gradebookId(gradebook.getId())
                     .enrollmentId(enrollment.getId())
@@ -296,7 +302,9 @@ public class GradebookService {
                     .credits(course == null ? null : course.getCredits())
                     .semesterName(section.getSemester() == null ? null : section.getSemester().getSemesterName())
                     .componentScore(grade == null ? null : grade.getComponentScore())
-                    .finalScore(grade == null ? null : grade.getFinalScore())
+                    .finalScore(finalScore)
+                    .classification(calculateClassification(finalScore, attScore))
+                    .passed(calculatePassed(finalScore, attScore))
                     .componentScores(components.stream().map(c -> StudentComponentScoreDto.builder()
                             .componentId(c.getId())
                             .componentName(c.getComponentName())
@@ -687,6 +695,46 @@ public class GradebookService {
                 .displayOrder(component.getDisplayOrder())
                 .required(component.getRequired())
                 .build();
+    }
+
+    public static final BigDecimal ATTENDANCE_MIN_SCORE = new BigDecimal("4.00");
+
+    public BigDecimal findAttendanceScore(List<GradeComponent> components, Map<Long, BigDecimal> scores) {
+        if (components == null || scores == null) return null;
+        for (GradeComponent c : components) {
+            String type = c.getComponentType();
+            String name = c.getComponentName();
+            if ("ATTENDANCE".equalsIgnoreCase(type) || (name != null && name.toLowerCase().contains("chuyên cần"))) {
+                return scores.get(c.getId());
+            }
+        }
+        return null;
+    }
+
+    public String calculateClassification(BigDecimal finalScore, BigDecimal attendanceScore) {
+        // Điểm liệt chuyên cần: nếu điểm chuyên cần dưới 4.0 điểm -> Mặc định xếp loại Kém
+        if (attendanceScore != null && attendanceScore.compareTo(ATTENDANCE_MIN_SCORE) < 0) {
+            return "Kém";
+        }
+        if (finalScore == null) {
+            return null;
+        }
+        double score = finalScore.doubleValue();
+        if (score >= 8.5) return "Xuất sắc";
+        if (score >= 7.0) return "Khá";
+        if (score >= 5.5) return "Trung bình";
+        if (score >= 4.0) return "Yếu";
+        return "Kém";
+    }
+
+    public Boolean calculatePassed(BigDecimal finalScore, BigDecimal attendanceScore) {
+        if (attendanceScore != null && attendanceScore.compareTo(ATTENDANCE_MIN_SCORE) < 0) {
+            return false;
+        }
+        if (finalScore == null) {
+            return null;
+        }
+        return finalScore.compareTo(ATTENDANCE_MIN_SCORE) >= 0;
     }
 
     private static class Progress {

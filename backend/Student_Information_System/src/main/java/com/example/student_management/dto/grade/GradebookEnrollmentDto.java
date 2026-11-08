@@ -21,5 +21,7 @@ public class GradebookEnrollmentDto {
     private Map<Long, BigDecimal> componentScores;
     private BigDecimal componentScore;
     private BigDecimal finalScore;
+    private String classification;
+    private Boolean passed;
     private boolean complete;
 }

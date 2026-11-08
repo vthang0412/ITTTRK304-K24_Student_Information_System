@@ -67,7 +67,17 @@ export const formatScore = (value) => {
   return num.toFixed(2);
 };
 
-export const gradeLabel = (score) => {
+export const ATTENDANCE_MIN_SCORE = 4.0;
+
+export const gradeLabel = (score, attendanceScore = null) => {
+  // Điểm liệt chuyên cần: nếu điểm chuyên cần đã nhập và dưới 4.0 điểm -> Mặc định xếp loại Kém
+  if (attendanceScore !== null && attendanceScore !== undefined && attendanceScore !== '') {
+    const att = Number(attendanceScore);
+    if (!Number.isNaN(att) && att < ATTENDANCE_MIN_SCORE) {
+      return { label: 'Kém', tone: 'red', reason: 'Chuyên cần < 4.0' };
+    }
+  }
+
   if (score === null || score === undefined || score === '') return { label: 'Chưa có điểm', tone: 'gray' };
   const num = Number(score);
   if (Number.isNaN(num)) return { label: 'Chưa có điểm', tone: 'gray' };
@@ -78,7 +88,13 @@ export const gradeLabel = (score) => {
   return { label: 'Kém', tone: 'red' };
 };
 
-export const passesCourse = (score) => {
+export const passesCourse = (score, attendanceScore = null) => {
+  if (attendanceScore !== null && attendanceScore !== undefined && attendanceScore !== '') {
+    const att = Number(attendanceScore);
+    if (!Number.isNaN(att) && att < ATTENDANCE_MIN_SCORE) {
+      return false;
+    }
+  }
   if (score === null || score === undefined || score === '') return false;
   return Number(score) >= 4;
 };
