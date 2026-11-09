@@ -4,6 +4,7 @@ export const authApi = {
   login: (data) => httpClient.post('/api/auth/login', data),
   register: (data) => httpClient.post('/api/auth/register', data),
   forgotPassword: (data) => httpClient.post('/api/auth/forgot-password', data),
+  resetPassword: (data) => httpClient.post('/api/auth/reset-password', data),
   logout: () => httpClient.post('/api/auth/logout'),
   me: () => httpClient.get('/api/me'),
   updateProfile: (data) => httpClient.put('/api/me', data),

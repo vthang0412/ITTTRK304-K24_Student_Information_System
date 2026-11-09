@@ -2,6 +2,15 @@ package com.example.student_management.service.auth;
 
 import com.example.student_management.dto.auth.AuthResponse;
 import com.example.student_management.dto.auth.ForgotPasswordRequest;
+import com.example.student_management.dto.auth.ForgotPasswordResponse;
+import com.example.student_management.dto.auth.ResetPasswordRequest;
+import com.example.student_management.repository.auth.PasswordResetTokenRepository;
+import com.example.student_management.service.email.EmailService;
+import org.springframework.beans.factory.annotation.Value;
+import java.util.UUID;
+import java.util.List;
+import java.util.Optional;
+
 import com.example.student_management.dto.auth.LoginRequest;
 import com.example.student_management.dto.auth.RegisterRequest;
 import com.example.student_management.entity.auth.*;
@@ -46,6 +55,21 @@ public class AuthService {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private PasswordResetTokenRepository passwordResetTokenRepository;
+
+    @Autowired
+    private EmailService emailService;
+
+    @Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
+
+    @Value("${app.security.otp.cooldown-seconds:60}")
+    private int otpCooldownSeconds;
+
+    @Value("${app.security.otp.max-requests-per-hour:5}")
+    private int otpMaxRequestsPerHour;
 
     public AuthResponse login(LoginRequest request) {
         if (request.getUsername() != null && request.getUsername().matches(".*\\s+.*")) {
@@ -236,10 +260,184 @@ public class AuthService {
         return code;
     }
 
-    public String forgotPassword(ForgotPasswordRequest request) {
-        if (!userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new BadRequestException("Email not found");
+        @Transactional
+    public ForgotPasswordResponse forgotPassword(ForgotPasswordRequest request) {
+        String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
+        if (email.isBlank()) {
+            throw new BadRequestException("Email không được để trống");
         }
-        return "Password reset link has been sent to your email (demo)";
+        if (email.matches(".*\\s+.*")) {
+            throw new BadRequestException("Email không được chứa khoảng trắng");
+        }
+
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) {
+            // Yêu cầu bảo mật: Không tiết lộ email có tồn tại trong hệ thống hay không để chống dò quét tài khoản
+            return ForgotPasswordResponse.builder()
+                    .message("Mã OTP đã được gửi đến email nếu tài khoản tồn tại trong hệ thống.")
+                    .build();
+        }
+
+        User user = userOpt.get();
+        if (user.getStatus() == AccountStatus.INACTIVE) {
+            return ForgotPasswordResponse.builder()
+                    .message("Mã OTP đã được gửi đến email nếu tài khoản tồn tại trong hệ thống.")
+                    .build();
+        }
+
+        // 1. Chống Spam / Rate limiting: Giới hạn Cooldown giữa các lần gửi
+        if (otpCooldownSeconds > 0) {
+            Optional<PasswordResetToken> lastTokenOpt = passwordResetTokenRepository
+                    .findFirstByUserIdOrderByCreatedAtDesc(user.getId());
+            if (lastTokenOpt.isPresent()) {
+                LocalDateTime createdAt = lastTokenOpt.get().getCreatedAt();
+                if (createdAt != null && createdAt.isAfter(LocalDateTime.now().minusSeconds(otpCooldownSeconds))) {
+                    long remainingSeconds = otpCooldownSeconds - java.time.Duration.between(createdAt, LocalDateTime.now()).toSeconds();
+                    if (remainingSeconds < 1) remainingSeconds = 1;
+                    throw new BadRequestException("Vui lòng đợi " + remainingSeconds + " giây trước khi gửi lại yêu cầu mã OTP mới (Cooldown).");
+                }
+            }
+        }
+
+        // 2. Chống Spam: Giới hạn tối đa số yêu cầu trong 1 giờ
+        if (otpMaxRequestsPerHour > 0) {
+            LocalDateTime oneHourAgo = LocalDateTime.now().minusHours(1);
+            long requestsLastHour = passwordResetTokenRepository.countByUserIdAndCreatedAtAfter(user.getId(), oneHourAgo);
+            if (requestsLastHour >= otpMaxRequestsPerHour) {
+                throw new BadRequestException("Bạn đã vượt quá số lần yêu cầu mã OTP (tối đa " + otpMaxRequestsPerHour + " lần / giờ). Vui lòng thử lại sau 1 giờ.");
+            }
+        }
+
+        // Hủy các token chưa sử dụng trước đó của người dùng này
+        List<PasswordResetToken> oldTokens = passwordResetTokenRepository.findByUserIdAndUsedFalse(user.getId());
+        for (PasswordResetToken oldToken : oldTokens) {
+            oldToken.setUsed(true);
+        }
+        passwordResetTokenRepository.saveAll(oldTokens);
+
+        // Sinh mã OTP 6 chữ số ngẫu nhiên: từ 100000 đến 999999
+        String otp = String.format("%06d", 100000 + new java.security.SecureRandom().nextInt(900000));
+
+        // Băm mã OTP bằng SHA-256 trước khi lưu vào DB (bảo mật tuyệt đối, không lưu plaintext)
+        String hashedOtp = PasswordResetToken.hashOtp(otp);
+
+        // Lưu trữ vào DB với TTL 5 phút, attemptCount = 0
+        PasswordResetToken resetToken = PasswordResetToken.builder()
+                .user(user)
+                .token(hashedOtp)
+                .expiryDate(LocalDateTime.now().plusMinutes(5))
+                .used(false)
+                .attemptCount(0)
+                .build();
+        passwordResetTokenRepository.save(resetToken);
+
+        // Gửi email thực sự qua EmailService
+        emailService.sendOtpEmail(user.getEmail(), user.getFullName(), otp);
+
+        String resetUrl = frontendUrl + "/reset-password?email=" + java.net.URLEncoder.encode(user.getEmail(), java.nio.charset.StandardCharsets.UTF_8) + "&otp=" + otp;
+
+        return ForgotPasswordResponse.builder()
+                .message("Mã OTP đã được gửi đến email nếu tài khoản tồn tại trong hệ thống. Vui lòng kiểm tra hộp thư (thời hạn 5 phút).")
+                .email(user.getEmail())
+                .otp(otp)
+                .resetToken(otp)
+                .resetUrl(resetUrl)
+                .build();
+    }
+
+    @Transactional
+    public String resetPassword(ResetPasswordRequest request) {
+        String rawOtp = request.getEffectiveOtp();
+        String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+        String newPassword = request.getNewPassword();
+
+        if (rawOtp == null || rawOtp.isBlank()) {
+            throw new BadRequestException("Mã OTP không được để trống");
+        }
+        String cleanOtp = rawOtp.trim();
+        if (!cleanOtp.matches("^\\d{6}$")) {
+            throw new BadRequestException("Mã OTP phải bao gồm đúng 6 chữ số");
+        }
+
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new BadRequestException("Mật khẩu mới không được để trống");
+        }
+        if (newPassword.length() < 6) {
+            throw new BadRequestException("Mật khẩu mới phải có tối thiểu 6 ký tự");
+        }
+        if (newPassword.startsWith(" ") || newPassword.endsWith(" ")) {
+            throw new BadRequestException("Mật khẩu mới không được chứa khoảng trắng ở đầu hoặc cuối");
+        }
+
+        String inputHashed = PasswordResetToken.hashOtp(cleanOtp);
+
+        // Tìm token chưa sử dụng:
+        PasswordResetToken resetToken = null;
+        if (!email.isBlank()) {
+            resetToken = passwordResetTokenRepository
+                    .findFirstByUser_EmailIgnoreCaseAndUsedFalseOrderByCreatedAtDesc(email)
+                    .orElse(null);
+        }
+        if (resetToken == null) {
+            // Tìm theo mã băm SHA-256
+            resetToken = passwordResetTokenRepository
+                    .findFirstByTokenAndUsedFalseOrderByCreatedAtDesc(inputHashed)
+                    .orElse(null);
+        }
+
+        if (resetToken == null) {
+            throw new BadRequestException("Mã OTP không hợp lệ hoặc đã hết hạn. Vui lòng gửi lại yêu cầu.");
+        }
+
+        // Kiểm tra xem token đã hết hạn chưa (TTL 5 phút)
+        if (resetToken.isExpired()) {
+            resetToken.setUsed(true);
+            passwordResetTokenRepository.save(resetToken);
+            throw new BadRequestException("Mã OTP đã hết hạn (chỉ có hiệu lực trong 5 phút). Vui lòng gửi lại yêu cầu.");
+        }
+
+        // Kiểm tra số lần thử sai (chống Brute-force: tối đa 5 lần)
+        if (resetToken.getAttemptCount() >= 5) {
+            resetToken.setUsed(true);
+            passwordResetTokenRepository.save(resetToken);
+            throw new BadRequestException("Bạn đã nhập sai mã OTP quá 5 lần. Mã này đã bị vô hiệu hóa vì lý do bảo mật. Vui lòng thao tác lại từ đầu.");
+        }
+
+        // So sánh mã băm SHA-256
+        if (!resetToken.getToken().equals(inputHashed)) {
+            resetToken.setAttemptCount(resetToken.getAttemptCount() + 1);
+            int remaining = 5 - resetToken.getAttemptCount();
+            if (remaining <= 0) {
+                resetToken.setUsed(true);
+                passwordResetTokenRepository.save(resetToken);
+                throw new BadRequestException("Bạn đã nhập sai mã OTP quá 5 lần. Mã này đã bị vô hiệu hóa. Vui lòng gửi lại yêu cầu mới.");
+            } else {
+                passwordResetTokenRepository.save(resetToken);
+                throw new BadRequestException("Mã OTP không chính xác. Bạn còn lại " + remaining + " lần thử.");
+            }
+        }
+
+        User user = resetToken.getUser();
+        if (user == null || user.getStatus() == AccountStatus.INACTIVE) {
+            throw new BadRequestException("Tài khoản không hợp lệ hoặc đã bị khóa");
+        }
+
+        if (!email.isBlank() && !user.getEmail().equalsIgnoreCase(email)) {
+            throw new BadRequestException("Mã OTP không khớp với email được chỉ định");
+        }
+
+        // Cập nhật mật khẩu mới được BCrypt mã hóa
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setUpdatedAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        // Đánh dấu token đã được sử dụng (chỉ dùng 1 lần)
+        resetToken.setUsed(true);
+        passwordResetTokenRepository.save(resetToken);
+
+        // Gửi email cảnh báo bảo mật: Mật khẩu tài khoản đã thay đổi thành công
+        emailService.sendPasswordResetSuccessEmail(user.getEmail(), user.getFullName());
+
+        return "Mật khẩu đã được đặt lại thành công. Bạn có thể đăng nhập bằng mật khẩu mới.";
     }
 }

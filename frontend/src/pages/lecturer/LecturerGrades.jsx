@@ -280,7 +280,11 @@ const LecturerGrades = () => {
                       const draftRow = draft[row.enrollmentId];
                       const preview = previewFinal(components, draftRow);
                       const finalValue = preview === null || Number.isNaN(preview) ? row.finalScore : preview;
-                      const gl = gradeLabel(finalValue);
+                      const attComp = components.find((c) =>
+                        c.componentType === 'ATTENDANCE' || (c.componentName && c.componentName.toLowerCase().includes('chuyên cần'))
+                      );
+                      const attScore = attComp ? (draftRow?.[attComp.id] ?? row.componentScores?.[attComp.id]) : null;
+                      const gl = gradeLabel(finalValue, attScore);
                       return (
                         <tr key={row.enrollmentId}>
                           <td>{(page - 1) * PAGE_SIZE + index + 1}</td>
@@ -308,7 +312,16 @@ const LecturerGrades = () => {
                             </td>
                           ))}
                           <td><strong>{formatScore(finalValue)}</strong></td>
-                          <td><span className={`badge badge-${gl.tone}`}>{gl.label}</span></td>
+                          <td>
+                            <span className={`badge badge-${gl.tone}`} title={gl.reason || ''}>
+                              {gl.label}
+                            </span>
+                            {gl.reason && (
+                              <div className="cell-muted" style={{ fontSize: 11, color: '#dc2626', marginTop: 2, fontWeight: 500 }}>
+                                {gl.reason}
+                              </div>
+                            )}
+                          </td>
                           <td>
                             <div className="row-actions">
                               <button
