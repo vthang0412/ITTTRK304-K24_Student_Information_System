@@ -24,7 +24,7 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public void sendOtpEmail(String toEmail, String fullName, String otp) {
-        log.info("[EMAIL SERVICE] Yêu cầu gửi mã OTP đặt lại mật khẩu tới email: {}", toEmail);
+        log.info("[EMAIL SERVICE] Đang gửi mã OTP xác thực đặt lại mật khẩu tới email: {}", toEmail);
 
         if (mailSender != null && fromEmail != null && !fromEmail.isBlank()) {
             try {

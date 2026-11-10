@@ -3,7 +3,6 @@ package com.example.student_management.controller.academic;
 import com.example.student_management.entity.academic.Semester;
 import com.example.student_management.entity.academic.SemesterStatus;
 import com.example.student_management.exception.BadRequestException;
-import com.example.student_management.exception.ConflictException;
 import com.example.student_management.exception.NotFoundException;
 import com.example.student_management.repository.academic.CourseSectionRepository;
 import com.example.student_management.repository.academic.SemesterRepository;
@@ -33,54 +32,45 @@ public class SemesterController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Semester> create(@RequestBody Semester semester) {
         if (semester.getSemesterCode() == null || semester.getSemesterCode().isBlank()) {
-            throw new BadRequestException("Mã học kỳ là bắt buộc");
+            throw new BadRequestException("Mã học kỳ không được để trống");
         }
         if (semester.getSemesterName() == null || semester.getSemesterName().isBlank()) {
-            throw new BadRequestException("Tên học kỳ là bắt buộc");
+            throw new BadRequestException("Tên học kỳ không được để trống");
         }
-        String code = semester.getSemesterCode().trim();
-        if (semesterRepository.existsBySemesterCode(code)) {
-            throw new ConflictException("Mã học kỳ đã tồn tại");
+        if (semester.getStartDate() != null && semester.getEndDate() != null
+                && !semester.getEndDate().isAfter(semester.getStartDate())) {
+            throw new BadRequestException("Ngày kết thúc học kỳ phải sau ngày bắt đầu");
         }
-        semester.setSemesterCode(code);
-        if (semester.getStartDate() == null || semester.getEndDate() == null) {
-            throw new BadRequestException("Ngày bắt đầu và ngày kết thúc học kỳ là bắt buộc");
+        if (semester.getRegistrationStart() != null && semester.getRegistrationEnd() != null
+                && !semester.getRegistrationEnd().isAfter(semester.getRegistrationStart())) {
+            throw new BadRequestException("Ngày kết thúc đăng ký phải sau ngày bắt đầu đăng ký");
         }
-        if (!semester.getEndDate().isAfter(semester.getStartDate())) {
-            throw new BadRequestException("Ngày kết thúc phải sau ngày bắt đầu");
-        }
-        if (semester.getRegistrationStart() != null && semester.getRegistrationEnd() != null) {
-            if (!semester.getRegistrationEnd().isAfter(semester.getRegistrationStart())) {
-                throw new BadRequestException("Thời gian kết thúc đăng ký phải sau thời gian bắt đầu đăng ký");
-            }
-        }
+        semester.setSemesterCode(semester.getSemesterCode().trim());
+        semester.setSemesterName(semester.getSemesterName().trim());
         return ResponseEntity.ok(semesterRepository.save(semester));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Semester> update(@PathVariable Long id, @RequestBody Semester semester) {
+        if (semester.getSemesterName() == null || semester.getSemesterName().isBlank()) {
+            throw new BadRequestException("Tên học kỳ không được để trống");
+        }
+        if (semester.getStartDate() != null && semester.getEndDate() != null
+                && !semester.getEndDate().isAfter(semester.getStartDate())) {
+            throw new BadRequestException("Ngày kết thúc học kỳ phải sau ngày bắt đầu");
+        }
+        if (semester.getRegistrationStart() != null && semester.getRegistrationEnd() != null
+                && !semester.getRegistrationEnd().isAfter(semester.getRegistrationStart())) {
+            throw new BadRequestException("Ngày kết thúc đăng ký phải sau ngày bắt đầu đăng ký");
+        }
         return semesterRepository.findById(id)
                 .map(existing -> {
-                    if (semester.getSemesterName() != null && !semester.getSemesterName().isBlank()) {
-                        existing.setSemesterName(semester.getSemesterName().trim());
-                    }
-                    java.time.LocalDate newStart = semester.getStartDate() != null ? semester.getStartDate() : existing.getStartDate();
-                    java.time.LocalDate newEnd = semester.getEndDate() != null ? semester.getEndDate() : existing.getEndDate();
-                    if (newStart != null && newEnd != null && !newEnd.isAfter(newStart)) {
-                        throw new BadRequestException("Ngày kết thúc phải sau ngày bắt đầu");
-                    }
-                    existing.setStartDate(newStart);
-                    existing.setEndDate(newEnd);
-
-                    java.time.LocalDateTime regStart = semester.getRegistrationStart() != null ? semester.getRegistrationStart() : existing.getRegistrationStart();
-                    java.time.LocalDateTime regEnd = semester.getRegistrationEnd() != null ? semester.getRegistrationEnd() : existing.getRegistrationEnd();
-                    if (regStart != null && regEnd != null && !regEnd.isAfter(regStart)) {
-                        throw new BadRequestException("Thời gian kết thúc đăng ký phải sau thời gian bắt đầu đăng ký");
-                    }
-                    existing.setRegistrationStart(regStart);
-                    existing.setRegistrationEnd(regEnd);
-
+                    existing.setSemesterName(semester.getSemesterName().trim());
+                    existing.setStartDate(semester.getStartDate());
+                    existing.setEndDate(semester.getEndDate());
+                    existing.setRegistrationStart(semester.getRegistrationStart());
+                    existing.setRegistrationEnd(semester.getRegistrationEnd());
                     if (semester.getStatus() != null) {
                         existing.setStatus(semester.getStatus());
                     }

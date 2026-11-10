@@ -163,8 +163,6 @@ public class AuthService {
             role = Role.LECTURER;
         }
 
-        String dept = (request.getDepartment() != null && !request.getDepartment().isBlank())
-                ? request.getDepartment().trim() : "CNTT";
         AccountStatus accountStatus = AccountStatus.ACTIVE;
         if (request.getStatus() != null && !request.getStatus().isBlank()) {
             try {
@@ -184,13 +182,17 @@ public class AuthService {
                 .build();
         user = userRepository.save(user);
 
+        String department = (request.getDepartment() != null && !request.getDepartment().isBlank())
+                ? request.getDepartment().trim()
+                : "CNTT";
+
         if (role == Role.STUDENT) {
             String studentCode = generateUniqueStudentCode();
             Student student = Student.builder()
                     .studentCode(studentCode)
                     .fullName(request.getFullName())
                     .email(request.getEmail())
-                    .department(dept)
+                    .department(department)
                     .status(accountStatus)
                     .user(user)
                     .build();
@@ -201,7 +203,7 @@ public class AuthService {
                     .lecturerCode(lecturerCode)
                     .fullName(request.getFullName())
                     .email(request.getEmail())
-                    .department(dept)
+                    .department(department)
                     .status(accountStatus)
                     .user(user)
                     .build();
@@ -343,10 +345,12 @@ public class AuthService {
         // Gửi email thực sự qua EmailService
         emailService.sendOtpEmail(user.getEmail(), user.getFullName(), otp);
 
-        // Bảo mật C-01: Tuyệt đối không trả về otp, resetToken hoặc resetUrl trong response API
         return ForgotPasswordResponse.builder()
                 .message("Mã OTP đã được gửi đến email nếu tài khoản tồn tại trong hệ thống. Vui lòng kiểm tra hộp thư (thời hạn 5 phút).")
                 .email(user.getEmail())
+                .otp(null)
+                .resetToken(null)
+                .resetUrl(null)
                 .build();
     }
 

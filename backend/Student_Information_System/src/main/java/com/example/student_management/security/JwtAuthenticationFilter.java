@@ -49,8 +49,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
             } catch (Exception e) {
-                // If user is deleted or not found, clear context so request is rejected with 401 instead of 500
-                SecurityContextHolder.clearContext();
+                // If user not found, deleted or disabled -> proceed unauthenticated (security chain handles 401)
             }
         }
         filterChain.doFilter(request, response);

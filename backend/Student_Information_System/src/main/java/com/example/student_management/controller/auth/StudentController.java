@@ -4,6 +4,7 @@ import com.example.student_management.entity.auth.AccountStatus;
 import com.example.student_management.entity.auth.Student;
 import com.example.student_management.entity.auth.User;
 import com.example.student_management.exception.BadRequestException;
+import com.example.student_management.exception.ForbiddenException;
 import com.example.student_management.exception.NotFoundException;
 import com.example.student_management.repository.auth.StudentRepository;
 import com.example.student_management.repository.auth.UserRepository;
@@ -13,6 +14,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -42,17 +44,15 @@ public class StudentController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('STUDENT')")
-    public ResponseEntity<Student> getById(@PathVariable Long id, org.springframework.security.core.Authentication authentication) {
+    public ResponseEntity<Student> getById(@PathVariable Long id, Authentication authentication) {
         Student student = studentService.findById(id)
-                .orElseThrow(() -> new NotFoundException("Student not found"));
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy sinh viên"));
 
         boolean isAdmin = authentication.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         if (!isAdmin) {
-            User currentUser = userRepository.findByUsername(authentication.getName())
-                    .orElseThrow(() -> new NotFoundException("User not found"));
-            if (currentUser.getStudent() == null || !currentUser.getStudent().getId().equals(id)) {
-                throw new com.example.student_management.exception.ForbiddenException("Bạn chỉ có quyền xem thông tin của chính mình");
+            if (student.getUser() == null || !student.getUser().getUsername().equals(authentication.getName())) {
+                throw new ForbiddenException("Bạn không có quyền xem thông tin của sinh viên khác");
             }
         }
         return ResponseEntity.ok(student);
