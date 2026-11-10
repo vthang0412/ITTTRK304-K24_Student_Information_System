@@ -42,10 +42,20 @@ public class StudentController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('STUDENT')")
-    public ResponseEntity<Student> getById(@PathVariable Long id) {
-        return studentService.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<Student> getById(@PathVariable Long id, org.springframework.security.core.Authentication authentication) {
+        Student student = studentService.findById(id)
+                .orElseThrow(() -> new NotFoundException("Student not found"));
+
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (!isAdmin) {
+            User currentUser = userRepository.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new NotFoundException("User not found"));
+            if (currentUser.getStudent() == null || !currentUser.getStudent().getId().equals(id)) {
+                throw new com.example.student_management.exception.ForbiddenException("Bạn chỉ có quyền xem thông tin của chính mình");
+            }
+        }
+        return ResponseEntity.ok(student);
     }
 
     @PostMapping

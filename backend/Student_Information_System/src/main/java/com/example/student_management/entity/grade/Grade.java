@@ -28,10 +28,10 @@ public class Grade {
     @JoinColumn(name = "enrollment_id", unique = true, nullable = false)
     private Enrollment enrollment;
 
-    @Column(precision = 4, scale = 2)
+    @Column(precision = 5, scale = 2)
     private BigDecimal componentScore;
 
-    @Column(precision = 4, scale = 2)
+    @Column(precision = 5, scale = 2)
     private BigDecimal finalScore;
 
     private String updatedBy;

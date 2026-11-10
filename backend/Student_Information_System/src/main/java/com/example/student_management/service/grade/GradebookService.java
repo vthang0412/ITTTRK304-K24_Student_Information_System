@@ -111,6 +111,8 @@ public class GradebookService {
                 .courseName(section.getCourse() == null ? null : section.getCourse().getCourseName())
                 .semesterName(section.getSemester() == null ? null : section.getSemester().getSemesterName())
                 .status(gradebook.getStatus().name())
+                .gradingMode(components.isEmpty() ? "FINAL" : "COMPONENT")
+                .lecturerName(section.getLecturer() == null ? null : section.getLecturer().getFullName())
                 .components(components.stream().map(this::toComponentDto).collect(Collectors.toList()))
                 .enrollments(items)
                 .build();

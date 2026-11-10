@@ -2,6 +2,7 @@ package com.example.student_management.controller.academic;
 
 import com.example.student_management.entity.academic.Course;
 import com.example.student_management.exception.BadRequestException;
+import com.example.student_management.exception.ConflictException;
 import com.example.student_management.exception.NotFoundException;
 import com.example.student_management.repository.academic.CourseRepository;
 import com.example.student_management.repository.academic.CourseSectionRepository;
@@ -30,6 +31,20 @@ public class CourseController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Course> create(@RequestBody Course course) {
+        if (course.getCourseCode() == null || course.getCourseCode().isBlank()) {
+            throw new BadRequestException("Mã môn học là bắt buộc");
+        }
+        if (course.getCourseName() == null || course.getCourseName().isBlank()) {
+            throw new BadRequestException("Tên môn học là bắt buộc");
+        }
+        if (course.getCredits() == null || course.getCredits() < 1) {
+            throw new BadRequestException("Số tín chỉ phải lớn hơn 0");
+        }
+        String code = course.getCourseCode().trim();
+        if (courseRepository.existsByCourseCode(code)) {
+            throw new ConflictException("Mã môn học đã tồn tại");
+        }
+        course.setCourseCode(code);
         return ResponseEntity.ok(courseRepository.save(course));
     }
 
@@ -38,10 +53,18 @@ public class CourseController {
     public ResponseEntity<Course> update(@PathVariable Long id, @RequestBody Course course) {
         return courseRepository.findById(id)
                 .map(existing -> {
-                    existing.setCourseName(course.getCourseName());
-                    existing.setCredits(course.getCredits());
-                    existing.setDescription(course.getDescription());
-                    existing.setStatus(course.getStatus());
+                    if (course.getCourseName() != null && !course.getCourseName().isBlank()) {
+                        existing.setCourseName(course.getCourseName().trim());
+                    }
+                    if (course.getCredits() != null && course.getCredits() > 0) {
+                        existing.setCredits(course.getCredits());
+                    }
+                    if (course.getDescription() != null) {
+                        existing.setDescription(course.getDescription());
+                    }
+                    if (course.getStatus() != null) {
+                        existing.setStatus(course.getStatus());
+                    }
                     return ResponseEntity.ok(courseRepository.save(existing));
                 })
                 .orElse(ResponseEntity.notFound().build());

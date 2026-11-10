@@ -19,6 +19,8 @@ public class GradebookDetailDto {
     private String courseName;
     private String semesterName;
     private String status;
+    private String gradingMode;
+    private String lecturerName;
     private List<GradeComponentDto> components;
     private List<GradebookEnrollmentDto> enrollments;
 }

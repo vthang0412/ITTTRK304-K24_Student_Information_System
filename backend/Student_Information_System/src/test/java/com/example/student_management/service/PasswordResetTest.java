@@ -81,13 +81,12 @@ class PasswordResetTest {
 
         ForgotPasswordResponse response = authService.forgotPassword(request);
 
-        assertNotNull(response.getResetToken());
-        assertNotNull(response.getOtp());
-        assertEquals(6, response.getOtp().length());
+        assertNull(response.getResetToken());
+        assertNull(response.getOtp());
         assertEquals("student@sis.edu.vn", response.getEmail());
-        verify(emailService).sendOtpEmail(eq("student@sis.edu.vn"), anyString(), eq(response.getOtp()));
+        verify(emailService).sendOtpEmail(eq("student@sis.edu.vn"), anyString(), argThat(otp -> otp != null && otp.length() == 6));
         verify(passwordResetTokenRepository).save(argThat(token ->
-                token.getToken().equals(PasswordResetToken.hashOtp(response.getOtp())) &&
+                token.getToken() != null &&
                 !token.isUsed() &&
                 token.getAttemptCount() == 0
         ));

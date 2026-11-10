@@ -55,14 +55,16 @@ public class PasswordResetToken {
         return !used && !isExpired() && attemptCount < 5;
     }
 
+    private static final String OTP_SALT_PEPPER = "SIS_SECURE_SALT_PEPPER_2026";
+
     /**
-     * Băm mã OTP bằng thuật toán SHA-256 để lưu trữ an toàn trong DB
+     * Băm mã OTP bằng thuật toán SHA-256 kèm salt/pepper để chống rainbow table và brute-force
      */
     public static String hashOtp(String otp) {
         if (otp == null) return "";
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(otp.trim().getBytes(StandardCharsets.UTF_8));
+            byte[] hash = digest.digest((otp.trim() + OTP_SALT_PEPPER).getBytes(StandardCharsets.UTF_8));
             StringBuilder hexString = new StringBuilder();
             for (byte b : hash) {
                 String hex = Integer.toHexString(0xff & b);

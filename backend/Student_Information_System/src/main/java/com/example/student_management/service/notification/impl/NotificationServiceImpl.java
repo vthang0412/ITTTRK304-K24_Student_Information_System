@@ -5,9 +5,11 @@ import com.example.student_management.dto.notification.NotificationRequest;
 import com.example.student_management.entity.auth.Role;
 import com.example.student_management.entity.auth.User;
 import com.example.student_management.entity.notification.Notification;
+import com.example.student_management.entity.notification.NotificationRead;
 import com.example.student_management.exception.ForbiddenException;
 import com.example.student_management.exception.NotFoundException;
 import com.example.student_management.repository.auth.UserRepository;
+import com.example.student_management.repository.notification.NotificationReadRepository;
 import com.example.student_management.repository.notification.NotificationRepository;
 import com.example.student_management.service.notification.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -24,15 +27,25 @@ public class NotificationServiceImpl implements NotificationService {
     private NotificationRepository notificationRepository;
 
     @Autowired
+    private NotificationReadRepository notificationReadRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Override
     @Transactional(readOnly = true)
     public List<NotificationDto> getMyNotifications(String username) {
         User user = currentUser(username);
+        Set<Long> readIds = notificationReadRepository.findReadNotificationIdsByUserId(user.getId());
         return notificationRepository.findNotificationsForUser(user.getId(), user.getRole())
                 .stream()
-                .map(this::toDto)
+                .map(n -> {
+                    NotificationDto dto = toDto(n);
+                    if (n.getRecipient() == null) {
+                        dto.setIsRead(readIds.contains(n.getId()));
+                    }
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 
@@ -40,7 +53,15 @@ public class NotificationServiceImpl implements NotificationService {
     @Transactional(readOnly = true)
     public long getUnreadCount(String username) {
         User user = currentUser(username);
-        return notificationRepository.countUnreadForUser(user.getId(), user.getRole());
+        Set<Long> readIds = notificationReadRepository.findReadNotificationIdsByUserId(user.getId());
+        List<Notification> all = notificationRepository.findNotificationsForUser(user.getId(), user.getRole());
+        return all.stream().filter(n -> {
+            if (n.getRecipient() != null) {
+                return !Boolean.TRUE.equals(n.getIsRead());
+            } else {
+                return !readIds.contains(n.getId());
+            }
+        }).count();
     }
 
     @Override
@@ -59,9 +80,22 @@ public class NotificationServiceImpl implements NotificationService {
             throw new ForbiddenException("You cannot access this notification");
         }
 
-        notification.setIsRead(true);
-        Notification saved = notificationRepository.save(notification);
-        return toDto(saved);
+        if (notification.getRecipient() != null) {
+            notification.setIsRead(true);
+            notificationRepository.save(notification);
+        } else {
+            // Thông báo chung: lưu trạng thái đã đọc riêng cho user này vào bảng notification_reads
+            if (!notificationReadRepository.existsByUserIdAndNotificationId(user.getId(), notification.getId())) {
+                notificationReadRepository.save(NotificationRead.builder()
+                        .userId(user.getId())
+                        .notificationId(notification.getId())
+                        .build());
+            }
+        }
+
+        NotificationDto dto = toDto(notification);
+        dto.setIsRead(true);
+        return dto;
     }
 
     @Override
@@ -69,6 +103,17 @@ public class NotificationServiceImpl implements NotificationService {
     public void markAllAsRead(String username) {
         User user = currentUser(username);
         notificationRepository.markAllAsReadForUser(user.getId());
+
+        List<Notification> globals = notificationRepository.findNotificationsForUser(user.getId(), user.getRole())
+                .stream().filter(n -> n.getRecipient() == null).collect(Collectors.toList());
+        Set<Long> alreadyRead = notificationReadRepository.findReadNotificationIdsByUserId(user.getId());
+        List<NotificationRead> toSave = globals.stream()
+                .filter(n -> !alreadyRead.contains(n.getId()))
+                .map(n -> NotificationRead.builder().userId(user.getId()).notificationId(n.getId()).build())
+                .collect(Collectors.toList());
+        if (!toSave.isEmpty()) {
+            notificationReadRepository.saveAll(toSave);
+        }
     }
 
     @Override

@@ -12,6 +12,8 @@ import com.example.student_management.repository.academic.CourseSectionRepositor
 import com.example.student_management.repository.academic.EnrollmentRepository;
 import com.example.student_management.repository.auth.UserRepository;
 import com.example.student_management.service.academic.EnrollmentService;
+import com.example.student_management.entity.grade.GradebookStatus;
+import com.example.student_management.repository.grade.GradebookRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,8 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     private CourseSectionRepository courseSectionRepository;
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private GradebookRepository gradebookRepository;
 
     @Override
     public List<Enrollment> getMyEnrollments(String username) {
@@ -35,7 +39,23 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         if (user.getStudent() == null) {
             return List.of();
         }
-        return enrollmentRepository.findByStudentId(user.getStudent().getId());
+        List<Enrollment> list = enrollmentRepository.findByStudentId(user.getStudent().getId());
+        // Bảo mật H-02: Sinh viên chỉ được thấy điểm khi sổ điểm của lớp đã ở trạng thái PUBLISHED
+        for (Enrollment enrollment : list) {
+            if (enrollment.getGrade() != null) {
+                CourseSection section = enrollment.getCourseSection();
+                boolean published = false;
+                if (section != null) {
+                    published = gradebookRepository.findByCourseSectionId(section.getId())
+                            .map(gb -> gb.getStatus() == GradebookStatus.PUBLISHED)
+                            .orElse(false);
+                }
+                if (!published) {
+                    enrollment.setGrade(null);
+                }
+            }
+        }
+        return list;
     }
 
     @Override
@@ -50,7 +70,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         if (student.getStatus() == AccountStatus.INACTIVE) {
             throw new ForbiddenException("Account is disabled");
         }
-        CourseSection section = courseSectionRepository.findById(sectionId)
+        CourseSection section = courseSectionRepository.findByIdForUpdate(sectionId)
                 .orElseThrow(() -> new NotFoundException("Course section not found"));
         if (section.getStatus() != CourseSectionStatus.OPEN) {
             throw new BadRequestException("Course section is not open for registration");

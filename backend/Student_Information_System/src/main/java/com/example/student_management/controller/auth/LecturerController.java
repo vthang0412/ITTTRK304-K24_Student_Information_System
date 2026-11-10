@@ -5,6 +5,7 @@ import com.example.student_management.entity.auth.Lecturer;
 import com.example.student_management.entity.auth.Role;
 import com.example.student_management.entity.auth.User;
 import com.example.student_management.exception.BadRequestException;
+import com.example.student_management.exception.ConflictException;
 import com.example.student_management.exception.NotFoundException;
 import com.example.student_management.repository.auth.LecturerRepository;
 import com.example.student_management.repository.auth.UserRepository;
@@ -36,18 +37,26 @@ public class LecturerController {
         return ResponseEntity.ok(lecturerRepository.findAll());
     }
 
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('LECTURER')")
+    public ResponseEntity<Lecturer> getById(@PathVariable Long id) {
+        return lecturerRepository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Lecturer> create(@RequestBody Lecturer lecturer) {
         String email = lecturer.getEmail() == null ? "" : lecturer.getEmail().trim();
         if (email.isBlank()) {
-            throw new IllegalArgumentException("Email is required");
+            throw new BadRequestException("Email is required");
         }
         if (userRepository.findByEmail(email).isPresent()
                 || userRepository.findByEmail(email.toLowerCase()).isPresent()
                 || lecturerRepository.findAll().stream().anyMatch(existing -> existing.getEmail() != null
                         && existing.getEmail().equalsIgnoreCase(email))) {
-            throw new IllegalArgumentException("Email already exists");
+            throw new ConflictException("Email already exists");
         }
         lecturer.setEmail(email);
         return ResponseEntity.ok(lecturerRepository.save(lecturer));
