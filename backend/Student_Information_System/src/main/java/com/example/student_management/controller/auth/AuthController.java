@@ -1,10 +1,6 @@
 package com.example.student_management.controller.auth;
 
-
-import com.example.student_management.dto.auth.AuthResponse;
-import com.example.student_management.dto.auth.ForgotPasswordRequest;
-import com.example.student_management.dto.auth.LoginRequest;
-import com.example.student_management.dto.auth.RegisterRequest;
+import com.example.student_management.dto.auth.*;
 import com.example.student_management.service.auth.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +9,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -31,8 +29,13 @@ public class AuthController {
     }
 
     @PostMapping("/forgot-password")
-    public ResponseEntity<String> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+    public ResponseEntity<ForgotPasswordResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         return ResponseEntity.ok(authService.forgotPassword(request));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, String>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        return ResponseEntity.ok(Map.of("message", authService.resetPassword(request)));
     }
 
     @PostMapping("/logout")

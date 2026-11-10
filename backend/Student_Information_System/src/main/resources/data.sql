@@ -8,6 +8,17 @@ SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 -- Bổ sung trạng thái mới cho các CSDL đã được tạo từ phiên bản trước.
 ALTER TABLE gradebooks MODIFY COLUMN status ENUM('OPEN', 'LOCKED', 'APPROVED', 'PUBLISHED') NOT NULL;
 
+-- Bảng lưu token đặt lại mật khẩu (thời hạn 15 phút, dùng 1 lần)
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    token VARCHAR(100) NOT NULL UNIQUE,
+    user_id BIGINT NOT NULL,
+    expiry_date DATETIME NOT NULL,
+    used BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_password_reset_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Script này chỉ BỔ SUNG dữ liệu mẫu và có thể chạy lại nhiều lần.
 -- Tuyệt đối không TRUNCATE/DELETE để tránh xóa dữ liệu nghiệp vụ của người dùng.
 
