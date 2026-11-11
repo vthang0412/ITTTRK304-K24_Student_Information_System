@@ -99,7 +99,8 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                     : "Chưa phân công";
             String dateFormatted = now.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
 
-            String content = "Bạn đã đăng ký thành công lớp " + section.getSectionCode() + " - " + courseName + " (" + credits + " tín chỉ).\n"
+            String content = "Bạn đã đăng ký thành công lớp " + section.getSectionCode() + " - " + courseName + " ("
+                    + credits + " tín chỉ).\n"
                     + "• Giảng viên: " + lecturerName + "\n"
                     + "• Thời khóa biểu: " + schedule + "\n"
                     + "• Ngày đăng ký: " + dateFormatted + "\n"
@@ -109,9 +110,9 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                     user,
                     "Đăng ký học phần thành công: " + section.getSectionCode(),
                     content,
-                    "ENROLLMENT"
-            );
-        } catch (Exception ignored) {}
+                    "ENROLLMENT");
+        } catch (Exception ignored) {
+        }
 
         return saved;
     }
@@ -141,18 +142,20 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         try {
             CourseSection section = enrollment.getCourseSection();
             String sectionCode = section != null ? section.getSectionCode() : "";
-            String courseName = (section != null && section.getCourse() != null) ? section.getCourse().getCourseName() : "Học phần";
+            String courseName = (section != null && section.getCourse() != null) ? section.getCourse().getCourseName()
+                    : "Học phần";
             String dateFormatted = now.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
 
-            String content = "Bạn đã huỷ đăng ký lớp học phần " + sectionCode + " - " + courseName + " vào ngày " + dateFormatted + ".";
+            String content = "Bạn đã huỷ đăng ký lớp học phần " + sectionCode + " - " + courseName + " vào ngày "
+                    + dateFormatted + ".";
 
             notificationService.sendSystemNotification(
                     user,
                     "Huỷ đăng ký học phần: " + sectionCode,
                     content,
-                    "ENROLLMENT"
-            );
-        } catch (Exception ignored) {}
+                    "ENROLLMENT");
+        } catch (Exception ignored) {
+        }
 
         return saved;
     }
