@@ -1,6 +1,5 @@
 package com.example.student_management.dto.auth;
 
-
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -22,14 +21,6 @@ public class StudentRequest {
     private String email;
 
     private String department;
-
-    private String phone;
-
-    private String className;
-
-    private String major;
-
-    private String academicStatus;
 
     private String phone;
 
