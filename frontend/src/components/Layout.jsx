@@ -118,12 +118,17 @@ const Layout = ({ children }) => {
     const fetchUnread = async () => {
       try {
         const res = await notificationApi.getUnreadCount();
-        setUnreadCount(res.data?.unreadCount || 0);
+        setUnreadCount(Number(res.data?.unreadCount || 0));
       } catch { /* imặng nếu lỗi */ }
     };
     fetchUnread();
+    const handleNotificationUpdate = () => fetchUnread();
+    window.addEventListener('notifications:updated', handleNotificationUpdate);
     const id = setInterval(fetchUnread, 60_000); // cập nhật mỗi 1 phút
-    return () => clearInterval(id);
+    return () => {
+      window.removeEventListener('notifications:updated', handleNotificationUpdate);
+      clearInterval(id);
+    };
   }, [user?.role, location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
