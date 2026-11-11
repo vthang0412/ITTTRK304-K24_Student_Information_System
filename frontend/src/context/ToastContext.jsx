@@ -100,6 +100,14 @@ export const ToastProvider = ({ children }) => {
           border: 1px solid rgba(148, 163, 184, 0.18) !important;
           padding: 1.2rem 1.2rem 1rem !important;
         }
+        .swal-auth-popup .swal2-actions {
+          display: flex !important;
+          justify-content: center !important;
+          align-items: center !important;
+          gap: 12px !important;
+          margin-top: 1rem !important;
+          flex-wrap: wrap !important;
+        }
         .swal-auth-title {
           font-size: 1.15rem !important;
           font-weight: 800 !important;
@@ -113,18 +121,46 @@ export const ToastProvider = ({ children }) => {
         .swal-auth-icon {
           margin: 0 auto 0.65rem !important;
         }
-        .swal-auth-confirm {
+        .swal-auth-confirm,
+        .swal-auth-cancel {
+          min-width: 148px !important;
+          height: 40px !important;
           border-radius: 10px !important;
-          padding: 0.7rem 1.1rem !important;
+          padding: 0 1rem !important;
+          font-size: 0.92rem !important;
           font-weight: 600 !important;
+          line-height: 1 !important;
+          white-space: nowrap !important;
+          transition: all 0.2s ease !important;
+        }
+        .swal-auth-confirm {
           background: #2563eb !important;
           color: #fff !important;
           border: none !important;
         }
+        .swal-auth-confirm:hover {
+          background: #1d4ed8 !important;
+        }
         .swal-auth-cancel {
-          border-radius: 10px !important;
-          padding: 0.7rem 1.1rem !important;
-          font-weight: 600 !important;
+          background: #e2e8f0 !important;
+          color: #334155 !important;
+          border: 1px solid #cbd5e1 !important;
+        }
+        .swal-auth-cancel:hover {
+          background: #dfe7f0 !important;
+        }
+        @media (max-width: 480px) {
+          .swal-auth-popup {
+            width: min(92vw, 420px) !important;
+          }
+          .swal-auth-popup .swal2-actions {
+            gap: 10px !important;
+          }
+          .swal-auth-confirm,
+          .swal-auth-cancel {
+            flex: 1 1 140px !important;
+            min-width: 0 !important;
+          }
         }
       `}</style>
       <div className="toast-stack">
