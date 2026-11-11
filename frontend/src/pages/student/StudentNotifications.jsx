@@ -5,7 +5,7 @@ import {
   BellIcon, CheckCircleIcon, CheckIcon, InboxIcon, RefreshIcon,
 } from '../../components/Icons';
 import {
-  EmptyState, LoadingBlock, PageHeader,
+  EmptyState, LoadingBlock, PageHeader, Pagination,
 } from '../../components/UI';
 import { formatDateTime } from '../../utils/format';
 
@@ -202,6 +202,8 @@ const NotifCard = ({ notif, onSelect }) => (
   </button>
 );
 
+const PAGE_SIZE = 8;
+
 /* ─── Trang chính ──────────────────────────────────────── */
 const StudentNotifications = () => {
   const toast = useToast();
@@ -210,6 +212,7 @@ const StudentNotifications = () => {
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
   const [filter, setFilter] = useState('ALL'); // ALL | UNREAD | READ
+  const [page, setPage] = useState(1);
   const [markingAll, setMarkingAll] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
@@ -286,6 +289,7 @@ const StudentNotifications = () => {
     return true;
   });
 
+  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   return (
@@ -325,7 +329,7 @@ const StudentNotifications = () => {
         ].map(({ key, label }) => (
           <button
             key={key}
-            onClick={() => setFilter(key)}
+            onClick={() => { setFilter(key); setPage(1); }}
             style={{
               padding: '7px 16px', borderRadius: 8, border: 'none',
               fontSize: 13, fontWeight: 600, cursor: 'pointer',
@@ -356,11 +360,21 @@ const StudentNotifications = () => {
           />
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {filtered.map((n) => (
-            <NotifCard key={n.id} notif={n} onSelect={setSelected} />
-          ))}
-        </div>
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {pageItems.map((n) => (
+              <NotifCard key={n.id} notif={n} onSelect={setSelected} />
+            ))}
+          </div>
+          <div style={{ marginTop: 16 }}>
+            <Pagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              totalItems={filtered.length}
+              onPageChange={setPage}
+            />
+          </div>
+        </>
       )}
 
       {/* Modal chi tiết */}

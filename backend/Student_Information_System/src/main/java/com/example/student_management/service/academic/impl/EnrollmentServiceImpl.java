@@ -12,11 +12,13 @@ import com.example.student_management.repository.academic.CourseSectionRepositor
 import com.example.student_management.repository.academic.EnrollmentRepository;
 import com.example.student_management.repository.auth.UserRepository;
 import com.example.student_management.service.academic.EnrollmentService;
+import com.example.student_management.service.notification.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -27,6 +29,8 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     private CourseSectionRepository courseSectionRepository;
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private NotificationService notificationService;
 
     @Override
     public List<Enrollment> getMyEnrollments(String username) {
@@ -65,7 +69,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         if (enrolledCount >= capacity) {
             throw new ConflictException("Course section is full");
         }
-        return enrollmentRepository.findByStudentIdAndCourseSectionId(student.getId(), sectionId)
+        Enrollment saved = enrollmentRepository.findByStudentIdAndCourseSectionId(student.getId(), sectionId)
                 .map(existing -> {
                     if (existing.getStatus() == EnrollmentStatus.ENROLLED) {
                         throw new ConflictException("Already enrolled in this section");
@@ -81,6 +85,36 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                         .status(EnrollmentStatus.ENROLLED)
                         .registeredAt(now)
                         .build()));
+
+        // Tự động gửi thông báo đăng ký thành công kèm Thời khóa biểu và Ngày đăng ký
+        try {
+            Course course = section.getCourse();
+            String courseName = course != null ? course.getCourseName() : "Học phần";
+            int credits = course != null && course.getCredits() != null ? course.getCredits() : 0;
+            String schedule = (section.getSchedule() != null && !section.getSchedule().isBlank())
+                    ? section.getSchedule()
+                    : "Chưa cập nhật";
+            String lecturerName = (section.getLecturer() != null && section.getLecturer().getFullName() != null)
+                    ? section.getLecturer().getFullName()
+                    : "Chưa phân công";
+            String dateFormatted = now.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
+
+            String content = "Bạn đã đăng ký thành công lớp " + section.getSectionCode() + " - " + courseName + " ("
+                    + credits + " tín chỉ).\n"
+                    + "• Giảng viên: " + lecturerName + "\n"
+                    + "• Thời khóa biểu: " + schedule + "\n"
+                    + "• Ngày đăng ký: " + dateFormatted + "\n"
+                    + "Học phần đã được đồng bộ vào Thời khóa biểu và Lịch học của bạn.";
+
+            notificationService.sendSystemNotification(
+                    user,
+                    "Đăng ký học phần thành công: " + section.getSectionCode(),
+                    content,
+                    "ENROLLMENT");
+        } catch (Exception ignored) {
+        }
+
+        return saved;
     }
 
     @Override
@@ -99,8 +133,30 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         if (enrollment.getStatus() == EnrollmentStatus.WITHDRAWN) {
             throw new BadRequestException("Already withdrawn");
         }
+        LocalDateTime now = LocalDateTime.now();
         enrollment.setStatus(EnrollmentStatus.WITHDRAWN);
-        enrollment.setWithdrawnAt(LocalDateTime.now());
-        return enrollmentRepository.save(enrollment);
+        enrollment.setWithdrawnAt(now);
+        Enrollment saved = enrollmentRepository.save(enrollment);
+
+        // Tự động gửi thông báo huỷ đăng ký học phần
+        try {
+            CourseSection section = enrollment.getCourseSection();
+            String sectionCode = section != null ? section.getSectionCode() : "";
+            String courseName = (section != null && section.getCourse() != null) ? section.getCourse().getCourseName()
+                    : "Học phần";
+            String dateFormatted = now.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
+
+            String content = "Bạn đã huỷ đăng ký lớp học phần " + sectionCode + " - " + courseName + " vào ngày "
+                    + dateFormatted + ".";
+
+            notificationService.sendSystemNotification(
+                    user,
+                    "Huỷ đăng ký học phần: " + sectionCode,
+                    content,
+                    "ENROLLMENT");
+        } catch (Exception ignored) {
+        }
+
+        return saved;
     }
 }
