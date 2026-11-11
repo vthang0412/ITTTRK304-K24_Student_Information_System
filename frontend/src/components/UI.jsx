@@ -39,6 +39,9 @@ const TONES = {
   UPCOMING: 'amber',
   DRAFT: 'amber',
   IN_PROGRESS: 'blue',
+  RESPONDED: 'purple',
+  RESOLVED: 'green',
+  REJECTED: 'red',
   REGISTRATION_OPEN: 'green',
   LOCKED: 'red',
   APPROVED: 'blue',
@@ -51,11 +54,14 @@ const LABELS = {
   INACTIVE: 'Ngừng hoạt động',
   OPEN: 'Đang mở',
   CLOSED: 'Đã đóng',
-  PENDING: 'Chờ xử lý',
+  PENDING: 'Chờ tiếp nhận',
   PLANNED: 'Sắp diễn ra',
   UPCOMING: 'Sắp diễn ra',
   REGISTRATION_OPEN: 'Đang mở đăng ký',
-  IN_PROGRESS: 'Đang diễn ra',
+  IN_PROGRESS: 'Đang xử lý',
+  RESPONDED: 'Đã phản hồi',
+  RESOLVED: 'Đã giải quyết',
+  REJECTED: 'Từ chối xử lý',
   COMPLETED: 'Đã kết thúc',
   DRAFT: 'Bản nháp',
   ENROLLED: 'Đã đăng ký',
@@ -127,7 +133,7 @@ export const SearchInput = ({ value, onChange, placeholder = 'Tìm kiếm...' })
   </div>
 );
 
-export const Modal = ({ open, onClose, title, subtitle, children, footer, size = '' }) => {
+export const Modal = ({ open, onClose, title, subtitle, children, footer, size = '', headerRight }) => {
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
@@ -143,13 +149,16 @@ export const Modal = ({ open, onClose, title, subtitle, children, footer, size =
 
   return (
     <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
-      <div className={`modal ${size}`} role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`modal ${size}`} role="dialog" aria-modal="true" aria-label={title || 'Modal'}>
         <div className="modal-head">
-          <div>
-            <h3>{title}</h3>
-            {subtitle && <p>{subtitle}</p>}
+          <div className="modal-head-copy">
+            {title && <h3>{title}</h3>}
+            {subtitle && <div className="modal-subtitle">{subtitle}</div>}
           </div>
-          <button className="icon-btn" onClick={onClose} aria-label="Đóng"><XIcon /></button>
+          <div className="modal-head-actions">
+            {headerRight}
+            <button className="icon-btn" onClick={onClose} aria-label="Đóng"><XIcon /></button>
+          </div>
         </div>
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
@@ -164,7 +173,7 @@ export const ConfirmDialog = ({
 }) => (
   <Modal
     open={open}
-    onClose={loading ? () => {} : onCancel}
+    onClose={loading ? () => { } : onCancel}
     title={title}
     size="sm"
     footer={(

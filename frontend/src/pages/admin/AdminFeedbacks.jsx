@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Swal from 'sweetalert2';
 import { feedbackApi, lecturerApi } from '../../api';
+import { ClockIcon, FileTextIcon, RefreshIcon, SupportIcon, UsersIcon } from '../../components/Icons';
 import { useToast } from '../../context/ToastContext';
-import { Field, LoadingBlock, Modal, SearchInput } from '../../components/UI';
+import { EmptyState, Field, LoadingBlock, Modal, PageHeader, SearchInput, StatCard, StatusBadge } from '../../components/UI';
 import { formatDateTime, getErrorMessage } from '../../utils/format';
 
 const FEEDBACK_TYPE_OPTIONS = [
@@ -21,32 +22,20 @@ const STATUS_OPTIONS = [
     { value: 'PENDING', label: 'Chờ tiếp nhận' },
     { value: 'IN_PROGRESS', label: 'Đang xử lý' },
     { value: 'RESPONDED', label: 'Đã phản hồi' },
-    { value: 'RESOLVED', label: 'Đã hoàn thành' },
+    { value: 'RESOLVED', label: 'Đã giải quyết' },
     { value: 'REJECTED', label: 'Từ chối xử lý' },
 ];
-
-const statusTone = {
-    PENDING: 'badge-amber',
-    IN_PROGRESS: 'badge-blue',
-    RESPONDED: 'badge-purple',
-    RESOLVED: 'badge-green',
-    REJECTED: 'badge-red',
-};
 
 const statusLabelMap = {
     PENDING: 'Chờ tiếp nhận',
     IN_PROGRESS: 'Đang xử lý',
     RESPONDED: 'Đã phản hồi',
-    RESOLVED: 'Đã hoàn thành',
+    RESOLVED: 'Đã giải quyết',
     REJECTED: 'Từ chối xử lý',
 };
 
 const feedbackTypeLabel = (value) => FEEDBACK_TYPE_OPTIONS.find((item) => item.value === value)?.label || value || 'Khác';
 const messageRoleLabel = (role) => ({ STUDENT: 'Sinh viên', LECTURER: 'Giảng viên', ADMIN: 'Quản trị viên' }[role] || role || 'Hệ thống');
-
-const TicketBadge = ({ status }) => (
-    <span className={`badge ${statusTone[status] || 'badge-gray'}`}>{statusLabelMap[status] || status || 'Chưa rõ'}</span>
-);
 
 const AdminFeedbacks = () => {
     const toast = useToast();
@@ -73,7 +62,7 @@ const AdminFeedbacks = () => {
             const response = await feedbackApi.getAll(statusFilter || undefined, typeFilter || undefined);
             setTickets(response.data || []);
         } catch (error) {
-            toast.error('Không thể tải danh sách ticket', getErrorMessage(error));
+            toast.error('Không thể tải danh sách phản ánh', getErrorMessage(error));
         } finally {
             setLoading(false);
         }
@@ -90,6 +79,13 @@ const AdminFeedbacks = () => {
 
     useEffect(() => { loadTickets(); }, [statusFilter, typeFilter]);
     useEffect(() => { loadLecturers(); }, []);
+
+    const totals = useMemo(() => ({
+        total: tickets.length,
+        pending: tickets.filter((item) => item.status === 'PENDING').length,
+        inProgress: tickets.filter((item) => item.status === 'IN_PROGRESS').length,
+        resolved: tickets.filter((item) => item.status === 'RESOLVED').length,
+    }), [tickets]);
 
     const filteredTickets = useMemo(() => {
         const normalized = searchTerm.trim().toLowerCase();
@@ -113,7 +109,7 @@ const AdminFeedbacks = () => {
             setAdminNote(nextTicket.adminNote || '');
             setStatusValue(nextTicket.status || 'IN_PROGRESS');
         } catch (error) {
-            toast.error('Không thể mở chi tiết ticket', getErrorMessage(error));
+            toast.error('Không thể mở chi tiết phản ánh', getErrorMessage(error));
         } finally {
             setDetailLoading(false);
         }
@@ -133,7 +129,7 @@ const AdminFeedbacks = () => {
 
         const result = await Swal.fire({
             title: 'Phân công giảng viên?',
-            text: `Bạn sẽ giao ticket #${selectedTicket.id} cho giảng viên đã chọn.`,
+            text: `Bạn sẽ giao phản ánh #${selectedTicket.id} cho giảng viên đã chọn.`,
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: 'Phân công',
@@ -150,7 +146,7 @@ const AdminFeedbacks = () => {
             });
             setSelectedTicket(response.data);
             loadTickets();
-            toast.success('Phân công thành công', 'Giảng viên được thông báo và sinh viên sẽ theo dõi tiến độ.');
+            toast.success('Phân công thành công', 'Giảng viên sẽ nhận thông báo và theo dõi tiến độ xử lý.');
         } catch (error) {
             toast.error('Phân công thất bại', getErrorMessage(error));
         } finally {
@@ -162,7 +158,7 @@ const AdminFeedbacks = () => {
         if (!selectedTicket) return;
         const result = await Swal.fire({
             title: 'Cập nhật trạng thái?',
-            text: `Bạn sẽ đặt ticket #${selectedTicket.id} sang trạng thái ${statusLabelMap[statusValue] || statusValue}.`,
+            text: `Bạn sẽ đặt phản ánh #${selectedTicket.id} sang trạng thái ${statusLabelMap[statusValue] || statusValue}.`,
             icon: 'question',
             showCancelButton: true,
             cancelButtonText: 'Hủy',
@@ -177,7 +173,7 @@ const AdminFeedbacks = () => {
             setSelectedTicket(response.data);
             setStatusNote('');
             loadTickets();
-            toast.success('Cập nhật trạng thái thành công', 'Sinh viên và giảng viên đã được thông báo.');
+            toast.success('Cập nhật trạng thái thành công', 'Sinh viên và giảng viên đã được cập nhật tiến độ.');
         } catch (error) {
             toast.error('Cập nhật trạng thái thất bại', getErrorMessage(error));
         } finally {
@@ -206,76 +202,56 @@ const AdminFeedbacks = () => {
     };
 
     return (
-        <div className="feedback-page">
-            <div className="feedback-hero">
-                <div>
-                    <span className="eyebrow">Administration</span>
-                    <h1>Quản lý phản ánh</h1>
-                    <p>Theo dõi toàn bộ ticket, phân công giảng viên và kiểm soát tiến độ xử lý.</p>
-                </div>
+        <>
+            <PageHeader
+                title="Quản lý phản ánh"
+                subtitle="Theo dõi, phân công và xử lý các phản ánh của sinh viên trong hệ thống."
+                actions={(
+                    <button className="btn btn-secondary" onClick={() => { loadTickets(); loadLecturers(); }}>
+                        <RefreshIcon /> Làm mới
+                    </button>
+                )}
+            />
+
+            <div className="stats-grid">
+                <StatCard label="Tổng phản ánh" value={totals.total} icon={<SupportIcon />} tone="blue" />
+                <StatCard label="Chờ tiếp nhận" value={totals.pending} icon={<ClockIcon />} tone="amber" />
+                <StatCard label="Đang xử lý" value={totals.inProgress} icon={<UsersIcon />} tone="indigo" />
+                <StatCard label="Đã giải quyết" value={totals.resolved} icon={<FileTextIcon />} tone="green" />
             </div>
 
-            <div className="feedback-stats">
-                <div className="feedback-stat stat-blue">
-                    <div className="feedback-stat-icon"><span>#</span></div>
-                    <div>
-                        <small>Tổng ticket</small>
-                        <strong>{tickets.length}</strong>
-                    </div>
-                </div>
-                <div className="feedback-stat stat-amber">
-                    <div className="feedback-stat-icon"><span>⏳</span></div>
-                    <div>
-                        <small>Chờ tiếp nhận</small>
-                        <strong>{tickets.filter((item) => item.status === 'PENDING').length}</strong>
-                    </div>
-                </div>
-                <div className="feedback-stat stat-indigo">
-                    <div className="feedback-stat-icon"><span>⚙</span></div>
-                    <div>
-                        <small>Đang xử lý</small>
-                        <strong>{tickets.filter((item) => item.status === 'IN_PROGRESS').length}</strong>
-                    </div>
-                </div>
-                <div className="feedback-stat stat-green">
-                    <div className="feedback-stat-icon"><span>✓</span></div>
-                    <div>
-                        <small>Đã hoàn thành</small>
-                        <strong>{tickets.filter((item) => item.status === 'RESOLVED').length}</strong>
-                    </div>
-                </div>
-            </div>
-
-            <div className="card feedback-panel">
+            <div className="card">
                 <div className="card-head">
                     <div>
                         <h2>Danh sách phản ánh</h2>
-                        <p>Quản lý toàn bộ yêu cầu hỗ trợ của hệ thống.</p>
+                        <p>Quản lý toàn bộ yêu cầu hỗ trợ và tiến độ xử lý của hệ thống.</p>
                     </div>
                 </div>
                 <div className="card-body">
-                    <div className="feedback-toolbar">
-                        <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Tìm kiếm theo tiêu đề, sinh viên, giảng viên..." />
-                        <select className="input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                    <div className="toolbar">
+                        <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Tìm mã, tiêu đề, nội dung hoặc sinh viên..." />
+                        <select className="select" style={{ width: 200 }} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
                             {STATUS_OPTIONS.map((option) => <option key={option.value || 'all-status'} value={option.value}>{option.label}</option>)}
                         </select>
-                        <select className="input" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+                        <select className="select" style={{ width: 210 }} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
                             {FEEDBACK_TYPE_OPTIONS.map((option) => <option key={option.value || 'all-type'} value={option.value}>{option.label}</option>)}
                         </select>
                         <button className="btn btn-secondary" onClick={clearFilters}>Xóa lọc</button>
+                        <div className="toolbar-spacer" />
+                        <span className="badge badge-gray">{filteredTickets.length} phản ánh</span>
                     </div>
 
                     {loading ? (
-                        <div className="empty-state"><LoadingBlock text="Đang tải dữ liệu phản ánh..." /></div>
+                        <LoadingBlock text="Đang tải dữ liệu phản ánh..." />
                     ) : filteredTickets.length === 0 ? (
-                        <div className="empty-state">
-                            <div className="empty-icon">✦</div>
-                            <h3>Không tìm thấy phản ánh</h3>
-                            <p>Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm để xem thêm dữ liệu.</p>
-                        </div>
+                        <EmptyState
+                            icon={<SupportIcon />}
+                            title="Không tìm thấy phản ánh"
+                            description="Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm để xem thêm dữ liệu."
+                        />
                     ) : (
-                        <div className="feedback-table-wrap">
-                            <table className="data-table feedback-table">
+                        <div className="table-wrap">
+                            <table className="data-table">
                                 <thead>
                                     <tr>
                                         <th>Mã</th>
@@ -285,7 +261,7 @@ const AdminFeedbacks = () => {
                                         <th>Giảng viên</th>
                                         <th>Trạng thái</th>
                                         <th>Ngày gửi</th>
-                                        <th>Thao tác</th>
+                                        <th style={{ textAlign: 'right' }}>Thao tác</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -293,16 +269,23 @@ const AdminFeedbacks = () => {
                                         <tr key={ticket.id}>
                                             <td className="cell-strong">#{ticket.id}</td>
                                             <td>
-                                                <div className="ticket-title-stack">
-                                                    <strong>{ticket.title}</strong>
-                                                </div>
+                                                <div className="cell-strong">{ticket.title}</div>
+                                                <div className="cell-muted">{ticket.content?.slice(0, 72) || '—'}{ticket.content && ticket.content.length > 72 ? '...' : ''}</div>
                                             </td>
                                             <td>{ticket.studentName || '—'}</td>
                                             <td>{feedbackTypeLabel(ticket.feedbackType)}</td>
-                                            <td>{ticket.assignedLecturerName || 'Chưa phân công'}</td>
-                                            <td><TicketBadge status={ticket.status} /></td>
+                                            <td>{ticket.assignedLecturerName || <span className="badge badge-amber">Chưa phân công</span>}</td>
+                                            <td>
+                                                <StatusBadge status={ticket.status} label={statusLabelMap[ticket.status] || ticket.status || 'Chưa rõ'} />
+                                            </td>
                                             <td>{formatDateTime(ticket.createdAt)}</td>
-                                            <td><button className="btn btn-secondary btn-sm" onClick={() => openTicket(ticket.id)}>Xem</button></td>
+                                            <td>
+                                                <div className="row-actions">
+                                                    <button className="btn btn-secondary btn-sm" onClick={() => openTicket(ticket.id)}>
+                                                        Xem
+                                                    </button>
+                                                </div>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -312,140 +295,185 @@ const AdminFeedbacks = () => {
                 </div>
             </div>
 
-            <Modal open={Boolean(selectedTicket)} onClose={() => setSelectedTicket(null)} title={selectedTicket ? `Ticket #${selectedTicket.id}` : 'Chi tiết'} subtitle={selectedTicket ? selectedTicket.title : ''} size="lg" footer={null}>
+            <Modal
+                open={Boolean(selectedTicket)}
+                onClose={() => setSelectedTicket(null)}
+                title="Chi tiết phản ánh"
+                subtitle={selectedTicket ? (
+                    <span className="modal-ticket-subtitle">
+                        <span className="modal-ticket-id">#{selectedTicket.id}</span>
+                        <span className="modal-ticket-separator">•</span>
+                        <span>{selectedTicket.title}</span>
+                        <StatusBadge status={selectedTicket.status} label={statusLabelMap[selectedTicket.status] || selectedTicket.status || 'Chưa rõ'} />
+                    </span>
+                ) : ''}
+                size="xl"
+                footer={null}
+            >
                 {detailLoading ? (
-                    <LoadingBlock text="Đang tải chi tiết ticket..." />
+                    <LoadingBlock text="Đang tải chi tiết phản ánh..." />
                 ) : selectedTicket ? (
-                    <div className="feedback-detail-layout">
-                        <div className="feedback-detail-panel">
-                            <div className="detail-topbar">
-                                <div>
-                                    <span className="detail-kicker">Thông tin phản ánh</span>
-                                    <h3>{selectedTicket.title}</h3>
+                    <div className="detail-shell">
+                        <div className="detail-content-grid">
+                            <div className="detail-column-main">
+                                <div className="detail-panel">
+                                    <div className="detail-panel-head">
+                                        <h3>Thông tin người gửi</h3>
+                                    </div>
+                                    <div className="student-summary">
+                                        <div className="avatar avatar-lg">{(selectedTicket.studentName || 'S').charAt(0).toUpperCase()}</div>
+                                        <div className="student-summary-meta">
+                                            <strong>{selectedTicket.studentName || 'Sinh viên chưa cập nhật'}</strong>
+                                            <span>{selectedTicket.studentCode || 'Mã sinh viên: —'}</span>
+                                            <span>{selectedTicket.studentEmail || 'Email: —'}</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <TicketBadge status={selectedTicket.status} />
+
+                                <div className="detail-panel">
+                                    <div className="detail-panel-head">
+                                        <h3>Nội dung phản ánh</h3>
+                                    </div>
+                                    <div className="content-card">
+                                        <div className="content-card-header">
+                                            <span className="content-card-title">{selectedTicket.title}</span>
+                                            <span className="content-card-time">{formatDateTime(selectedTicket.createdAt)}</span>
+                                        </div>
+                                        <div className="content-body">{selectedTicket.content}</div>
+                                        {selectedTicket.attachmentUrl ? (
+                                            <div className="attachment-row">
+                                                <a href={selectedTicket.attachmentUrl} target="_blank" rel="noreferrer">Xem file đính kèm</a>
+                                            </div>
+                                        ) : null}
+                                    </div>
+
+                                    {selectedTicket.adminNote && (
+                                        <div className="content-note">
+                                            <strong>Ghi chú quản trị</strong>
+                                            <p>{selectedTicket.adminNote}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="detail-panel">
+                                    <div className="detail-panel-head">
+                                        <h3>Trao đổi & phản hồi</h3>
+                                    </div>
+                                    <div className="chat-thread">
+                                        {(selectedTicket.messages || []).length === 0 ? (
+                                            <div className="empty-chat">Chưa có tin nhắn nào.</div>
+                                        ) : (
+                                            (selectedTicket.messages || []).map((message) => (
+                                                <div key={message.id} className={`chat-bubble ${message.senderRole === 'ADMIN' ? 'outgoing' : 'incoming'}`}>
+                                                    <div className="chat-head">
+                                                        <div className="chat-user">
+                                                            <span className="avatar avatar-sm">{(message.senderFullName || 'U').charAt(0).toUpperCase()}</span>
+                                                            <strong>{message.senderFullName || 'Người dùng'}</strong>
+                                                        </div>
+                                                        <span>{messageRoleLabel(message.senderRole)}</span>
+                                                    </div>
+                                                    <p>{message.message}</p>
+                                                    <small>{formatDateTime(message.createdAt)}</small>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="detail-grid">
-                                <div className="meta-card">
-                                    <span>Sinh viên</span>
-                                    <strong>{selectedTicket.studentName || '—'}</strong>
-                                </div>
-                                <div className="meta-card">
-                                    <span>Giảng viên phụ trách</span>
-                                    <strong>{selectedTicket.assignedLecturerName || 'Chưa phân công'}</strong>
-                                </div>
-                                <div className="meta-card">
-                                    <span>Loại</span>
-                                    <strong>{feedbackTypeLabel(selectedTicket.feedbackType)}</strong>
-                                </div>
-                                <div className="meta-card">
-                                    <span>Ngày gửi</span>
-                                    <strong>{formatDateTime(selectedTicket.createdAt)}</strong>
-                                </div>
-                            </div>
-
-                            <div className="detail-block">
-                                <label>Nội dung phản ánh</label>
-                                <div className="text-box">{selectedTicket.content}</div>
-                            </div>
-
-                            {selectedTicket.adminNote && (
-                                <div className="detail-block">
-                                    <label>Ghi chú quản trị</label>
-                                    <div className="text-box text-box-soft">{selectedTicket.adminNote}</div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="feedback-detail-panel">
-                            <div className="timeline-header">Phân công giảng viên</div>
-                            <div className="detail-form-grid">
-                                <Field label="Giảng viên phụ trách">
-                                    <select className="input" value={selectedLecturerId} onChange={(event) => setSelectedLecturerId(event.target.value)}>
-                                        <option value="">Chọn giảng viên...</option>
-                                        {lecturers.map((lecturer) => (
-                                            <option key={lecturer.id} value={String(lecturer.id)}>{lecturer.fullName || lecturer.lecturerCode || lecturer.username}</option>
-                                        ))}
-                                    </select>
-                                </Field>
-                                <Field label="Ghi chú quản trị">
-                                    <input className="input" value={adminNote} onChange={(event) => setAdminNote(event.target.value)} placeholder="Nhập ghi chú..." />
-                                </Field>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                <button className="btn btn-primary" onClick={handleAssign} disabled={assigning}>{assigning ? 'Đang phân công...' : 'Phân công giảng viên'}</button>
-                            </div>
-                        </div>
-
-                        <div className="feedback-detail-panel">
-                            <div className="timeline-header">Tiến độ xử lý</div>
-                            <div className="timeline">
-                                {['PENDING', 'IN_PROGRESS', 'RESPONDED', 'RESOLVED'].map((step, index) => {
-                                    const currentIndex = ['PENDING', 'IN_PROGRESS', 'RESPONDED', 'RESOLVED'].indexOf(selectedTicket.status);
-                                    const isPast = currentIndex >= index;
-                                    const isCurrent = selectedTicket.status === step;
-                                    return (
-                                        <div key={step} className={`timeline-item ${isPast ? 'done' : ''} ${isCurrent ? 'active' : ''}`}>
-                                            <div className="timeline-dot" />
-                                            <div className="timeline-copy">
-                                                <strong>{step === 'PENDING' ? 'Đã gửi phản ánh' : step === 'IN_PROGRESS' ? 'Đã tiếp nhận' : step === 'RESPONDED' ? 'Đã phản hồi' : 'Hoàn thành'}</strong>
-                                                <small>{isCurrent ? 'Đang diễn ra' : isPast ? 'Đã hoàn tất' : 'Chưa bắt đầu'}</small>
+                            <div className="detail-column-side">
+                                <div className="detail-panel">
+                                    <div className="detail-panel-head">
+                                        <h3>Phân công xử lý</h3>
+                                    </div>
+                                    <div className="assignment-box">
+                                        <div className="mentor-summary">
+                                            <div className="avatar avatar-md">{(selectedTicket.assignedLecturerName || 'L').charAt(0).toUpperCase()}</div>
+                                            <div>
+                                                <strong>{selectedTicket.assignedLecturerName || 'Chưa phân công'}</strong>
+                                                <span>{selectedTicket.assignedLecturerCode || 'Giảng viên phụ trách'}</span>
                                             </div>
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        <div className="feedback-detail-panel feedback-chat-panel">
-                            <div className="timeline-header">Lịch sử trao đổi</div>
-                            <div className="chat-thread">
-                                {(selectedTicket.messages || []).length === 0 ? (
-                                    <div className="empty-chat">Chưa có tin nhắn nào.</div>
-                                ) : (
-                                    (selectedTicket.messages || []).map((message) => (
-                                        <div key={message.id} className={`chat-bubble ${message.senderRole === 'ADMIN' ? 'outgoing' : 'incoming'}`}>
-                                            <div className="chat-head">
-                                                <strong>{message.senderFullName || 'Người dùng'}</strong>
-                                                <span>{messageRoleLabel(message.senderRole)}</span>
-                                            </div>
-                                            <p>{message.message}</p>
-                                            <small>{formatDateTime(message.createdAt)}</small>
+                                        <div className="detail-form-grid compact">
+                                            <Field label="Giảng viên phụ trách">
+                                                <select className="input" value={selectedLecturerId} onChange={(event) => setSelectedLecturerId(event.target.value)}>
+                                                    <option value="">Chọn giảng viên...</option>
+                                                    {lecturers.map((lecturer) => (
+                                                        <option key={lecturer.id} value={String(lecturer.id)}>
+                                                            {lecturer.fullName || lecturer.lecturerCode || lecturer.username}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </Field>
+                                            <Field label="Ghi chú quản trị">
+                                                <input className="input" value={adminNote} onChange={(event) => setAdminNote(event.target.value)} placeholder="Nhập ghi chú..." />
+                                            </Field>
                                         </div>
-                                    ))
-                                )}
-                            </div>
-
-                            <div className="reply-box">
-                                <div className="detail-form-grid">
-                                    <Field label="Cập nhật trạng thái">
-                                        <select className="input" value={statusValue} onChange={(event) => setStatusValue(event.target.value)}>
-                                            {STATUS_OPTIONS.filter((option) => option.value).map((option) => (
-                                                <option key={option.value} value={option.value}>{option.label}</option>
-                                            ))}
-                                        </select>
-                                    </Field>
-                                    <Field label="Ghi chú">
-                                        <input className="input" value={statusNote} onChange={(event) => setStatusNote(event.target.value)} placeholder="Nhập ghi chú..." />
-                                    </Field>
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                    <button className="btn btn-primary" onClick={handleStatusUpdate} disabled={updatingStatus}>{updatingStatus ? 'Đang cập nhật...' : 'Cập nhật trạng thái'}</button>
+                                        <div className="detail-actions-row">
+                                            <button className="btn btn-primary" onClick={handleAssign} disabled={assigning}>{assigning ? 'Đang phân công...' : 'Phân công giảng viên'}</button>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <Field label="Thêm tin nhắn">
-                                    <textarea rows={4} className="input" value={replyText} onChange={(event) => setReplyText(event.target.value)} placeholder="Nhập phản hồi hoặc hướng dẫn xử lý..." />
-                                </Field>
-                                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                    <button className="btn btn-primary" onClick={handleReply} disabled={sendingReply}>{sendingReply ? 'Đang gửi...' : 'Gửi tin nhắn'}</button>
+                                <div className="detail-panel">
+                                    <div className="detail-panel-head">
+                                        <h3>Tiến độ xử lý</h3>
+                                    </div>
+                                    <div className="timeline">
+                                        {['PENDING', 'IN_PROGRESS', 'RESPONDED', 'RESOLVED'].map((step, index) => {
+                                            const currentIndex = ['PENDING', 'IN_PROGRESS', 'RESPONDED', 'RESOLVED'].indexOf(selectedTicket.status);
+                                            const isPast = currentIndex >= index;
+                                            const isCurrent = selectedTicket.status === step;
+                                            return (
+                                                <div key={step} className={`timeline-item ${isPast ? 'done' : ''} ${isCurrent ? 'active' : ''}`}>
+                                                    <div className="timeline-marker" aria-hidden="true" />
+                                                    <div className="timeline-content">
+                                                        <div className="timeline-copy">
+                                                            <strong>{step === 'PENDING' ? 'Đã gửi phản ánh' : step === 'IN_PROGRESS' ? 'Đã tiếp nhận' : step === 'RESPONDED' ? 'Đã phản hồi' : 'Hoàn thành'}</strong>
+                                                            <small>{isCurrent ? 'Đang diễn ra' : isPast ? 'Đã hoàn tất' : 'Chưa bắt đầu'}</small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="detail-panel">
+                                    <div className="detail-panel-head">
+                                        <h3>Thao tác xử lý</h3>
+                                    </div>
+                                    <div className="reply-box">
+                                        <div className="detail-form-grid compact">
+                                            <Field label="Cập nhật trạng thái">
+                                                <select className="input" value={statusValue} onChange={(event) => setStatusValue(event.target.value)}>
+                                                    {STATUS_OPTIONS.filter((option) => option.value).map((option) => (
+                                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                                    ))}
+                                                </select>
+                                            </Field>
+                                            <Field label="Ghi chú">
+                                                <input className="input" value={statusNote} onChange={(event) => setStatusNote(event.target.value)} placeholder="Nhập ghi chú..." />
+                                            </Field>
+                                        </div>
+                                        <div className="detail-actions-row">
+                                            <button className="btn btn-primary" onClick={handleStatusUpdate} disabled={updatingStatus}>{updatingStatus ? 'Đang cập nhật...' : 'Cập nhật trạng thái'}</button>
+                                        </div>
+
+                                        <Field label="Thêm tin nhắn">
+                                            <textarea rows={4} className="input" value={replyText} onChange={(event) => setReplyText(event.target.value)} placeholder="Nhập phản hồi hoặc hướng dẫn xử lý..." />
+                                        </Field>
+                                        <div className="detail-actions-row">
+                                            <button className="btn btn-primary" onClick={handleReply} disabled={sendingReply}>{sendingReply ? 'Đang gửi...' : 'Gửi tin nhắn'}</button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 ) : null}
             </Modal>
-        </div>
+        </>
     );
 };
 
