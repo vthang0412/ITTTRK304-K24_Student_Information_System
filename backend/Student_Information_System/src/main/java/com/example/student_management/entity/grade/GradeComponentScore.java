@@ -32,7 +32,7 @@ public class GradeComponentScore {
     @JoinColumn(name = "enrollment_id", nullable = false)
     private Enrollment enrollment;
 
-    @Column(nullable = false, precision = 5, scale = 2)
+    @Column(nullable = false, precision = 4, scale = 2)
     private BigDecimal score;
 
     private String updatedBy;

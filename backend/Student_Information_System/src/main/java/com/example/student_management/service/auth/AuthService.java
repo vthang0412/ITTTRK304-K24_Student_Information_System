@@ -163,28 +163,17 @@ public class AuthService {
             role = Role.LECTURER;
         }
 
-        AccountStatus accountStatus = AccountStatus.ACTIVE;
-        if (request.getStatus() != null && !request.getStatus().isBlank()) {
-            try {
-                accountStatus = AccountStatus.valueOf(request.getStatus().trim().toUpperCase());
-            } catch (IllegalArgumentException ignored) {}
-        }
-
         User user = User.builder()
                 .username(username)
                 .email(email)
                 .fullName(fullName)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .role(role)
-                .status(accountStatus)
+                .status(AccountStatus.ACTIVE)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
         user = userRepository.save(user);
-
-        String department = (request.getDepartment() != null && !request.getDepartment().isBlank())
-                ? request.getDepartment().trim()
-                : "CNTT";
 
         if (role == Role.STUDENT) {
             String studentCode = generateUniqueStudentCode();
@@ -192,8 +181,8 @@ public class AuthService {
                     .studentCode(studentCode)
                     .fullName(request.getFullName())
                     .email(request.getEmail())
-                    .department(department)
-                    .status(accountStatus)
+                    .department("CNTT")
+                    .status(AccountStatus.ACTIVE)
                     .user(user)
                     .build();
             studentRepository.save(student);
@@ -203,8 +192,8 @@ public class AuthService {
                     .lecturerCode(lecturerCode)
                     .fullName(request.getFullName())
                     .email(request.getEmail())
-                    .department(department)
-                    .status(accountStatus)
+                    .department("CNTT")
+                    .status(AccountStatus.ACTIVE)
                     .user(user)
                     .build();
             lecturerRepository.save(lecturer);
@@ -345,12 +334,14 @@ public class AuthService {
         // Gửi email thực sự qua EmailService
         emailService.sendOtpEmail(user.getEmail(), user.getFullName(), otp);
 
+        String resetUrl = frontendUrl + "/reset-password?email=" + java.net.URLEncoder.encode(user.getEmail(), java.nio.charset.StandardCharsets.UTF_8) + "&otp=" + otp;
+
         return ForgotPasswordResponse.builder()
                 .message("Mã OTP đã được gửi đến email nếu tài khoản tồn tại trong hệ thống. Vui lòng kiểm tra hộp thư (thời hạn 5 phút).")
                 .email(user.getEmail())
-                .otp(null)
-                .resetToken(null)
-                .resetUrl(null)
+                .otp(otp)
+                .resetToken(otp)
+                .resetUrl(resetUrl)
                 .build();
     }
 

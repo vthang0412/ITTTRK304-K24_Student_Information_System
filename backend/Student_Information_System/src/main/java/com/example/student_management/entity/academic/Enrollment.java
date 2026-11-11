@@ -3,7 +3,6 @@ package com.example.student_management.entity.academic;
 
 import com.example.student_management.entity.auth.Student;
 import com.example.student_management.entity.grade.Grade;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -42,7 +41,6 @@ public class Enrollment {
 
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
-    @JsonIgnore
     @OneToOne(mappedBy = "enrollment", fetch = FetchType.LAZY)
     private Grade grade;
 }

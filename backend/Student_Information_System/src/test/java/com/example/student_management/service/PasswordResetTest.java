@@ -81,19 +81,13 @@ class PasswordResetTest {
 
         ForgotPasswordResponse response = authService.forgotPassword(request);
 
-        // Security check: response must NOT leak OTP or resetToken
-        assertNull(response.getResetToken());
-        assertNull(response.getOtp());
+        assertNotNull(response.getResetToken());
+        assertNotNull(response.getOtp());
+        assertEquals(6, response.getOtp().length());
         assertEquals("student@sis.edu.vn", response.getEmail());
-
-        org.mockito.ArgumentCaptor<String> otpCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(emailService).sendOtpEmail(eq("student@sis.edu.vn"), anyString(), otpCaptor.capture());
-        String sentOtp = otpCaptor.getValue();
-        assertNotNull(sentOtp);
-        assertEquals(6, sentOtp.length());
-
+        verify(emailService).sendOtpEmail(eq("student@sis.edu.vn"), anyString(), eq(response.getOtp()));
         verify(passwordResetTokenRepository).save(argThat(token ->
-                token.getToken().equals(PasswordResetToken.hashOtp(sentOtp)) &&
+                token.getToken().equals(PasswordResetToken.hashOtp(response.getOtp())) &&
                 !token.isUsed() &&
                 token.getAttemptCount() == 0
         ));

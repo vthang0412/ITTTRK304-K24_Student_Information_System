@@ -1,7 +1,5 @@
 package com.example.student_management.entity.auth;
 
-
-
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

@@ -141,18 +141,6 @@ public class MeController {
             if (request.getDepartment() != null) {
                 student.setDepartment(request.getDepartment().trim());
             }
-            if (request.getPhone() != null) {
-                student.setPhone(request.getPhone().trim());
-            }
-            if (request.getClassName() != null) {
-                student.setClassName(request.getClassName().trim());
-            }
-            if (request.getMajor() != null) {
-                student.setMajor(request.getMajor().trim());
-            }
-            if (request.getAcademicStatus() != null) {
-                student.setAcademicStatus(request.getAcademicStatus().trim());
-            }
             studentRepository.save(student);
         } else if (lecturer != null) {
             lecturer.setFullName(fullName);
@@ -190,10 +178,6 @@ public class MeController {
             result.put("studentCode", student.getStudentCode());
             result.put("fullName", student.getFullName());
             result.put("department", student.getDepartment());
-            result.put("phone", student.getPhone());
-            result.put("className", student.getClassName());
-            result.put("major", student.getMajor());
-            result.put("academicStatus", student.getAcademicStatus());
             result.put("profileStatus", student.getStatus());
         }
 

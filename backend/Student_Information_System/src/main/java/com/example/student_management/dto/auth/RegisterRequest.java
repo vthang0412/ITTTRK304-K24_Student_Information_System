@@ -25,8 +25,4 @@ public class RegisterRequest {
     private String fullName;
 
     private String role; // STUDENT or LECTURER
-
-    private String department;
-
-    private String status;
 }
