@@ -31,7 +31,7 @@ public class LecturerController {
     private PasswordEncoder passwordEncoder;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STUDENT', 'LECTURER')")
     public ResponseEntity<List<Lecturer>> getAll() {
         return ResponseEntity.ok(lecturerRepository.findAll());
     }

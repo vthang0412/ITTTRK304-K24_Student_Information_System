@@ -67,13 +67,23 @@ public class FeedbackServiceImpl implements FeedbackService {
             section = courseSectionRepository.findById(request.getCourseSectionId()).orElse(null);
         }
 
+        Lecturer assignedLecturer = null;
+        if (request.getLecturerId() != null) {
+            assignedLecturer = lecturerRepository.findById(request.getLecturerId()).orElse(null);
+        } else if (section != null && section.getLecturer() != null) {
+            assignedLecturer = section.getLecturer();
+        }
+
+        FeedbackStatus initialStatus = (assignedLecturer != null) ? FeedbackStatus.IN_PROGRESS : FeedbackStatus.PENDING;
+
         Feedback feedback = Feedback.builder()
                 .title(request.getTitle().trim())
                 .feedbackType(request.getFeedbackType())
                 .content(request.getContent().trim())
-                .status(FeedbackStatus.PENDING)
+                .status(initialStatus)
                 .student(student)
                 .courseSection(section)
+                .assignedLecturer(assignedLecturer)
                 .createdAt(LocalDateTime.now())
                 .build();
 
@@ -88,11 +98,46 @@ public class FeedbackServiceImpl implements FeedbackService {
                 .build();
         feedbackMessageRepository.save(initialMessage);
 
+        // Nếu đã được gán trực tiếp cho giảng viên, ghi nhận vào luồng trao đổi
+        if (assignedLecturer != null) {
+            FeedbackMessage autoAssignMessage = FeedbackMessage.builder()
+                    .feedback(saved)
+                    .sender(user)
+                    .message("Hệ thống: Sinh viên đã chỉ định gửi trực tiếp đến Giảng viên " + assignedLecturer.getFullName() + " tiếp nhận xử lý.")
+                    .createdAt(LocalDateTime.now().plusSeconds(1))
+                    .build();
+            feedbackMessageRepository.save(autoAssignMessage);
+        }
+
+        // Tự động thông báo cho Giảng viên được phân công (nếu có tài khoản)
+        if (assignedLecturer != null && assignedLecturer.getUser() != null) {
+            try {
+                notificationService.sendSystemNotification(
+                        assignedLecturer.getUser(),
+                        "Bạn nhận được phản ánh mới từ sinh viên " + student.getFullName(),
+                        "Sinh viên " + student.getFullName() + " (" + student.getStudentCode() + ") đã gửi phản ánh #" + saved.getId() + ": \"" + saved.getTitle() + "\"",
+                        "ACADEMIC"
+                );
+            } catch (Exception ignored) {}
+        }
+
+        // Tự động thông báo xác nhận cho Sinh viên
+        try {
+            notificationService.sendSystemNotification(
+                    user,
+                    "Gửi phản ánh thành công: #" + saved.getId(),
+                    "Phản ánh \"" + saved.getTitle() + "\" của bạn đã được tiếp nhận" +
+                            (assignedLecturer != null ? " và chuyển trực tiếp tới Giảng viên " + assignedLecturer.getFullName() + "." : " và đang chờ tiếp nhận."),
+                    "ACADEMIC"
+            );
+        } catch (Exception ignored) {}
+
         // Gửi thông báo đến Admin
         try {
             Notification notification = Notification.builder()
                     .title("Phản ánh mới từ sinh viên " + student.getFullName())
-                    .content("Sinh viên " + student.getFullName() + " (" + student.getStudentCode() + ") đã gửi phản ánh: \"" + saved.getTitle() + "\"")
+                    .content("Sinh viên " + student.getFullName() + " (" + student.getStudentCode() + ") đã gửi phản ánh: \"" + saved.getTitle() + "\"" +
+                            (assignedLecturer != null ? " (Chỉ định cho GV " + assignedLecturer.getFullName() + ")" : ""))
                     .type("ACADEMIC")
                     .targetRole(Role.ADMIN)
                     .sender(user)
