@@ -27,13 +27,12 @@ const typeColor = (type) => ({
 }[type] || '#6366f1');
 
 /* ─── Modal chi tiết thông báo ─────────────────────────── */
-const NotificationModal = ({ notification, onClose, onRead }) => {
+const NotificationModal = ({ notification, onClose, onRead, onDelete }) => {
   useEffect(() => {
     if (!notification) return undefined;
     document.body.style.overflow = 'hidden';
-    if (!notification.isRead) onRead(notification.id);
     return () => { document.body.style.overflow = ''; };
-  }, [notification]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [notification]);
 
   if (!notification) return null;
 
@@ -61,7 +60,6 @@ const NotificationModal = ({ notification, onClose, onRead }) => {
           animation: 'ntfSlideUp .22s ease',
         }}
       >
-        {/* Header */}
         <div style={{
           padding: '20px 24px 16px',
           borderBottom: '1px solid var(--border)',
@@ -106,15 +104,25 @@ const NotificationModal = ({ notification, onClose, onRead }) => {
           >×</button>
         </div>
 
-        {/* Body */}
         <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
           <p style={{ margin: 0, lineHeight: 1.8, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>
             {notification.content}
           </p>
         </div>
 
-        {/* Footer */}
-        <div style={{ padding: '12px 24px 20px', borderTop: '1px solid var(--border)' }}>
+        <div style={{ padding: '12px 24px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {!notification.isRead && (
+              <button className="btn btn-primary btn-sm" onClick={() => onRead(notification.id)}>
+                <CheckIcon size={15} /> Đánh dấu đã đọc
+              </button>
+            )}
+            {typeof onDelete === 'function' && (
+              <button className="btn btn-secondary btn-sm" onClick={() => onDelete(notification.id)}>
+                <InboxIcon size={15} /> Xóa thông báo
+              </button>
+            )}
+          </div>
           <button className="btn btn-secondary" onClick={onClose}>Đóng</button>
         </div>
       </div>
@@ -206,13 +214,23 @@ const StudentNotifications = () => {
   const [filter, setFilter] = useState('ALL'); // ALL | UNREAD | READ
   const [page, setPage] = useState(1);
   const [markingAll, setMarkingAll] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+
+  const refreshUnreadBadge = () => {
+    window.dispatchEvent(new CustomEvent('notifications:updated'));
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const res = await notificationApi.getAll();
-      setNotifications(res.data || []);
+      const nextNotifications = Array.isArray(res?.data) ? res.data : [];
+      setNotifications(nextNotifications.map((n) => ({
+        ...n,
+        isRead: Boolean(n.isRead),
+      })));
+      refreshUnreadBadge();
     } catch {
       setError('Không thể tải thông báo. Vui lòng thử lại.');
     } finally {
@@ -224,11 +242,31 @@ const StudentNotifications = () => {
 
   const handleRead = async (id) => {
     try {
-      await notificationApi.markAsRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
-      );
-    } catch { /* bỏ qua – không quan trọng */ }
+      const res = await notificationApi.markAsRead(id);
+      const nextReadState = Boolean(res?.data?.isRead ?? true);
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: nextReadState } : n)));
+      setSelected((prev) => (prev && prev.id === id ? { ...prev, isRead: nextReadState } : prev));
+      refreshUnreadBadge();
+    } catch {
+      toast.error('Không thể đánh dấu đã đọc', 'Vui lòng thử lại sau.');
+    }
+  };
+
+  const handleDelete = async (id) => {
+    const target = notifications.find((n) => n.id === id);
+    if (!target) return;
+    setDeletingId(id);
+    try {
+      await notificationApi.delete(id);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      setSelected((prev) => (prev && prev.id === id ? null : prev));
+      refreshUnreadBadge();
+      toast.success('Đã xóa thông báo', `"${target.title}" đã được xóa.`);
+    } catch {
+      toast.error('Không thể xóa thông báo', 'Vui lòng thử lại sau.');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const handleMarkAllRead = async () => {
@@ -236,6 +274,7 @@ const StudentNotifications = () => {
     try {
       await notificationApi.markAllAsRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      setSelected((prev) => (prev ? { ...prev, isRead: true } : prev));
       toast.success('Đã đánh dấu tất cả là đã đọc', '');
     } catch {
       toast.error('Không thể đánh dấu', 'Vui lòng thử lại sau.');
@@ -343,6 +382,7 @@ const StudentNotifications = () => {
         notification={selected}
         onClose={() => setSelected(null)}
         onRead={handleRead}
+        onDelete={handleDelete}
       />
 
       <style>{`

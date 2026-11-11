@@ -36,11 +36,20 @@ const Login = () => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  /* Kiểm tra xem lỗi có phải do tài khoản bị vô hiệu hoá không */
+  /* Kiểm tra xem lỗi có phải do tài khoản bị vô hiệu hoá/ngừng hoạt động không.
+   * Backend trả HTTP 401 + message tiếng Việt chứa "ngừng hoạt động" hoặc "bị khóa",
+   * hoặc Spring Security cũ trả "Account is disabled" / "disabled".
+   */
   const isDisabledAccount = (err) => {
     const data = err?.response?.data;
     const msg = (typeof data === 'string' ? data : data?.message) || '';
-    return msg === 'Account is disabled' || msg.toLowerCase().includes('disabled');
+    const lc = msg.toLowerCase();
+    return (
+      lc.includes('ngừng hoạt động') ||
+      lc.includes('bị khóa') ||
+      lc.includes('disabled') ||
+      msg === 'Account is disabled'
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -99,22 +108,32 @@ const Login = () => {
       }, 2200);
     } catch (err) {
       if (isDisabledAccount(err)) {
+        // Tài khoản bị ngừng hoạt động - thông báo có nút xác nhận
         toast.showAuthModal({
           icon: 'warning',
-          title: 'Tài khoản đã bị khóa',
-          message: 'Tài khoản của bạn đã bị quản trị viên ngừng hoạt động. Vui lòng liên hệ Admin để được hỗ trợ.',
-          duration: 4000,
+          title: 'Tài khoản đã bị khoá',
+          message:
+            'Tài khoản của bạn đã bị quản trị viên ngừng hoạt động. Vui lòng liên hệ Admin để được hỗ trợ.',
+          duration: 0,
           showConfirmButton: true,
           confirmButtonText: 'Đã hiểu',
         });
+        setError(
+          'Tài khoản của bạn đã bị quản trị viên ngừng hoạt động. Vui lòng liên hệ Admin.'
+        );
       } else {
-        const message = getErrorMessage(err, 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.');
+        // Sai thông tin đăng nhập hoặc lỗi server
+        const rawMsg = err?.response?.data?.message || err?.response?.data || '';
+        const message =
+          typeof rawMsg === 'string' && rawMsg.trim()
+            ? rawMsg
+            : 'Tên đăng nhập hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.';
         setError(message);
         toast.showAuthModal({
           icon: 'error',
           title: 'Đăng nhập thất bại',
           message,
-          duration: 2200,
+          duration: 2500,
         });
       }
     } finally {
