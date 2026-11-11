@@ -4,7 +4,6 @@ import com.example.student_management.entity.auth.AccountStatus;
 import com.example.student_management.entity.auth.Student;
 import com.example.student_management.entity.auth.User;
 import com.example.student_management.exception.BadRequestException;
-import com.example.student_management.exception.ForbiddenException;
 import com.example.student_management.exception.NotFoundException;
 import com.example.student_management.repository.auth.StudentRepository;
 import com.example.student_management.repository.auth.UserRepository;
@@ -14,7 +13,6 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -44,18 +42,10 @@ public class StudentController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('STUDENT')")
-    public ResponseEntity<Student> getById(@PathVariable Long id, Authentication authentication) {
-        Student student = studentService.findById(id)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy sinh viên"));
-
-        boolean isAdmin = authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
-        if (!isAdmin) {
-            if (student.getUser() == null || !student.getUser().getUsername().equals(authentication.getName())) {
-                throw new ForbiddenException("Bạn không có quyền xem thông tin của sinh viên khác");
-            }
-        }
-        return ResponseEntity.ok(student);
+    public ResponseEntity<Student> getById(@PathVariable Long id) {
+        return studentService.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
@@ -74,10 +64,6 @@ public class StudentController {
         String fullName = payload.get("fullName") != null ? payload.get("fullName").toString().trim() : existing.getFullName();
         String email = payload.get("email") != null ? payload.get("email").toString().trim() : existing.getEmail();
         String department = payload.get("department") != null ? payload.get("department").toString().trim() : existing.getDepartment();
-        String phone = payload.get("phone") != null ? payload.get("phone").toString().trim() : existing.getPhone();
-        String className = payload.get("className") != null ? payload.get("className").toString().trim() : existing.getClassName();
-        String major = payload.get("major") != null ? payload.get("major").toString().trim() : existing.getMajor();
-        String academicStatus = payload.get("academicStatus") != null ? payload.get("academicStatus").toString().trim() : existing.getAcademicStatus();
         String statusValue = payload.get("status") != null ? payload.get("status").toString() : (existing.getStatus() != null ? existing.getStatus().name() : null);
         String password = payload.get("password") != null ? payload.get("password").toString() : null;
 
@@ -113,10 +99,6 @@ public class StudentController {
         existing.setFullName(fullName);
         existing.setEmail(email);
         existing.setDepartment(department);
-        existing.setPhone(phone);
-        existing.setClassName(className);
-        existing.setMajor(major);
-        existing.setAcademicStatus(academicStatus);
 
         if (user != null) {
             user.setFullName(fullName);

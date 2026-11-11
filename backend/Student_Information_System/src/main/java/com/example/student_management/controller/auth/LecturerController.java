@@ -36,14 +36,6 @@ public class LecturerController {
         return ResponseEntity.ok(lecturerRepository.findAll());
     }
 
-    @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Lecturer> getById(@PathVariable Long id) {
-        return lecturerRepository.findById(id)
-                .map(ResponseEntity::ok)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy giảng viên"));
-    }
-
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Lecturer> create(@RequestBody Lecturer lecturer) {

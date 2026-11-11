@@ -34,7 +34,7 @@ public class GradeComponent {
     @Column(nullable = false, precision = 5, scale = 2)
     private BigDecimal weight;
 
-    @Column(nullable = false, precision = 5, scale = 2)
+    @Column(nullable = false, precision = 4, scale = 2)
     private BigDecimal maxScore;
 
     private String componentType;

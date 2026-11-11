@@ -30,37 +30,18 @@ public class CourseController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Course> create(@RequestBody Course course) {
-        if (course.getCourseCode() == null || course.getCourseCode().isBlank()) {
-            throw new BadRequestException("Mã môn học không được để trống");
-        }
-        if (course.getCourseName() == null || course.getCourseName().isBlank()) {
-            throw new BadRequestException("Tên môn học không được để trống");
-        }
-        if (course.getCredits() == null || course.getCredits() < 1) {
-            throw new BadRequestException("Số tín chỉ phải lớn hơn 0");
-        }
-        course.setCourseCode(course.getCourseCode().trim());
-        course.setCourseName(course.getCourseName().trim());
         return ResponseEntity.ok(courseRepository.save(course));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Course> update(@PathVariable Long id, @RequestBody Course course) {
-        if (course.getCourseName() == null || course.getCourseName().isBlank()) {
-            throw new BadRequestException("Tên môn học không được để trống");
-        }
-        if (course.getCredits() == null || course.getCredits() < 1) {
-            throw new BadRequestException("Số tín chỉ phải lớn hơn 0");
-        }
         return courseRepository.findById(id)
                 .map(existing -> {
-                    existing.setCourseName(course.getCourseName().trim());
+                    existing.setCourseName(course.getCourseName());
                     existing.setCredits(course.getCredits());
                     existing.setDescription(course.getDescription());
-                    if (course.getStatus() != null) {
-                        existing.setStatus(course.getStatus());
-                    }
+                    existing.setStatus(course.getStatus());
                     return ResponseEntity.ok(courseRepository.save(existing));
                 })
                 .orElse(ResponseEntity.notFound().build());

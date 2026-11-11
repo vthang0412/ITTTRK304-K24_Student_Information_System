@@ -23,21 +23,5 @@ public class StudentRequest {
 
     private String department;
 
-    private String phone;
-
-    private String className;
-
-    private String major;
-
-    private String academicStatus;
-
-    private String phone;
-
-    private String className;
-
-    private String major;
-
-    private String academicStatus;
-
     private String status;
 }
