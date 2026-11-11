@@ -44,6 +44,7 @@ const AdminGradebookConfig = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [detail, setDetail] = useState(null);
+  const [summary, setSummary] = useState(null);
   const [rows, setRows] = useState([]);
   const [error, setError] = useState('');
 
@@ -65,6 +66,7 @@ const AdminGradebookConfig = () => {
   useEffect(() => {
     if (!sectionId) {
       setDetail(null);
+      setSummary(null);
       setRows([]);
       return;
     }
@@ -75,9 +77,20 @@ const AdminGradebookConfig = () => {
         const res = await gradebookApi.getSectionDetail(sectionId);
         setDetail(res.data);
         setRows(toRows(res.data.components));
+        if (res.data?.gradebookId) {
+          try {
+            const sumRes = await gradebookApi.getById(res.data.gradebookId);
+            setSummary(sumRes.data);
+          } catch {
+            setSummary(null);
+          }
+        } else {
+          setSummary(null);
+        }
       } catch (err) {
         setError(getErrorMessage(err, 'Không tải được cấu hình thành phần điểm.'));
         setDetail(null);
+        setSummary(null);
         setRows([]);
       } finally {
         setLoading(false);
@@ -144,16 +157,24 @@ const AdminGradebookConfig = () => {
     try {
       const payload = rows.map((row, index) => ({
         componentName: row.componentName.trim(),
-        weight: Number(row.weight),
-        maxScore: Number(row.maxScore),
-        componentType: row.componentType,
+        weight: Number(Number(row.weight).toFixed(2)),
+        maxScore: Number(Number(row.maxScore).toFixed(2)),
+        componentType: row.componentType || 'OTHER',
         displayOrder: index + 1,
-        required: true,
+        required: row.required !== false,
       }));
       await gradebookApi.updateComponents(sectionId, payload);
       const res = await gradebookApi.getSectionDetail(sectionId);
       setDetail(res.data);
       setRows(toRows(res.data.components));
+      if (res.data?.gradebookId) {
+        try {
+          const sumRes = await gradebookApi.getById(res.data.gradebookId);
+          setSummary(sumRes.data);
+        } catch {
+          // ignore
+        }
+      }
       toast.success('Lưu cấu hình thành công', 'Cấu hình thành phần điểm đã được cập nhật.');
     } catch (err) {
       const message = getErrorMessage(err, 'Không lưu được cấu hình thành phần điểm.');
@@ -194,9 +215,15 @@ const AdminGradebookConfig = () => {
         </select>
         {detail && (
           <>
-            <span className="chip">
-              {detail.gradingMode === 'COMPONENT' ? 'Đang dùng điểm thành phần' : 'Đang dùng điểm cuối kỳ'}
-            </span>
+            {(summary?.gradingMode || detail.gradingMode) && (
+              <span className="chip">
+                {(summary?.gradingMode || detail.gradingMode) === 'COMPONENT'
+                  ? 'Điểm thành phần'
+                  : (summary?.gradingMode || detail.gradingMode) === 'FINAL'
+                    ? 'Điểm cuối kỳ'
+                    : (summary?.gradingMode || detail.gradingMode)}
+              </span>
+            )}
             <StatusBadge status={detail.status} />
           </>
         )}
@@ -224,7 +251,7 @@ const AdminGradebookConfig = () => {
           <div className="card-head">
             <div>
               <h3>{selectedSection?.sectionCode || detail.sectionCode} · {selectedSection?.course?.courseName || detail.courseName}</h3>
-              <p className="muted small">Giảng viên: {detail.lecturerName || 'Chưa phân công'} · Sinh viên: {detail.enrollments?.length || 0}</p>
+              <p className="muted small">Giảng viên: {summary?.lecturerName || selectedSection?.lecturer?.fullName || detail.lecturerName || 'Chưa phân công'} · Sinh viên: {detail.enrollments?.length ?? summary?.totalStudents ?? 0}</p>
             </div>
             <div className="row-actions">
               <button className="btn btn-secondary" onClick={applyTemplate} disabled={!editable || saving}>Mẫu 10/20/70</button>
@@ -275,7 +302,7 @@ const AdminGradebookConfig = () => {
                       <input
                         className="input"
                         type="number"
-                        min="0"
+                        min="0.01"
                         max="100"
                         step="0.01"
                         value={row.weight}
@@ -287,7 +314,7 @@ const AdminGradebookConfig = () => {
                       <input
                         className="input"
                         type="number"
-                        min="0"
+                        min="0.01"
                         max="100"
                         step="0.01"
                         value={row.maxScore}

@@ -104,31 +104,9 @@ const AdminCourses = () => {
   };
 
   const handleDelete = async (course) => {
-    const inUse = courses.some((item) => item.id !== course.id && item.sections?.some?.((section) => section.courseId === course.id));
-    if (inUse || (course.status === 'ACTIVE' && course.id)) {
-      const reason = inUse ? 'Môn học này đã được gắn vào lớp học phần hoặc dữ liệu liên quan, nên không thể xóa cứng.' : 'Môn học đang còn hoạt động và cần được chuyển sang trạng thái ngừng hoạt động thay vì xóa.';
-      await Swal.fire({
-        title: 'Không thể xóa môn học',
-        text: reason,
-        icon: 'warning',
-        confirmButtonText: 'Đã hiểu',
-        customClass: {
-          popup: 'swal-auth-popup',
-          title: 'swal-auth-title',
-          htmlContainer: 'swal-auth-text',
-          confirmButton: 'swal-auth-confirm',
-          icon: 'swal-auth-icon',
-        },
-        buttonsStyling: false,
-        background: '#ffffff',
-        color: '#0f172a',
-      });
-      return;
-    }
-
     const result = await Swal.fire({
       title: 'Xác nhận xoá môn học?',
-      text: `Bạn có chắc muốn xoá ${course.courseName || course.courseCode}?`,
+      text: `Bạn có chắc muốn xoá ${course.courseName || course.courseCode}? Lưu ý: Không thể xoá môn học nếu môn học đang được sử dụng bởi học phần hoặc dữ liệu liên quan.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Xoá môn học',
@@ -145,6 +123,7 @@ const AdminCourses = () => {
       buttonsStyling: false,
       background: '#ffffff',
       color: '#0f172a',
+      width: 440,
     });
 
     if (!result.isConfirmed) return;
@@ -154,12 +133,7 @@ const AdminCourses = () => {
       toast.success('Xoá thành công', `Đã xoá môn học ${course.courseName}.`);
       load();
     } catch (err) {
-      const status = err?.response?.status;
-      if (status === 404 || status === 405) {
-        toast.error('Backend chưa hỗ trợ xóa môn học', 'API DELETE /api/courses/{id} chưa được triển khai hoặc chưa có kiểm tra ràng buộc an toàn. Không có thao tác xóa nào được giả lập thành công.');
-      } else {
-        toast.error('Không thể xóa môn học', getErrorMessage(err));
-      }
+      toast.error('Không thể xóa môn học', getErrorMessage(err));
     }
   };
 
