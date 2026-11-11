@@ -69,11 +69,19 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    setToken(null);
-    setUser(null);
-    localStorage.removeItem('token');
-    persist(null);
+  const logout = async () => {
+    // Gọi API logout để Backend ghi nhận (Backend trả 200 với text thuần).
+    // Dùng try/catch để không block việc xóa session nếu request lỗi.
+    try {
+      await authApi.logout();
+    } catch {
+      // Bỏ qua lỗi logout API – có thể do token đã hết hạn
+    } finally {
+      setToken(null);
+      setUser(null);
+      localStorage.removeItem('token');
+      persist(null);
+    }
   };
 
   return (

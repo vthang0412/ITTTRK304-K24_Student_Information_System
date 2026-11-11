@@ -103,8 +103,8 @@ const AdminSections = () => {
     try {
       const payload = {
         sectionCode: form.sectionCode.trim(),
-        course: { id: Number(form.courseId) },
-        semester: { id: Number(form.semesterId) },
+        course: form.courseId ? { id: Number(form.courseId) } : (editing?.course?.id ? { id: editing.course.id } : null),
+        semester: form.semesterId ? { id: Number(form.semesterId) } : (editing?.semester?.id ? { id: editing.semester.id } : null),
         lecturer: form.lecturerId ? { id: Number(form.lecturerId) } : null,
         capacity: Number(form.capacity),
         schedule: form.schedule.trim(),
@@ -127,33 +127,9 @@ const AdminSections = () => {
   };
 
   const handleDelete = async (section) => {
-    const hasEnrollment = Number(section.enrolledStudents ?? 0) > 0 || Number(section.enrollmentCount ?? 0) > 0;
-    if (hasEnrollment || section.status === 'OPEN' || section.status === 'IN_PROGRESS' || section.status === 'CLOSED') {
-      const reason = hasEnrollment
-        ? 'Lớp học phần đã có sinh viên đăng ký hoặc dữ liệu điểm liên quan, nên không được xóa cứng.'
-        : 'Lớp học phần đang còn hoạt động hoặc đang diễn ra, vui lòng sử dụng chức năng hủy lớp hoặc chuyển trạng thái thay vì xóa cứng.';
-      await Swal.fire({
-        title: 'Không thể xóa lớp học phần',
-        text: reason,
-        icon: 'warning',
-        confirmButtonText: 'Đã hiểu',
-        customClass: {
-          popup: 'swal-auth-popup',
-          title: 'swal-auth-title',
-          htmlContainer: 'swal-auth-text',
-          confirmButton: 'swal-auth-confirm',
-          icon: 'swal-auth-icon',
-        },
-        buttonsStyling: false,
-        background: '#ffffff',
-        color: '#0f172a',
-      });
-      return;
-    }
-
     const result = await Swal.fire({
       title: 'Xác nhận xoá lớp học phần?',
-      text: `Bạn có chắc muốn xoá ${section.sectionCode || 'lớp học phần'}?`,
+      text: `Bạn có chắc muốn xoá ${section.sectionCode || 'lớp học phần'}? Lưu ý: Không thể xoá nếu lớp đã có sinh viên đăng ký, có dữ liệu điểm hoặc đang ở trạng thái mở/diễn ra/đã đóng.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Xoá lớp học phần',
@@ -170,6 +146,7 @@ const AdminSections = () => {
       buttonsStyling: false,
       background: '#ffffff',
       color: '#0f172a',
+      width: 440,
     });
 
     if (!result.isConfirmed) return;
@@ -179,12 +156,7 @@ const AdminSections = () => {
       toast.success('Xoá thành công', `Đã xoá lớp học phần ${section.sectionCode}.`);
       load();
     } catch (err) {
-      const status = err?.response?.status;
-      if (status === 404 || status === 405) {
-        toast.error('Backend chưa hỗ trợ xóa lớp học phần', 'API DELETE /api/course-sections/{id} chưa được triển khai. Không có xóa cứng nào được thực hiện vì hệ thống hiện chưa có route an toàn cho trường hợp này.');
-      } else {
-        toast.error('Không thể xóa lớp học phần', getErrorMessage(err));
-      }
+      toast.error('Không thể xóa lớp học phần', getErrorMessage(err));
     }
   };
 

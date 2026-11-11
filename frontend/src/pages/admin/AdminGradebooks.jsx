@@ -150,15 +150,29 @@ const AdminGradebooks = () => {
       );
     }
     if (item.status === 'LOCKED') {
+      const hasIncomplete = Number(item.incompleteStudents || 0) > 0;
       buttons.push(
-        <button key="approve" className="btn btn-primary btn-sm" onClick={() => setTarget({ type: 'approve', item })}>
+        <button
+          key="approve"
+          className="btn btn-primary btn-sm"
+          onClick={() => setTarget({ type: 'approve', item })}
+          disabled={hasIncomplete}
+          title={hasIncomplete ? 'Không thể duyệt khi còn sinh viên chưa đủ điểm' : 'Duyệt bảng điểm'}
+        >
           <CheckCircleIcon size={14} /> Duyệt
         </button>,
       );
     }
     if (item.status === 'APPROVED') {
+      const hasIncomplete = Number(item.incompleteStudents || 0) > 0;
       buttons.push(
-        <button key="publish" className="btn btn-primary btn-sm" onClick={() => setTarget({ type: 'publish', item })}>
+        <button
+          key="publish"
+          className="btn btn-primary btn-sm"
+          onClick={() => setTarget({ type: 'publish', item })}
+          disabled={hasIncomplete}
+          title={hasIncomplete ? 'Không thể công bố khi còn sinh viên chưa đủ điểm' : 'Công bố bảng điểm'}
+        >
           <AwardIcon size={14} /> Công bố
         </button>,
       );
@@ -255,7 +269,13 @@ const AdminGradebooks = () => {
                           </div>
                         </td>
                         <td>
-                          <span className="chip">{item.gradingMode === 'COMPONENT' ? `${item.componentCount} thành phần` : 'Điểm cuối kỳ'}</span>
+                          <span className="chip">
+                            {item.gradingMode === 'COMPONENT'
+                              ? `${item.componentCount || 0} thành phần`
+                              : item.gradingMode === 'FINAL'
+                                ? 'Điểm cuối kỳ'
+                                : item.gradingMode || '—'}
+                          </span>
                         </td>
                         <td><StatusBadge status={item.status} /></td>
                         <td>
@@ -341,7 +361,7 @@ const AdminGradebooks = () => {
                       </td>
                     </tr>
                   )) : (
-                    <tr><td colSpan={4} className="cell-muted">Lớp chưa có sinh viên đăng ký.</td></tr>
+                    <tr><td colSpan={(detail.data.components?.length || 0) + 3} className="cell-muted" style={{ textAlign: 'center', padding: 24 }}>Lớp chưa có sinh viên đăng ký.</td></tr>
                   )}
                 </tbody>
               </table>
