@@ -110,6 +110,51 @@ public class AIProviderService {
                 .build();
     }
 
+    /**
+     * Gọi AI Provider cho các tác vụ phân tích (Insights, Advisor, Planner).
+     * Trả về success=false nếu chưa cấu hình API key hoặc gọi lỗi để service gọi fallback cục bộ.
+     */
+    public AIProviderResult generateExternalAnalysis(String systemPrompt, String userPrompt) {
+        long start = System.currentTimeMillis();
+        if ("gemini".equalsIgnoreCase(provider) && geminiApiKey != null && !geminiApiKey.isBlank()) {
+            try {
+                String answer = callGeminiApi(systemPrompt, List.of(), userPrompt);
+                if (answer != null && !answer.isBlank()) {
+                    return AIProviderResult.builder()
+                            .content(answer)
+                            .providerUsed("GEMINI")
+                            .modelUsed(model)
+                            .success(true)
+                            .latencyMs(System.currentTimeMillis() - start)
+                            .build();
+                }
+            } catch (Exception ignored) {}
+        }
+
+        if ("openai".equalsIgnoreCase(provider) && openaiApiKey != null && !openaiApiKey.isBlank()) {
+            try {
+                String answer = callOpenAiApi(systemPrompt, List.of(), userPrompt);
+                if (answer != null && !answer.isBlank()) {
+                    return AIProviderResult.builder()
+                            .content(answer)
+                            .providerUsed("OPENAI")
+                            .modelUsed(model)
+                            .success(true)
+                            .latencyMs(System.currentTimeMillis() - start)
+                            .build();
+                }
+            } catch (Exception ignored) {}
+        }
+
+        return AIProviderResult.builder()
+                .content(null)
+                .providerUsed("SIS-ASSISTANT-ENGINE")
+                .modelUsed("sis-local-v1")
+                .success(false)
+                .latencyMs(System.currentTimeMillis() - start)
+                .build();
+    }
+
     private String callGeminiApi(String systemContext, List<Map<String, String>> history, String userQuestion) throws Exception {
         String url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + geminiApiKey.trim();
 
