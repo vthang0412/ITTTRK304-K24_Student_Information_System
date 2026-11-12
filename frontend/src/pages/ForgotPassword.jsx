@@ -25,13 +25,13 @@ const ForgotPassword = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  // backendOtp không được hiển thị/lưu ra ngoài – chỉ dùng nội bộ để tự động điền ô OTP
-  // khi Backend trả về trong response (môi trường dev).
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [success, setSuccess] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [remainingAttempts, setRemainingAttempts] = useState(null);
+  const [otpLocked, setOtpLocked] = useState(false);
 
   const toast = useToast();
   const navigate = useNavigate();
@@ -71,6 +71,9 @@ const ForgotPassword = () => {
       const res = await authApi.forgotPassword({ email: rawEmail });
       const data = res.data || {};
       setStep(2);
+      setOtp('');
+      setRemainingAttempts(null);
+      setOtpLocked(false);
       setCountdown(60);
       toast.success(
         'Đã gửi mã xác thực OTP',
@@ -90,15 +93,18 @@ const ForgotPassword = () => {
     setError('');
     setResending(true);
     try {
-      const res = await authApi.forgotPassword({ email: email.trim().toLowerCase() });
-      const data = res.data || {};
+      await authApi.forgotPassword({ email: email.trim().toLowerCase() });
+      setOtp('');
+      setRemainingAttempts(null);
+      setOtpLocked(false);
       setCountdown(60);
       toast.success(
         'Đã gửi lại mã OTP',
         'Mã OTP mới đã được gửi tới email của bạn (hiệu lực 5 phút).'
       );
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể gửi lại mã OTP. Vui lòng thử lại sau.'));
+      const message = getErrorMessage(err, 'Không thể gửi lại mã OTP. Vui lòng thử lại sau.');
+      setError(message);
     } finally {
       setResending(false);
     }
@@ -168,15 +174,30 @@ const ForgotPassword = () => {
 
       // Phân loại lỗi để hướng dẫn người dùng cụ thể
       const lc = msg.toLowerCase();
+      const remainingMatch = msg.match(/còn\s+(\d+)\s+lần thử/i);
+      if (remainingMatch) {
+        setRemainingAttempts(Number(remainingMatch[1]));
+      }
       let shouldGoBackToStep1 = false;
       if (lc.includes('hết hạn') || lc.includes('5 phút')) {
         // OTP đã hết hạn - cần quay lại bước 1
         shouldGoBackToStep1 = true;
-      } else if (lc.includes('quá 5 lần') || lc.includes('vô hiệu hóa') || lc.includes('thao tác lại từ đầu')) {
+      } else if (
+        lc.includes('hết số lần thử') ||
+        lc.includes('quá 5 lần') ||
+        lc.includes('vô hiệu hóa') ||
+        lc.includes('đã được sử dụng') ||
+        lc.includes('không còn hợp lệ') ||
+        lc.includes('thao tác lại từ đầu')
+      ) {
         // OTP bị vô hiệu hoá do nhập sai quá nhiều - cần quay lại bước 1
         shouldGoBackToStep1 = true;
       }
 
+      if (shouldGoBackToStep1) {
+        setOtpLocked(true);
+        setRemainingAttempts(0);
+      }
       setError(msg);
       toast.showAuthModal({
         icon: 'error',
@@ -199,6 +220,8 @@ const ForgotPassword = () => {
     setStep(1);
     setOtp('');
     setError('');
+    setRemainingAttempts(null);
+    setOtpLocked(false);
   };
 
   return (
@@ -211,6 +234,13 @@ const ForgotPassword = () => {
       }
     >
       {error && <Alert tone="error">{error}</Alert>}
+      {step === 2 && remainingAttempts !== null && !otpLocked && (
+        <Alert tone="warning">
+          {remainingAttempts === 1
+            ? 'Bạn chỉ còn 1 lần thử.'
+            : `Bạn còn ${remainingAttempts} lần thử.`}
+        </Alert>
+      )}
 
       {success ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -334,10 +364,16 @@ const ForgotPassword = () => {
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="000000"
                 autoFocus
-                disabled={loading}
+                disabled={loading || otpLocked}
               />
             </div>
           </Field>
+
+          {otpLocked && (
+            <button type="button" className="btn btn-secondary btn-block" onClick={handleBackToStep1}>
+              Yêu cầu mã OTP mới
+            </button>
+          )}
 
           <Field label="Mật khẩu mới" required hint="Tối thiểu 6 ký tự, không có khoảng trắng ở đầu hoặc cuối">
             <div style={{ position: 'relative' }}>
@@ -387,7 +423,7 @@ const ForgotPassword = () => {
             </div>
           </Field>
 
-          <button className="btn btn-primary btn-block" type="submit" disabled={loading} style={{ marginTop: 10 }}>
+          <button className="btn btn-primary btn-block" type="submit" disabled={loading || otpLocked} style={{ marginTop: 10 }}>
             {loading ? (
               <>
                 <span className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,.35)' }} />

@@ -10,9 +10,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ForgotPasswordResponse {
+    // Chỉ trả về thông điệp chung, không trả OTP/token/email để tránh lộ bí mật
+    // và tránh dò quét sự tồn tại của tài khoản (account enumeration).
     private String message;
-    private String email;
-    private String otp;
-    private String resetToken;
-    private String resetUrl;
 }

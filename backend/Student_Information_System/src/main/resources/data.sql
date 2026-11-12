@@ -5,20 +5,6 @@
 -- ============================================================
 SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- Bổ sung trạng thái mới cho các CSDL đã được tạo từ phiên bản trước.
-ALTER TABLE gradebooks MODIFY COLUMN status ENUM('OPEN', 'LOCKED', 'APPROVED', 'PUBLISHED') NOT NULL;
-
--- Bảng lưu token đặt lại mật khẩu (thời hạn 15 phút, dùng 1 lần)
-CREATE TABLE IF NOT EXISTS password_reset_tokens (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    token VARCHAR(100) NOT NULL UNIQUE,
-    user_id BIGINT NOT NULL,
-    expiry_date DATETIME NOT NULL,
-    used BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_password_reset_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
 -- Script này chỉ BỔ SUNG dữ liệu mẫu và có thể chạy lại nhiều lần.
 -- Tuyệt đối không TRUNCATE/DELETE để tránh xóa dữ liệu nghiệp vụ của người dùng.
 
@@ -334,20 +320,6 @@ WHERE g.status = 'PUBLISHED' AND e.status = 'ENROLLED' AND gc.component_name = '
 -- ------------------------------------------------------------
 -- THÔNG BÁO (NOTIFICATIONS)
 -- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS notifications (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    content TEXT NOT NULL,
-    type VARCHAR(50) NOT NULL DEFAULT 'SYSTEM',
-    recipient_id BIGINT,
-    sender_id BIGINT,
-    target_role VARCHAR(20),
-    is_read BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at DATETIME(6) NOT NULL,
-    CONSTRAINT fk_notification_recipient FOREIGN KEY (recipient_id) REFERENCES users(id) ON DELETE CASCADE,
-    CONSTRAINT fk_notification_sender FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE SET NULL
-);
-
 INSERT IGNORE INTO notifications (title, content, type, recipient_id, sender_id, target_role, is_read, created_at)
 SELECT 'Chào mừng đến với Hệ thống Thông tin Sinh viên', 'Chào mừng bạn đến với cổng thông tin đào tạo trực tuyến.', 'SYSTEM', NULL, 1, NULL, FALSE, NOW()
 WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE title = 'Chào mừng đến với Hệ thống Thông tin Sinh viên');

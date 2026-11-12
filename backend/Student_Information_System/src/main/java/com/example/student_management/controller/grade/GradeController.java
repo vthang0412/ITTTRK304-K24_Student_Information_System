@@ -3,6 +3,7 @@ package com.example.student_management.controller.grade;
 import com.example.student_management.dto.grade.GradeRequest;
 import com.example.student_management.entity.academic.CourseSection;
 import com.example.student_management.entity.academic.Enrollment;
+import com.example.student_management.entity.academic.EnrollmentStatus;
 import com.example.student_management.entity.auth.Lecturer;
 import com.example.student_management.entity.auth.Role;
 import com.example.student_management.entity.auth.User;
@@ -45,7 +46,11 @@ public class GradeController {
         CourseSection section = courseSectionRepository.findById(sectionId)
                 .orElseThrow(() -> new NotFoundException("Course section not found"));
         requireSectionAccess(section, authentication);
-        return ResponseEntity.ok(enrollmentRepository.findByCourseSectionId(sectionId));
+        // Chỉ hiển thị sinh viên đã được duyệt chính thức; đơn PENDING/REJECTED
+        // và các đăng ký đã huỷ không thuộc bảng điểm.
+        return ResponseEntity.ok(enrollmentRepository.findByCourseSectionId(sectionId).stream()
+                .filter(e -> e.getStatus() == EnrollmentStatus.ENROLLED)
+                .toList());
     }
 
     @PutMapping("/enrollments/{id}/grade")

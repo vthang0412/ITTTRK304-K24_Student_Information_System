@@ -1,25 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { courseSectionApi, enrollmentApi } from '../../api';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useToast } from '../../context/ToastContext';
 import {
-  BookIcon, CalendarIcon, ClockIcon, LayersIcon, PinIcon, SearchIcon, UserIcon,
+  BookIcon, ClockIcon, LayersIcon, SearchIcon, UserIcon,
 } from '../../components/Icons';
 import {
   EmptyState, LoadingBlock, PageHeader, Pagination, SearchInput, StatusBadge,
 } from '../../components/UI';
 
-const PAGE_SIZE = 8;
-
 const StudentCourses = () => {
   const toast = useToast();
   const [sections, setSections] = useState([]);
-  const [enrolledIds, setEnrolledIds] = useState(new Set());
+  const [sectionStatus, setSectionStatus] = useState({});
   const [loading, setLoading] = useState(true);
   const [enrollingId, setEnrollingId] = useState(null);
   const [search, setSearch] = useState('');
   const [semester, setSemester] = useState('ALL');
   const [status, setStatus] = useState('ALL');
-  const [page, setPage] = useState(1);
 
   const load = async () => {
     try {
@@ -28,7 +26,11 @@ const StudentCourses = () => {
         enrollmentApi.getMyEnrollments(),
       ]);
       setSections(sectionsRes.data || []);
-      setEnrolledIds(new Set((enrollRes.data || []).filter((e) => e.status === 'ENROLLED').map((e) => e.courseSection?.id)));
+      const activeStatuses = {};
+      (enrollRes.data || [])
+        .filter((e) => e.status === 'ENROLLED' || e.status === 'PENDING')
+        .forEach((e) => { activeStatuses[e.courseSection?.id] = e.status; });
+      setSectionStatus(activeStatuses);
     } catch {
       toast.error('Không tải được danh sách lớp', 'Vui lòng kiểm tra kết nối tới máy chủ.');
     } finally {
@@ -55,21 +57,24 @@ const StudentCourses = () => {
     });
   }, [sections, search, semester, status]);
 
-  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const { page, setPage, pageSize, setPageSize, totalItems, pageItems } = usePaginatedList(filtered);
 
   const handleEnroll = async (section) => {
     setEnrollingId(section.id);
     try {
       await enrollmentApi.enroll(section.id);
-      setEnrolledIds((prev) => new Set(prev).add(section.id));
-      toast.success('Đăng ký thành công', `Bạn đã đăng ký lớp ${section.sectionCode}.`);
+      setSectionStatus((prev) => ({ ...prev, [section.id]: 'PENDING' }));
+      toast.success('Đã gửi đơn đăng ký', `Lớp ${section.sectionCode} đang chờ quản trị viên duyệt.`);
+      await load();
     } catch (err) {
       const message = err.response?.data?.message;
       const map = {
         'Already enrolled in this section': 'Bạn đã đăng ký lớp học phần này.',
         'Course section is full': 'Lớp học phần đã đủ sĩ số.',
+        'Lớp học phần đã đủ số lượng đăng ký': 'Lớp học phần đã đủ sĩ số.',
         'Course section is not open for registration': 'Lớp học phần chưa mở đăng ký.',
       };
+      if (message?.includes('đủ số lượng')) await load();
       toast.error('Đăng ký thất bại', map[message] || message || 'Vui lòng thử lại sau.');
     } finally {
       setEnrollingId(null);
@@ -126,10 +131,15 @@ const StudentCourses = () => {
                 </thead>
                 <tbody>
                   {pageItems.map((s) => {
-                    const isEnrolled = enrolledIds.has(s.id);
-                    const disabled = isEnrolled || s.status !== 'OPEN' || enrollingId === s.id;
+                    const currentStatus = sectionStatus[s.id];
+                    const isEnrolled = currentStatus === 'ENROLLED';
+                    const isPending = currentStatus === 'PENDING';
+                    const capacity = Number(s.capacity) > 0 ? Number(s.capacity) : 40;
+                    const registeredCount = Number(s.registeredCount) || 0;
+                    const isFull = registeredCount >= capacity;
+                    const disabled = Boolean(currentStatus) || s.status !== 'OPEN' || isFull || enrollingId === s.id;
                     return (
-                      <tr key={s.id}>
+                      <tr key={s.id} className={isFull ? 'course-section-full' : undefined}>
                         <td className="cell-strong">{s.sectionCode}</td>
                         <td>
                           <div className="cell-strong">{s.course?.courseName || '—'}</div>
@@ -144,20 +154,31 @@ const StudentCourses = () => {
                         <td>
                           <div className="schedule-line"><ClockIcon size={14} /> {s.schedule || 'Chưa xếp lịch'}</div>
                         </td>
-                        <td>{s.capacity}</td>
-                        <td><StatusBadge status={s.status} /></td>
+                        <td>{registeredCount}/{capacity}</td>
+                        <td>
+                          <div className="course-section-status">
+                            <StatusBadge status={s.status} />
+                            {isFull && <StatusBadge status="CLOSED" label="Đã đủ sĩ số" />}
+                          </div>
+                        </td>
                         <td>
                           <div className="row-actions">
                             {isEnrolled ? (
                               <span className="badge badge-green">Đã đăng ký</span>
+                            ) : isPending ? (
+                              <span className="badge badge-amber">Chờ duyệt</span>
                             ) : (
-                              <button
-                                className="btn btn-primary btn-sm"
-                                disabled={disabled}
-                                onClick={() => handleEnroll(s)}
-                              >
-                                {enrollingId === s.id ? 'Đang đăng ký...' : 'Đăng ký'}
-                              </button>
+                              isFull ? (
+                                <span className="badge badge-gray">Hết chỗ</span>
+                              ) : (
+                                <button
+                                  className="btn btn-primary btn-sm"
+                                  disabled={disabled}
+                                  onClick={() => handleEnroll(s)}
+                                >
+                                  {enrollingId === s.id ? 'Đang gửi...' : 'Đăng ký'}
+                                </button>
+                              )
                             )}
                           </div>
                         </td>
@@ -167,7 +188,7 @@ const StudentCourses = () => {
                 </tbody>
               </table>
             </div>
-            <Pagination page={page} pageSize={PAGE_SIZE} totalItems={filtered.length} onPageChange={setPage} />
+            <Pagination page={page} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
           </>
         )}
       </div>
@@ -177,7 +198,8 @@ const StudentCourses = () => {
           <BookIcon style={{ color: 'var(--blue-600)', flex: '0 0 auto' }} />
           <p className="small" style={{ color: 'var(--text-2)' }}>
             Lưu ý: Bạn chỉ có thể đăng ký lớp đang ở trạng thái <strong>Đang mở</strong> và còn sĩ số.
-            Sau khi đăng ký, lớp sẽ xuất hiện trong mục <strong>Học phần đã đăng ký</strong>.
+            Sau khi gửi đơn, lớp sẽ ở trạng thái <strong>Chờ duyệt</strong> cho đến khi quản trị viên phê duyệt
+            và mới xuất hiện trong <strong>Thời khóa biểu</strong>.
           </p>
         </div>
       </div>

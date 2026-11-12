@@ -2,7 +2,9 @@ package com.example.student_management.repository.auth;
 
 import com.example.student_management.entity.auth.PasswordResetToken;
 import com.example.student_management.entity.auth.User;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -20,6 +22,11 @@ public interface PasswordResetTokenRepository extends JpaRepository<PasswordRese
     Optional<PasswordResetToken> findFirstByTokenAndUsedFalseOrderByCreatedAtDesc(String token);
 
     Optional<PasswordResetToken> findFirstByUser_EmailIgnoreCaseAndTokenAndUsedFalseOrderByCreatedAtDesc(String email, String token);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<PasswordResetToken> findFirstByUser_EmailIgnoreCaseOrderByCreatedAtDesc(String email);
+
+    Optional<PasswordResetToken> findFirstByUser_EmailIgnoreCaseAndTokenOrderByCreatedAtDesc(String email, String token);
 
     Optional<PasswordResetToken> findFirstByUser_EmailIgnoreCaseAndUsedFalseOrderByCreatedAtDesc(String email);
 

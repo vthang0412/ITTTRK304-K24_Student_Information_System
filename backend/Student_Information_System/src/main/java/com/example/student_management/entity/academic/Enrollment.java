@@ -2,7 +2,9 @@ package com.example.student_management.entity.academic;
 
 
 import com.example.student_management.entity.auth.Student;
+import com.example.student_management.entity.auth.User;
 import com.example.student_management.entity.grade.Grade;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -39,8 +41,30 @@ public class Enrollment {
 
     private LocalDateTime withdrawnAt;
 
+    private LocalDateTime approvedAt;
+
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "approved_by")
+    private User approvedBy;
+
+    private LocalDateTime rejectedAt;
+
+    @Column(length = 500)
+    private String rejectionReason;
+
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "rejected_by")
+    private User rejectedBy;
+
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @JsonIgnore
     @OneToOne(mappedBy = "enrollment", fetch = FetchType.LAZY)
     private Grade grade;
 }

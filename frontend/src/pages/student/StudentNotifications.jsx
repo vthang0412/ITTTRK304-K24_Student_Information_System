@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { notificationApi } from '../../api';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useToast } from '../../context/ToastContext';
 import {
   BellIcon, CheckCircleIcon, CheckIcon, InboxIcon, RefreshIcon,
@@ -202,8 +203,6 @@ const NotifCard = ({ notif, onSelect }) => (
   </button>
 );
 
-const PAGE_SIZE = 8;
-
 /* ─── Trang chính ──────────────────────────────────────── */
 const StudentNotifications = () => {
   const toast = useToast();
@@ -212,7 +211,6 @@ const StudentNotifications = () => {
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
   const [filter, setFilter] = useState('ALL'); // ALL | UNREAD | READ
-  const [page, setPage] = useState(1);
   const [markingAll, setMarkingAll] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
@@ -289,7 +287,7 @@ const StudentNotifications = () => {
     return true;
   });
 
-  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const { page, setPage, pageSize, setPageSize, totalItems, pageItems } = usePaginatedList(filtered);
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   return (
@@ -358,6 +356,13 @@ const StudentNotifications = () => {
             title={filter === 'UNREAD' ? 'Không có thông báo chưa đọc' : 'Không có thông báo'}
             description={filter === 'UNREAD' ? 'Bạn đã đọc tất cả thông báo.' : 'Chưa có thông báo nào từ nhà trường.'}
           />
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       ) : (
         <>
@@ -369,9 +374,10 @@ const StudentNotifications = () => {
           <div style={{ marginTop: 16 }}>
             <Pagination
               page={page}
-              pageSize={PAGE_SIZE}
-              totalItems={filtered.length}
+              pageSize={pageSize}
+              totalItems={totalItems}
               onPageChange={setPage}
+              onPageSizeChange={setPageSize}
             />
           </div>
         </>
