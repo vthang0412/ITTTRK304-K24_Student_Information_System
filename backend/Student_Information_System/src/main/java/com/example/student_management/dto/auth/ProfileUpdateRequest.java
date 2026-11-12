@@ -19,6 +19,18 @@ public class ProfileUpdateRequest {
     @Size(max = 100)
     private String department;
 
+    @Size(max = 20)
+    private String phone;
+
+    @Size(max = 50)
+    private String className;
+
+    @Size(max = 100)
+    private String major;
+
+    @Size(max = 30)
+    private String academicStatus;
+
     private String currentPassword;
 
     @Size(min = 6, message = "New password must be at least 6 characters")

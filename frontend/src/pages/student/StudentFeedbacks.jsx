@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Swal from 'sweetalert2';
-import { feedbackApi } from '../../api';
+import { enrollmentApi, feedbackApi, lecturerApi } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { Field, LoadingBlock, Modal, PageHeader } from '../../components/UI';
 import { formatDateTime, getErrorMessage } from '../../utils/format';
@@ -48,7 +48,28 @@ const StudentFeedbacks = () => {
     const [sendingReply, setSendingReply] = useState(false);
     const [createOpen, setCreateOpen] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [form, setForm] = useState({ title: '', feedbackType: 'OTHER', content: '' });
+    const [lecturers, setLecturers] = useState([]);
+    const [myEnrollments, setMyEnrollments] = useState([]);
+    const [form, setForm] = useState({
+        title: '',
+        feedbackType: 'OTHER',
+        content: '',
+        courseSectionId: '',
+        lecturerId: '',
+    });
+
+    const loadLecturersAndEnrollments = async () => {
+        try {
+            const [lecRes, enrRes] = await Promise.all([
+                lecturerApi.getAll(),
+                enrollmentApi.getMyEnrollments(),
+            ]);
+            setLecturers(lecRes.data || []);
+            setMyEnrollments((enrRes.data || []).filter((e) => e.status === 'ENROLLED'));
+        } catch {
+            // Không block nếu lỗi phụ
+        }
+    };
 
     const loadTickets = async () => {
         setLoading(true);
@@ -62,7 +83,10 @@ const StudentFeedbacks = () => {
         }
     };
 
-    useEffect(() => { loadTickets(); }, []);
+    useEffect(() => {
+        loadTickets();
+        loadLecturersAndEnrollments();
+    }, []);
 
     const openTicket = async (ticketId) => {
         setDetailLoading(true);
@@ -82,9 +106,14 @@ const StudentFeedbacks = () => {
             return;
         }
 
+        const selectedLecturer = lecturers.find((l) => String(l.id) === String(form.lecturerId));
+        const confirmText = selectedLecturer
+            ? `Phản ánh sẽ được gửi trực tiếp đến Giảng viên ${selectedLecturer.fullName} để xử lý.`
+            : 'Ticket sẽ được gửi tới nhà trường và có thể được phân công cho giảng viên phụ trách.';
+
         const result = await Swal.fire({
             title: 'Xác nhận gửi phản ánh?',
-            text: 'Ticket sẽ được gửi tới nhà trường và có thể được phân công cho giảng viên phụ trách.',
+            text: confirmText,
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: 'Gửi phản ánh',
@@ -95,10 +124,18 @@ const StudentFeedbacks = () => {
 
         setSaving(true);
         try {
-            await feedbackApi.create({ title: form.title.trim(), feedbackType: form.feedbackType, content: form.content.trim() });
-            toast.success('Gửi phản ánh thành công', 'Ticket đã được tạo và đang chờ tiếp nhận.');
+            await feedbackApi.create({
+                title: form.title.trim(),
+                feedbackType: form.feedbackType,
+                content: form.content.trim(),
+                courseSectionId: form.courseSectionId ? Number(form.courseSectionId) : null,
+                lecturerId: form.lecturerId ? Number(form.lecturerId) : null,
+            });
+            toast.success('Gửi phản ánh thành công', selectedLecturer
+                ? `Ticket đã được chuyển trực tiếp cho GV ${selectedLecturer.fullName}.`
+                : 'Ticket đã được tạo và đang chờ tiếp nhận.');
             setCreateOpen(false);
-            setForm({ title: '', feedbackType: 'OTHER', content: '' });
+            setForm({ title: '', feedbackType: 'OTHER', content: '', courseSectionId: '', lecturerId: '' });
             loadTickets();
         } catch (error) {
             toast.error('Gửi phản ánh thất bại', getErrorMessage(error));
@@ -343,6 +380,49 @@ const StudentFeedbacks = () => {
                                 <option key={item.value} value={item.value}>{item.label}</option>
                             ))}
                         </select>
+                    </Field>
+                    <Field label="Lớp học phần liên quan (Tùy chọn)">
+                        <select
+                            className="input"
+                            value={form.courseSectionId}
+                            onChange={(event) => {
+                                const sectionId = event.target.value;
+                                const matched = myEnrollments.find((e) => String(e.courseSection?.id) === String(sectionId));
+                                setForm((prev) => ({
+                                    ...prev,
+                                    courseSectionId: sectionId,
+                                    // Tự động gán Giảng viên của lớp nếu có
+                                    lecturerId: matched?.courseSection?.lecturer?.id ? String(matched.courseSection.lecturer.id) : prev.lecturerId,
+                                }));
+                            }}
+                        >
+                            <option value="">-- Không thuộc lớp cụ thể --</option>
+                            {myEnrollments.map((e) => {
+                                const sec = e.courseSection;
+                                return (
+                                    <option key={sec?.id} value={sec?.id}>
+                                        {sec?.sectionCode} - {sec?.course?.courseName} ({sec?.lecturer?.fullName ? `GV: ${sec.lecturer.fullName}` : 'Chưa xếp GV'})
+                                    </option>
+                                );
+                            })}
+                        </select>
+                    </Field>
+                    <Field label="Chỉ định giảng viên xử lý trực tiếp">
+                        <select
+                            className="input"
+                            value={form.lecturerId}
+                            onChange={(event) => setForm({ ...form, lecturerId: event.target.value })}
+                        >
+                            <option value="">-- Gửi cho Quản trị viên điều phối (Mặc định) --</option>
+                            {lecturers.map((l) => (
+                                <option key={l.id} value={l.id}>
+                                    {l.fullName} ({l.lecturerCode}) {l.department ? `- Khoa ${l.department}` : ''}
+                                </option>
+                            ))}
+                        </select>
+                        <small style={{ color: 'var(--muted)', fontSize: 12, marginTop: 4, display: 'block' }}>
+                            Chọn giảng viên để ticket được gửi thẳng cho giảng viên đó xử lý mà không cần chờ Admin phân công.
+                        </small>
                     </Field>
                     <Field label="Nội dung phản ánh" required>
                         <textarea className="input" rows={7} value={form.content} onChange={(event) => setForm({ ...form, content: event.target.value })} placeholder="Mô tả chi tiết vấn đề, thời gian xảy ra và mong muốn hỗ trợ..." />

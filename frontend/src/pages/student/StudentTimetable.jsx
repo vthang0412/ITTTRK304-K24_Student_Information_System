@@ -57,18 +57,13 @@ const parseScheduleLine = (raw = '') => {
             const timeMatch = segment.match(/(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/i);
             const day = parseDay(segment);
             if (!timeMatch || day === null) {
-                return [{
-                    raw: segment,
-                    day: null,
-                    start: null,
-                    end: null,
-                    room: segment,
-                    label: segment,
-                }];
+                return [];
             }
 
             const start = toMinutes(timeMatch[1]);
             const end = toMinutes(timeMatch[2]);
+            if (end <= start) return [];
+
             const roomText = segment.slice(timeMatch.index + timeMatch[0].length).replace(/^\s*[,\-–]*\s*/, '').trim();
 
             return [{
@@ -159,7 +154,7 @@ const StudentTimetable = () => {
     }, [classCards]);
 
     const groupedByDay = useMemo(
-        () => DAYS.map((day) => classCards.filter((card) => card.day === day.index)),
+        () => DAYS.map((day) => classCards.filter((card) => card.day === day.index).sort((a, b) => a.start - b.start || a.end - b.end)),
         [classCards]
     );
 
@@ -169,15 +164,29 @@ const StudentTimetable = () => {
     );
 
     const nextClass = useMemo(() => {
+        if (!classCards.length) return null;
+
         const now = new Date();
+        const todayIndex = now.getDay() === 0 ? 6 : now.getDay() - 1;
         const currentMinute = now.getHours() * 60 + now.getMinutes();
+
         const upcoming = classCards
-            .filter((card) => card.start >= currentMinute || card.day >= (now.getDay() === 0 ? 6 : now.getDay() - 1))
+            .filter((card) => {
+                const isFutureWeekday = card.day > todayIndex;
+                const isToday = card.day === todayIndex;
+                const hasNotEnded = card.end > currentMinute;
+                return isFutureWeekday || (isToday && hasNotEnded);
+            })
+            .filter((card) => {
+                if (!Number.isFinite(card.start) || !Number.isFinite(card.end)) return false;
+                return true;
+            })
             .sort((a, b) => {
                 const aValue = (a.day + 1) * 1440 + a.start;
                 const bValue = (b.day + 1) * 1440 + b.start;
                 return aValue - bValue;
             })[0];
+
         return upcoming || null;
     }, [classCards]);
 

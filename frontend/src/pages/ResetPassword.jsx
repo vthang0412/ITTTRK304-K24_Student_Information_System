@@ -84,7 +84,9 @@ const ResetPassword = () => {
       toast.showAuthModal({
         icon: 'success',
         title: 'Đặt lại mật khẩu thành công',
-        message: res.data?.message || 'Mật khẩu của bạn đã được cập nhật thành công. Đang chuyển về trang đăng nhập...',
+        message:
+          res.data?.message ||
+          'Mật khẩu của bạn đã được cập nhật thành công. Đang chuyển về trang đăng nhập...',
         duration: 3000,
       });
 
@@ -92,13 +94,29 @@ const ResetPassword = () => {
         navigate('/login', { replace: true });
       }, 3000);
     } catch (err) {
-      const msg = getErrorMessage(err, 'Không thể đặt lại mật khẩu. Vui lòng kiểm tra lại mã OTP.');
+      const rawErrMsg = err?.response?.data?.message || '';
+      const msg = rawErrMsg || 'Không thể đặt lại mật khẩu. Vui lòng kiểm tra lại mã OTP.';
+      const lc = msg.toLowerCase();
+
+      // Phân loại lỗi để hiển thị thông báo phù hợp
+      const isExpiredOrInvalidated =
+        lc.includes('hết hạn') ||
+        lc.includes('quá 5 lần') ||
+        lc.includes('vô hiệu hóa') ||
+        lc.includes('thao tác lại từ đầu');
+
       setError(msg);
       toast.showAuthModal({
         icon: 'error',
         title: 'Đặt lại mật khẩu thất bại',
         message: msg,
-        duration: 3000,
+        duration: isExpiredOrInvalidated ? 0 : 3000,
+        showConfirmButton: isExpiredOrInvalidated,
+        confirmButtonText: isExpiredOrInvalidated ? 'Yêu cầu mã OTP mới' : undefined,
+      }).then((result) => {
+        if (isExpiredOrInvalidated && result.isConfirmed) {
+          navigate('/forgot-password', { replace: true });
+        }
       });
     } finally {
       setLoading(false);

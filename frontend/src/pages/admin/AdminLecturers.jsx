@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Swal from 'sweetalert2';
 import { authApi, lecturerApi } from '../../api';
 import { useToast } from '../../context/ToastContext';
@@ -100,26 +100,16 @@ const AdminLecturers = () => {
     confirmPassword: '',
   });
 
-  const openEdit = async (lecturer) => {
+  const openEdit = (lecturer) => {
     setOpen(true);
     setErrors({});
     setShowPassword(false);
     setShowConfirmPassword(false);
-    setLoadingProfile(true);
-    try {
-      const res = await lecturerApi.getById(lecturer.id);
-      const profile = res.data || lecturer;
-      const nextForm = normalizeEditForm(profile);
-      setEditing(profile);
-      setForm(nextForm);
-      setInitialForm(nextForm);
-    } catch (err) {
-      toast.error('Không tải được dữ liệu giảng viên', getErrorMessage(err));
-      setOpen(false);
-      setEditing(null);
-    } finally {
-      setLoadingProfile(false);
-    }
+    // Backend không có GET /api/lecturers/{id}, sử dụng trực tiếp dữ liệu từ danh sách đã tải
+    const nextForm = normalizeEditForm(lecturer);
+    setEditing(lecturer);
+    setForm(nextForm);
+    setInitialForm(nextForm);
   };
 
   const isDirty = editing && JSON.stringify({
@@ -200,6 +190,25 @@ const AdminLecturers = () => {
 
         if (attempt >= 5) {
           throw new Error('Không thể tạo tên đăng nhập duy nhất cho tài khoản này.');
+        }
+
+        // Backend authApi.register mặc định đặt department="CNTT" và status=ACTIVE.
+        // Đồng bộ lại department và status theo form nếu người dùng nhập khác mặc định.
+        if (payload.department || payload.status !== 'ACTIVE') {
+          try {
+            const listRes = await lecturerApi.getAll();
+            const created = (listRes.data || []).find((l) => l.email?.toLowerCase() === payload.email.toLowerCase());
+            if (created && (created.department !== payload.department || created.status !== payload.status)) {
+              await lecturerApi.update(created.id, {
+                fullName: payload.fullName,
+                email: payload.email,
+                department: payload.department,
+                status: payload.status,
+              });
+            }
+          } catch (syncErr) {
+            console.warn('Could not sync department/status for new lecturer:', syncErr);
+          }
         }
 
         toast.success('Tạo tài khoản thành công', `${payload.fullName} đã được tạo trong hệ thống với mật khẩu khởi tạo đã được thiết lập.`);
@@ -333,12 +342,12 @@ const AdminLecturers = () => {
         subtitle={editing ? `Mã giảng viên: ${editing.lecturerCode || editing.user?.lecturerCode || ''}` : 'Tạo hồ sơ giảng viên mới trong hệ thống.'}
         footer={(
           <>
-            <button className="btn btn-secondary" onClick={() => setOpen(false)} disabled={saving || loadingProfile}>Huỷ</button>
+            <button className="btn btn-secondary" onClick={() => setOpen(false)} disabled={saving}>Huỷ</button>
             <button
               className="btn btn-primary"
               onClick={handleSubmit}
-              disabled={saving || loadingProfile || (editing && !isDirty)}
-              style={{ opacity: (saving || loadingProfile || (editing && !isDirty)) ? 0.5 : 1 }}
+              disabled={saving || (editing && !isDirty)}
+              style={{ opacity: (saving || (editing && !isDirty)) ? 0.5 : 1 }}
             >
               {saving ? 'Đang lưu...' : editing ? 'Lưu thay đổi' : 'Thêm mới'}
             </button>

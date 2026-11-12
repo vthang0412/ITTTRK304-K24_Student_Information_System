@@ -113,34 +113,9 @@ const AdminSemesters = () => {
   };
 
   const handleDelete = async (semester) => {
-    const linkedSections = semesters.filter((item) => item.id !== semester.id && item.sections?.some?.((section) => section.semesterId === semester.id));
-    const inUse = linkedSections.length > 0 || semester.status === 'REGISTRATION_OPEN' || semester.status === 'IN_PROGRESS';
-    if (inUse) {
-      const reason = semester.status === 'REGISTRATION_OPEN' || semester.status === 'IN_PROGRESS'
-        ? 'Học kỳ đang mở đăng ký hoặc đang diễn ra, không thể xóa cứng để tránh ảnh hưởng lịch học và đăng ký.'
-        : 'Học kỳ đã có lớp học phần hoặc dữ liệu liên quan, nên phải giữ lại để phục vụ tra cứu lịch sử.';
-      await Swal.fire({
-        title: 'Không thể xóa học kỳ',
-        text: reason,
-        icon: 'warning',
-        confirmButtonText: 'Đã hiểu',
-        customClass: {
-          popup: 'swal-auth-popup',
-          title: 'swal-auth-title',
-          htmlContainer: 'swal-auth-text',
-          confirmButton: 'swal-auth-confirm',
-          icon: 'swal-auth-icon',
-        },
-        buttonsStyling: false,
-        background: '#ffffff',
-        color: '#0f172a',
-      });
-      return;
-    }
-
     const result = await Swal.fire({
       title: 'Xác nhận xoá học kỳ?',
-      text: `Bạn có chắc muốn xoá ${semester.semesterName || semester.semesterCode}?`,
+      text: `Bạn có chắc muốn xoá ${semester.semesterName || semester.semesterCode}? Lưu ý: Không thể xoá học kỳ nếu đã có lớp học phần liên kết với học kỳ này.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Xoá học kỳ',
@@ -157,6 +132,7 @@ const AdminSemesters = () => {
       buttonsStyling: false,
       background: '#ffffff',
       color: '#0f172a',
+      width: 440,
     });
 
     if (!result.isConfirmed) return;
@@ -166,12 +142,7 @@ const AdminSemesters = () => {
       toast.success('Xoá thành công', `Đã xoá học kỳ ${semester.semesterName}.`);
       load();
     } catch (err) {
-      const status = err?.response?.status;
-      if (status === 404 || status === 405) {
-        toast.error('Backend chưa hỗ trợ xóa học kỳ', 'API DELETE /api/semesters/{id} chưa được triển khai. Xóa cứng chưa an toàn trong hệ thống hiện tại.');
-      } else {
-        toast.error('Không thể xóa học kỳ', getErrorMessage(err));
-      }
+      toast.error('Không thể xóa học kỳ', getErrorMessage(err));
     }
   };
 

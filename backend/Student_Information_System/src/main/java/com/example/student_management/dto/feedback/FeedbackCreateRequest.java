@@ -23,5 +23,6 @@ public class FeedbackCreateRequest {
     private String content;
 
     private Long courseSectionId; // Tùy chọn nếu phản ánh liên quan tới lớp học phần/điểm số
-}
 
+    private Long lecturerId; // Tùy chọn: sinh viên trực tiếp chỉ định giảng viên xử lý
+}

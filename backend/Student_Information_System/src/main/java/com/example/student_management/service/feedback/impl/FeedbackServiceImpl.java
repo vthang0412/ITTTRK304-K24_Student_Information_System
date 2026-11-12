@@ -67,13 +67,23 @@ public class FeedbackServiceImpl implements FeedbackService {
             section = courseSectionRepository.findById(request.getCourseSectionId()).orElse(null);
         }
 
+        Lecturer assignedLecturer = null;
+        if (request.getLecturerId() != null) {
+            assignedLecturer = lecturerRepository.findById(request.getLecturerId()).orElse(null);
+        } else if (section != null && section.getLecturer() != null) {
+            assignedLecturer = section.getLecturer();
+        }
+
+        FeedbackStatus initialStatus = (assignedLecturer != null) ? FeedbackStatus.IN_PROGRESS : FeedbackStatus.PENDING;
+
         Feedback feedback = Feedback.builder()
                 .title(request.getTitle().trim())
                 .feedbackType(request.getFeedbackType())
                 .content(request.getContent().trim())
-                .status(FeedbackStatus.PENDING)
+                .status(initialStatus)
                 .student(student)
                 .courseSection(section)
+                .assignedLecturer(assignedLecturer)
                 .createdAt(LocalDateTime.now())
                 .build();
 
@@ -88,11 +98,52 @@ public class FeedbackServiceImpl implements FeedbackService {
                 .build();
         feedbackMessageRepository.save(initialMessage);
 
+        // Nếu đã được gán trực tiếp cho giảng viên, ghi nhận vào luồng trao đổi
+        if (assignedLecturer != null) {
+            FeedbackMessage autoAssignMessage = FeedbackMessage.builder()
+                    .feedback(saved)
+                    .sender(user)
+                    .message("Hệ thống: Sinh viên đã chỉ định gửi trực tiếp đến Giảng viên "
+                            + assignedLecturer.getFullName() + " tiếp nhận xử lý.")
+                    .createdAt(LocalDateTime.now().plusSeconds(1))
+                    .build();
+            feedbackMessageRepository.save(autoAssignMessage);
+        }
+
+        // Tự động thông báo cho Giảng viên được phân công (nếu có tài khoản)
+        if (assignedLecturer != null && assignedLecturer.getUser() != null) {
+            try {
+                notificationService.sendSystemNotification(
+                        assignedLecturer.getUser(),
+                        "Bạn nhận được phản ánh mới từ sinh viên " + student.getFullName(),
+                        "Sinh viên " + student.getFullName() + " (" + student.getStudentCode() + ") đã gửi phản ánh #"
+                                + saved.getId() + ": \"" + saved.getTitle() + "\"",
+                        "ACADEMIC");
+            } catch (Exception ignored) {
+            }
+        }
+
+        // Tự động thông báo xác nhận cho Sinh viên
+        try {
+            notificationService.sendSystemNotification(
+                    user,
+                    "Gửi phản ánh thành công: #" + saved.getId(),
+                    "Phản ánh \"" + saved.getTitle() + "\" của bạn đã được tiếp nhận" +
+                            (assignedLecturer != null
+                                    ? " và chuyển trực tiếp tới Giảng viên " + assignedLecturer.getFullName() + "."
+                                    : " và đang chờ tiếp nhận."),
+                    "ACADEMIC");
+        } catch (Exception ignored) {
+        }
+
         // Gửi thông báo đến Admin
         try {
             Notification notification = Notification.builder()
                     .title("Phản ánh mới từ sinh viên " + student.getFullName())
-                    .content("Sinh viên " + student.getFullName() + " (" + student.getStudentCode() + ") đã gửi phản ánh: \"" + saved.getTitle() + "\"")
+                    .content("Sinh viên " + student.getFullName() + " (" + student.getStudentCode()
+                            + ") đã gửi phản ánh: \"" + saved.getTitle() + "\"" +
+                            (assignedLecturer != null ? " (Chỉ định cho GV " + assignedLecturer.getFullName() + ")"
+                                    : ""))
                     .type("ACADEMIC")
                     .targetRole(Role.ADMIN)
                     .sender(user)
@@ -100,7 +151,8 @@ public class FeedbackServiceImpl implements FeedbackService {
                     .createdAt(LocalDateTime.now())
                     .build();
             notificationRepository.save(notification);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         return toDto(saved);
     }
@@ -176,7 +228,9 @@ public class FeedbackServiceImpl implements FeedbackService {
                 .feedback(saved)
                 .sender(admin)
                 .message("Hệ thống: Quản trị viên đã phân công phản ánh này cho giảng viên " + lecturer.getFullName() +
-                        (request.getAdminNote() != null && !request.getAdminNote().isBlank() ? " (Ghi chú: " + request.getAdminNote().trim() + ")" : ""))
+                        (request.getAdminNote() != null && !request.getAdminNote().isBlank()
+                                ? " (Ghi chú: " + request.getAdminNote().trim() + ")"
+                                : ""))
                 .createdAt(LocalDateTime.now())
                 .build();
         feedbackMessageRepository.save(assignMessage);
@@ -187,11 +241,12 @@ public class FeedbackServiceImpl implements FeedbackService {
                 notificationService.sendSystemNotification(
                         lecturer.getUser(),
                         "Bạn được phân công xử lý phản ánh",
-                        "Admin đã phân công cho bạn xử lý phản ánh #" + saved.getId() + ": \"" + saved.getTitle() + "\"",
-                        "ACADEMIC"
-                );
+                        "Admin đã phân công cho bạn xử lý phản ánh #" + saved.getId() + ": \"" + saved.getTitle()
+                                + "\"",
+                        "ACADEMIC");
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         // Thông báo cho Sinh viên (nếu có tài khoản)
         try {
@@ -199,11 +254,12 @@ public class FeedbackServiceImpl implements FeedbackService {
                 notificationService.sendSystemNotification(
                         saved.getStudent().getUser(),
                         "Tiến độ phản ánh #" + saved.getId(),
-                        "Phản ánh \"" + saved.getTitle() + "\" của bạn đã được chuyển cho Giảng viên " + lecturer.getFullName() + " xử lý.",
-                        "ACADEMIC"
-                );
+                        "Phản ánh \"" + saved.getTitle() + "\" của bạn đã được chuyển cho Giảng viên "
+                                + lecturer.getFullName() + " xử lý.",
+                        "ACADEMIC");
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         return toDto(saved);
     }
@@ -232,7 +288,9 @@ public class FeedbackServiceImpl implements FeedbackService {
                 .feedback(saved)
                 .sender(user)
                 .message("Trạng thái phản ánh được cập nhật thành: " + getStatusDisplayName(request.getStatus()) +
-                        (request.getNote() != null && !request.getNote().isBlank() ? " - Ghi chú: " + request.getNote().trim() : ""))
+                        (request.getNote() != null && !request.getNote().isBlank()
+                                ? " - Ghi chú: " + request.getNote().trim()
+                                : ""))
                 .createdAt(LocalDateTime.now())
                 .build();
         feedbackMessageRepository.save(statusMessage);
@@ -243,11 +301,12 @@ public class FeedbackServiceImpl implements FeedbackService {
                 notificationService.sendSystemNotification(
                         saved.getStudent().getUser(),
                         "Cập nhật phản ánh #" + saved.getId(),
-                        "Phản ánh \"" + saved.getTitle() + "\" đã được cập nhật trạng thái: " + getStatusDisplayName(request.getStatus()),
-                        "ACADEMIC"
-                );
+                        "Phản ánh \"" + saved.getTitle() + "\" đã được cập nhật trạng thái: "
+                                + getStatusDisplayName(request.getStatus()),
+                        "ACADEMIC");
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         return toDto(saved);
     }
@@ -269,7 +328,8 @@ public class FeedbackServiceImpl implements FeedbackService {
                 .build();
         FeedbackMessage saved = feedbackMessageRepository.save(message);
 
-        // Nếu người phản hồi là Giảng viên hoặc Admin, cập nhật trạng thái thành RESPONDED (nếu chưa giải quyết)
+        // Nếu người phản hồi là Giảng viên hoặc Admin, cập nhật trạng thái thành
+        // RESPONDED (nếu chưa giải quyết)
         if ((user.getRole() == Role.LECTURER || user.getRole() == Role.ADMIN)
                 && feedback.getStatus() != FeedbackStatus.RESOLVED
                 && feedback.getStatus() != FeedbackStatus.REJECTED) {
@@ -287,8 +347,7 @@ public class FeedbackServiceImpl implements FeedbackService {
                             feedback.getAssignedLecturer().getUser(),
                             "Tin nhắn mới từ sinh viên trong phản ánh #" + feedback.getId(),
                             "Sinh viên " + user.getFullName() + ": " + truncate(request.getMessage(), 60),
-                            "ACADEMIC"
-                    );
+                            "ACADEMIC");
                 }
             } else {
                 // Giảng viên hoặc Admin gửi tin nhắn -> Thông báo cho Sinh viên
@@ -297,11 +356,11 @@ public class FeedbackServiceImpl implements FeedbackService {
                             feedback.getStudent().getUser(),
                             "Phản hồi mới trong phản ánh #" + feedback.getId(),
                             user.getFullName() + " đã trả lời phản ánh của bạn: " + truncate(request.getMessage(), 60),
-                            "ACADEMIC"
-                    );
+                            "ACADEMIC");
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         return toMessageDto(saved);
     }
@@ -340,12 +399,14 @@ public class FeedbackServiceImpl implements FeedbackService {
     }
 
     private String truncate(String text, int maxLength) {
-        if (text == null) return "";
+        if (text == null)
+            return "";
         return text.length() <= maxLength ? text : text.substring(0, maxLength) + "...";
     }
 
     private FeedbackDto toDto(Feedback feedback) {
-        List<FeedbackMessage> messages = feedbackMessageRepository.findByFeedbackIdOrderByCreatedAtAsc(feedback.getId());
+        List<FeedbackMessage> messages = feedbackMessageRepository
+                .findByFeedbackIdOrderByCreatedAtAsc(feedback.getId());
         List<FeedbackMessageDto> messageDtos = messages != null
                 ? messages.stream().map(this::toMessageDto).collect(Collectors.toList())
                 : List.of();
@@ -360,14 +421,20 @@ public class FeedbackServiceImpl implements FeedbackService {
                 .studentCode(feedback.getStudent() != null ? feedback.getStudent().getStudentCode() : null)
                 .studentName(feedback.getStudent() != null ? feedback.getStudent().getFullName() : null)
                 .studentEmail(feedback.getStudent() != null ? feedback.getStudent().getEmail() : null)
-                .assignedLecturerId(feedback.getAssignedLecturer() != null ? feedback.getAssignedLecturer().getId() : null)
-                .assignedLecturerCode(feedback.getAssignedLecturer() != null ? feedback.getAssignedLecturer().getLecturerCode() : null)
-                .assignedLecturerName(feedback.getAssignedLecturer() != null ? feedback.getAssignedLecturer().getFullName() : null)
-                .assignedLecturerEmail(feedback.getAssignedLecturer() != null ? feedback.getAssignedLecturer().getEmail() : null)
+                .assignedLecturerId(
+                        feedback.getAssignedLecturer() != null ? feedback.getAssignedLecturer().getId() : null)
+                .assignedLecturerCode(
+                        feedback.getAssignedLecturer() != null ? feedback.getAssignedLecturer().getLecturerCode()
+                                : null)
+                .assignedLecturerName(
+                        feedback.getAssignedLecturer() != null ? feedback.getAssignedLecturer().getFullName() : null)
+                .assignedLecturerEmail(
+                        feedback.getAssignedLecturer() != null ? feedback.getAssignedLecturer().getEmail() : null)
                 .courseSectionId(feedback.getCourseSection() != null ? feedback.getCourseSection().getId() : null)
                 .sectionCode(feedback.getCourseSection() != null ? feedback.getCourseSection().getSectionCode() : null)
                 .courseName(feedback.getCourseSection() != null && feedback.getCourseSection().getCourse() != null
-                        ? feedback.getCourseSection().getCourse().getCourseName() : null)
+                        ? feedback.getCourseSection().getCourse().getCourseName()
+                        : null)
                 .adminNote(feedback.getAdminNote())
                 .createdAt(feedback.getCreatedAt())
                 .updatedAt(feedback.getUpdatedAt())

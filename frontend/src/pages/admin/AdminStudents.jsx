@@ -113,10 +113,12 @@ const AdminStudents = () => {
       setEditing(profile);
       setForm(nextForm);
       setInitialForm(nextForm);
-    } catch (err) {
-      toast.error('Không tải được dữ liệu sinh viên', getErrorMessage(err));
-      setOpen(false);
-      setEditing(null);
+    } catch {
+      // Fallback sử dụng dữ liệu từ danh sách nếu không tải được chi tiết
+      const nextForm = normalizeEditForm(student);
+      setEditing(student);
+      setForm(nextForm);
+      setInitialForm(nextForm);
     } finally {
       setLoadingProfile(false);
     }
@@ -202,6 +204,25 @@ const AdminStudents = () => {
           throw new Error('Không thể tạo tên đăng nhập duy nhất cho tài khoản này.');
         }
 
+        // Backend authApi.register mặc định đặt department="CNTT" và status=ACTIVE.
+        // Đồng bộ lại department và status theo form nếu người dùng nhập khác mặc định.
+        if (payload.department || payload.status !== 'ACTIVE') {
+          try {
+            const listRes = await studentApi.getAll();
+            const created = (listRes.data || []).find((s) => s.email?.toLowerCase() === payload.email.toLowerCase());
+            if (created && (created.department !== payload.department || created.status !== payload.status)) {
+              await studentApi.update(created.id, {
+                fullName: payload.fullName,
+                email: payload.email,
+                department: payload.department,
+                status: payload.status,
+              });
+            }
+          } catch (syncErr) {
+            console.warn('Could not sync department/status for new student:', syncErr);
+          }
+        }
+
         toast.success('Tạo tài khoản thành công', `${payload.fullName} đã được tạo trong hệ thống với mật khẩu khởi tạo đã được thiết lập.`);
       }
       setOpen(false);
@@ -216,7 +237,7 @@ const AdminStudents = () => {
   const handleDelete = async (student) => {
     const result = await Swal.fire({
       title: 'Xác nhận xoá sinh viên?',
-      text: `Bạn có chắc muốn xoá ${student.fullName || student.studentCode}? Hành động này sẽ không hoàn tác nếu backend đã hỗ trợ API xoá.`,
+      text: `Bạn có chắc muốn xoá ${student.fullName || student.studentCode}? Hành động này chỉ được phép cho tài khoản đã ngừng hoạt động và không có ràng buộc dữ liệu.`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Xoá sinh viên',
@@ -243,12 +264,7 @@ const AdminStudents = () => {
       toast.success('Xoá sinh viên thành công', `Đã xoá ${student.fullName || student.studentCode}.`);
       load();
     } catch (err) {
-      const status = err?.response?.status;
-      if (status === 404 || status === 405) {
-        toast.error('Chưa hỗ trợ xoá trên backend', 'API xoá sinh viên chưa được triển khai trên server. Hãy bổ sung endpoint DELETE /api/students/{id} trước khi dùng chức năng này.');
-      } else {
-        toast.error('Không thể xoá sinh viên', getErrorMessage(err));
-      }
+      toast.error('Không thể xoá sinh viên', getErrorMessage(err));
     }
   };
 

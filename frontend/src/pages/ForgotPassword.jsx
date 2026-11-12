@@ -25,7 +25,8 @@ const ForgotPassword = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [backendOtp, setBackendOtp] = useState('');
+  // backendOtp không được hiển thị/lưu ra ngoài – chỉ dùng nội bộ để tự động điền ô OTP
+  // khi Backend trả về trong response (môi trường dev).
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -69,16 +70,15 @@ const ForgotPassword = () => {
     try {
       const res = await authApi.forgotPassword({ email: rawEmail });
       const data = res.data || {};
-      const receivedOtp = data.otp || data.resetToken || '';
-      setBackendOtp(receivedOtp);
       setStep(2);
       setCountdown(60);
       toast.success(
         'Đã gửi mã xác thực OTP',
-        data.message || 'Mã OTP 6 số đã được gửi tới email của bạn. Vui lòng kiểm tra hộp thư (thời hạn 15 phút).'
+        data.message || 'Mã OTP 6 số đã được gửi tới email của bạn. Vui lòng kiểm tra hộp thư (thời hạn 5 phút).'
       );
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể gửi yêu cầu đặt lại mật khẩu. Vui lòng kiểm tra lại.'));
+      const errMsg = getErrorMessage(err, 'Không thể gửi yêu cầu đặt lại mật khẩu. Vui lòng kiểm tra lại.');
+      setError(errMsg);
     } finally {
       setLoading(false);
     }
@@ -92,12 +92,10 @@ const ForgotPassword = () => {
     try {
       const res = await authApi.forgotPassword({ email: email.trim().toLowerCase() });
       const data = res.data || {};
-      const receivedOtp = data.otp || data.resetToken || '';
-      setBackendOtp(receivedOtp);
       setCountdown(60);
       toast.success(
         'Đã gửi lại mã OTP',
-        'Mã OTP mới đã được gửi tới email của bạn (hiệu lực 15 phút).'
+        'Mã OTP mới đã được gửi tới email của bạn (hiệu lực 5 phút).'
       );
     } catch (err) {
       setError(getErrorMessage(err, 'Không thể gửi lại mã OTP. Vui lòng thử lại sau.'));
@@ -155,7 +153,9 @@ const ForgotPassword = () => {
       toast.showAuthModal({
         icon: 'success',
         title: 'Đặt lại mật khẩu thành công',
-        message: res.data?.message || 'Mật khẩu của bạn đã được cập nhật thành công. Đang chuyển về trang đăng nhập...',
+        message:
+          res.data?.message ||
+          'Mật khẩu của bạn đã được cập nhật thành công. Đang chuyển về trang đăng nhập...',
         duration: 3000,
       });
 
@@ -163,13 +163,32 @@ const ForgotPassword = () => {
         navigate('/login', { replace: true });
       }, 3000);
     } catch (err) {
-      const msg = getErrorMessage(err, 'Không thể đặt lại mật khẩu. Vui lòng kiểm tra lại mã OTP.');
+      const rawErrMsg = err?.response?.data?.message || '';
+      let msg = rawErrMsg || 'Không thể đặt lại mật khẩu. Vui lòng kiểm tra lại mã OTP.';
+
+      // Phân loại lỗi để hướng dẫn người dùng cụ thể
+      const lc = msg.toLowerCase();
+      let shouldGoBackToStep1 = false;
+      if (lc.includes('hết hạn') || lc.includes('5 phút')) {
+        // OTP đã hết hạn - cần quay lại bước 1
+        shouldGoBackToStep1 = true;
+      } else if (lc.includes('quá 5 lần') || lc.includes('vô hiệu hóa') || lc.includes('thao tác lại từ đầu')) {
+        // OTP bị vô hiệu hoá do nhập sai quá nhiều - cần quay lại bước 1
+        shouldGoBackToStep1 = true;
+      }
+
       setError(msg);
       toast.showAuthModal({
         icon: 'error',
         title: 'Đặt lại mật khẩu thất bại',
         message: msg,
-        duration: 3000,
+        duration: shouldGoBackToStep1 ? 0 : 3000,
+        showConfirmButton: shouldGoBackToStep1,
+        confirmButtonText: shouldGoBackToStep1 ? 'Yêu cầu mã OTP mới' : undefined,
+      }).then((result) => {
+        if (shouldGoBackToStep1 && result.isConfirmed) {
+          handleBackToStep1();
+        }
       });
     } finally {
       setLoading(false);
@@ -241,7 +260,7 @@ const ForgotPassword = () => {
             }}
           >
             <ClockIcon size={15} style={{ color: 'var(--blue-600, #2563eb)', flexShrink: 0 }} />
-            <span>Mã xác thực OTP có hiệu lực trong <strong>5 phút</strong> (tối đa 5 lần thử, bảo mật SHA-256).</span>
+            <span>Mã xác thực OTP có hiệu lực trong <strong>5 phút</strong> (tối đa 5 lần thử sai, bảo mật SHA-256).</span>
           </div>
 
           <button className="btn btn-primary btn-block" type="submit" disabled={loading}>

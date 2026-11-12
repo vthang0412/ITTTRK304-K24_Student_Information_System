@@ -17,6 +17,7 @@ import com.example.student_management.repository.academic.CourseSectionRepositor
 import com.example.student_management.repository.academic.EnrollmentRepository;
 import com.example.student_management.repository.auth.UserRepository;
 import com.example.student_management.repository.grade.*;
+import com.example.student_management.service.notification.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,6 +58,9 @@ public class GradebookService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private NotificationService notificationService;
 
     @Transactional
     public List<GradebookSummaryDto> getGradebookSummaries() {
@@ -398,6 +402,30 @@ public class GradebookService {
         gradebook.setPublishedBy(actor);
         gradebookRepository.save(gradebook);
         logStatus(gradebook, actor, "PUBLISH", GradebookStatus.APPROVED.name(), GradebookStatus.PUBLISHED.name());
+
+        // Tự động thông báo tới tất cả sinh viên trong lớp học phần
+        try {
+            CourseSection section = gradebook.getCourseSection();
+            if (section != null) {
+                Course course = section.getCourse();
+                String courseName = course != null ? course.getCourseName() : "Học phần";
+                List<Enrollment> enrollments = enrolledEnrollments(section.getId());
+                for (Enrollment enrollment : enrollments) {
+                    if (enrollment.getStudent() != null && enrollment.getStudent().getUser() != null) {
+                        try {
+                            notificationService.sendSystemNotification(
+                                    enrollment.getStudent().getUser(),
+                                    "Công bố điểm học phần: " + section.getSectionCode(),
+                                    "Bảng điểm chính thức của lớp " + section.getSectionCode() + " - " + courseName +
+                                            " đã được công bố. Bạn có thể tra cứu điểm chi tiết trong mục Điểm số.",
+                                    "GRADE"
+                            );
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+
         return summarizeSection(gradebook.getCourseSection());
     }
 
