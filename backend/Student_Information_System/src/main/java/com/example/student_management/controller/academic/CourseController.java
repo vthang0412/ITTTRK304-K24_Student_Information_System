@@ -12,6 +12,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/courses")
@@ -24,7 +26,16 @@ public class CourseController {
 
     @GetMapping
     public ResponseEntity<List<Course>> getAll() {
-        return ResponseEntity.ok(courseRepository.findAll());
+        List<Course> courses = courseRepository.findAll();
+        Set<Long> linkedCourseIds = courseSectionRepository.findCourseIdsWithSections()
+                .stream().collect(Collectors.toSet());
+        courses.forEach(course -> {
+            if (linkedCourseIds.contains(course.getId())) {
+                course.setDeleteBlockedReason(
+                        "Môn học đang được lớp học phần tham chiếu; cần giữ lại đăng ký, điểm và lịch sử lịch học liên quan.");
+            }
+        });
+        return ResponseEntity.ok(courses);
     }
 
     @PostMapping
@@ -55,8 +66,8 @@ public class CourseController {
                 .orElseThrow(() -> new NotFoundException("Course not found"));
 
         if (courseSectionRepository.existsByCourseId(id)) {
-            throw new BadRequestException(
-                    "Không thể xóa môn học vì môn học đang được sử dụng bởi ít nhất một học phần hoặc dữ liệu liên quan.");
+            throw new BadRequestException("Không thể xóa môn học vì môn học đang được lớp học phần tham chiếu. "
+                    + "Các đăng ký, bảng điểm và lịch sử lịch học liên quan cần được bảo toàn.");
         }
 
         courseRepository.delete(course);

@@ -24,6 +24,8 @@ import AdminLecturers from './pages/admin/AdminLecturers';
 import AdminCourses from './pages/admin/AdminCourses';
 import AdminSemesters from './pages/admin/AdminSemesters';
 import AdminSections from './pages/admin/AdminSections';
+import AdminTimetable from './pages/admin/AdminTimetable';
+import AdminEnrollments from './pages/admin/AdminEnrollments';
 import AdminGradebooks from './pages/admin/AdminGradebooks';
 import AdminGradebookConfig from './pages/admin/AdminGradebookConfig';
 import AdminNotifications from './pages/admin/AdminNotifications';
@@ -72,6 +74,8 @@ function App() {
             <Route path="/admin/courses" element={withLayout(<AdminCourses />, ['ADMIN'])} />
             <Route path="/admin/semesters" element={withLayout(<AdminSemesters />, ['ADMIN'])} />
             <Route path="/admin/sections" element={withLayout(<AdminSections />, ['ADMIN'])} />
+            <Route path="/admin/timetable" element={withLayout(<AdminTimetable />, ['ADMIN'])} />
+            <Route path="/admin/enrollments" element={withLayout(<AdminEnrollments />, ['ADMIN'])} />
             <Route path="/admin/gradebooks" element={withLayout(<AdminGradebooks />, ['ADMIN'])} />
             <Route path="/admin/gradebook-config" element={withLayout(<AdminGradebookConfig />, ['ADMIN'])} />
             <Route path="/admin/notifications" element={withLayout(<AdminNotifications />, ['ADMIN'])} />

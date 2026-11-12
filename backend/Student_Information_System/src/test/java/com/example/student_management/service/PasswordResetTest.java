@@ -11,13 +11,17 @@ import com.example.student_management.exception.BadRequestException;
 import com.example.student_management.repository.auth.PasswordResetTokenRepository;
 import com.example.student_management.repository.auth.UserRepository;
 import com.example.student_management.service.auth.AuthService;
+import com.example.student_management.service.auth.PasswordResetService;
 import com.example.student_management.service.email.EmailService;
+import jakarta.persistence.LockModeType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -46,15 +50,18 @@ class PasswordResetTest {
     private PasswordEncoder passwordEncoder;
 
     @InjectMocks
+    private PasswordResetService passwordResetService;
+
+    @InjectMocks
     private AuthService authService;
 
     private User sampleUser;
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(authService, "frontendUrl", "http://localhost:5173");
         ReflectionTestUtils.setField(authService, "otpCooldownSeconds", 60);
         ReflectionTestUtils.setField(authService, "otpMaxRequestsPerHour", 5);
+        ReflectionTestUtils.setField(authService, "passwordResetService", passwordResetService);
         sampleUser = User.builder()
                 .id(1L)
                 .username("student01")
@@ -81,16 +88,51 @@ class PasswordResetTest {
 
         ForgotPasswordResponse response = authService.forgotPassword(request);
 
-        assertNotNull(response.getResetToken());
-        assertNotNull(response.getOtp());
-        assertEquals(6, response.getOtp().length());
-        assertEquals("student@sis.edu.vn", response.getEmail());
-        verify(emailService).sendOtpEmail(eq("student@sis.edu.vn"), anyString(), eq(response.getOtp()));
+        // OTP không được trả về trong response (C-01): chỉ được gửi qua email.
+        assertNotNull(response.getMessage());
+        assertTrue(response.getMessage().contains("nếu tài khoản tồn tại trong hệ thống"));
+
+        ArgumentCaptor<String> otpCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendOtpEmail(eq("student@sis.edu.vn"), anyString(), otpCaptor.capture());
+        String sentOtp = otpCaptor.getValue();
+        assertEquals(6, sentOtp.length());
         verify(passwordResetTokenRepository).save(argThat(token ->
-                token.getToken().equals(PasswordResetToken.hashOtp(response.getOtp())) &&
+                token.getToken().equals(PasswordResetToken.hashOtp(sentOtp)) &&
                 !token.isUsed() &&
                 token.getAttemptCount() == 0
         ));
+    }
+
+    @Test
+    void forgotPassword_shouldInvalidatePreviousTokenAndStartNewAttemptCount() {
+        ForgotPasswordRequest request = ForgotPasswordRequest.builder()
+                .email("student@sis.edu.vn")
+                .build();
+        PasswordResetToken oldToken = PasswordResetToken.builder()
+                .id(98L)
+                .user(sampleUser)
+                .createdAt(LocalDateTime.now().minusSeconds(120))
+                .used(false)
+                .attemptCount(3)
+                .build();
+
+        when(userRepository.findByEmail("student@sis.edu.vn")).thenReturn(Optional.of(sampleUser));
+        when(passwordResetTokenRepository.findFirstByUserIdOrderByCreatedAtDesc(1L))
+                .thenReturn(Optional.of(oldToken));
+        when(passwordResetTokenRepository.countByUserIdAndCreatedAtAfter(eq(1L), any(LocalDateTime.class)))
+                .thenReturn(1L);
+        when(passwordResetTokenRepository.findByUserIdAndUsedFalse(1L)).thenReturn(Collections.singletonList(oldToken));
+        when(passwordResetTokenRepository.save(any(PasswordResetToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        authService.forgotPassword(request);
+
+        assertTrue(oldToken.isUsed());
+        ArgumentCaptor<PasswordResetToken> tokenCaptor = ArgumentCaptor.forClass(PasswordResetToken.class);
+        verify(passwordResetTokenRepository).save(tokenCaptor.capture());
+        assertFalse(tokenCaptor.getValue().isUsed());
+        assertEquals(0, tokenCaptor.getValue().getAttemptCount());
+        verify(passwordResetTokenRepository).saveAll(Collections.singletonList(oldToken));
     }
 
     @Test
@@ -139,8 +181,6 @@ class PasswordResetTest {
 
         ForgotPasswordResponse response = authService.forgotPassword(request);
 
-        assertNull(response.getResetToken());
-        assertNull(response.getOtp());
         assertNotNull(response.getMessage());
         assertTrue(response.getMessage().contains("nếu tài khoản tồn tại trong hệ thống"));
         verify(emailService, never()).sendOtpEmail(any(), any(), any());
@@ -167,7 +207,7 @@ class PasswordResetTest {
                 .newPassword("NewPass@123")
                 .build();
 
-        when(passwordResetTokenRepository.findFirstByUser_EmailIgnoreCaseAndUsedFalseOrderByCreatedAtDesc("student@sis.edu.vn"))
+        when(passwordResetTokenRepository.findFirstByUser_EmailIgnoreCaseOrderByCreatedAtDesc("student@sis.edu.vn"))
                 .thenReturn(Optional.of(resetToken));
         when(passwordEncoder.encode("NewPass@123")).thenReturn("new-encoded-hash");
 
@@ -202,7 +242,7 @@ class PasswordResetTest {
                 .newPassword("NewPass@123")
                 .build();
 
-        when(passwordResetTokenRepository.findFirstByUser_EmailIgnoreCaseAndUsedFalseOrderByCreatedAtDesc("student@sis.edu.vn"))
+        when(passwordResetTokenRepository.findFirstByUser_EmailIgnoreCaseOrderByCreatedAtDesc("student@sis.edu.vn"))
                 .thenReturn(Optional.of(resetToken));
 
         BadRequestException ex = assertThrows(BadRequestException.class, () -> authService.resetPassword(request));
@@ -234,13 +274,91 @@ class PasswordResetTest {
                 .newPassword("NewPass@123")
                 .build();
 
-        when(passwordResetTokenRepository.findFirstByUser_EmailIgnoreCaseAndUsedFalseOrderByCreatedAtDesc("student@sis.edu.vn"))
+        when(passwordResetTokenRepository.findFirstByUser_EmailIgnoreCaseOrderByCreatedAtDesc("student@sis.edu.vn"))
                 .thenReturn(Optional.of(resetToken));
 
         BadRequestException ex = assertThrows(BadRequestException.class, () -> authService.resetPassword(request));
-        assertTrue(ex.getMessage().contains("quá 5 lần"));
+        assertTrue(ex.getMessage().contains("hết số lần thử"));
         assertTrue(resetToken.isUsed());
         verify(passwordResetTokenRepository).save(resetToken);
+    }
+
+    @Test
+    void resetPassword_shouldPersistExactlyFiveWrongAttempts() {
+        PasswordResetToken resetToken = PasswordResetToken.builder()
+                .id(10L)
+                .token(PasswordResetToken.hashOtp("123456"))
+                .user(sampleUser)
+                .expiryDate(LocalDateTime.now().plusMinutes(5))
+                .used(false)
+                .attemptCount(0)
+                .build();
+
+        when(passwordResetTokenRepository.findFirstByUser_EmailIgnoreCaseOrderByCreatedAtDesc("student@sis.edu.vn"))
+                .thenReturn(Optional.of(resetToken));
+        ResetPasswordRequest request = ResetPasswordRequest.builder()
+                .email("student@sis.edu.vn")
+                .otp("999999")
+                .newPassword("NewPass@123")
+                .build();
+
+        for (int attempt = 1; attempt <= 5; attempt++) {
+            BadRequestException ex = assertThrows(
+                    BadRequestException.class, () -> authService.resetPassword(request));
+            assertEquals(attempt, resetToken.getAttemptCount());
+            assertEquals(attempt == 5, resetToken.isUsed());
+            if (attempt < 5) {
+                assertTrue(ex.getMessage().contains("còn " + (5 - attempt) + " lần thử"));
+            } else {
+                assertTrue(ex.getMessage().contains("hết số lần thử"));
+            }
+        }
+
+        verify(passwordResetTokenRepository, times(5)).save(resetToken);
+        verify(userRepository, never()).save(any());
+
+        BadRequestException lockedAttempt = assertThrows(
+                BadRequestException.class, () -> authService.resetPassword(request));
+        assertTrue(lockedAttempt.getMessage().contains("hết số lần thử"));
+        assertEquals(5, resetToken.getAttemptCount());
+        verify(passwordResetTokenRepository, times(5)).save(resetToken);
+    }
+
+    @Test
+    void resetPassword_shouldNotChargeNewOtpForAPreviouslyIssuedCode() {
+        PasswordResetToken currentToken = PasswordResetToken.builder()
+                .id(12L)
+                .token(PasswordResetToken.hashOtp("222222"))
+                .user(sampleUser)
+                .expiryDate(LocalDateTime.now().plusMinutes(5))
+                .used(false)
+                .attemptCount(0)
+                .build();
+        PasswordResetToken oldToken = PasswordResetToken.builder()
+                .id(11L)
+                .token(PasswordResetToken.hashOtp("111111"))
+                .user(sampleUser)
+                .expiryDate(LocalDateTime.now().plusMinutes(5))
+                .used(true)
+                .attemptCount(0)
+                .build();
+
+        when(passwordResetTokenRepository.findFirstByUser_EmailIgnoreCaseOrderByCreatedAtDesc("student@sis.edu.vn"))
+                .thenReturn(Optional.of(currentToken));
+        when(passwordResetTokenRepository.findFirstByUser_EmailIgnoreCaseAndTokenOrderByCreatedAtDesc(
+                "student@sis.edu.vn", PasswordResetToken.hashOtp("111111")))
+                .thenReturn(Optional.of(oldToken));
+        ResetPasswordRequest request = ResetPasswordRequest.builder()
+                .email("student@sis.edu.vn")
+                .otp("111111")
+                .newPassword("NewPass@123")
+                .build();
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () -> authService.resetPassword(request));
+
+        assertTrue(ex.getMessage().contains("mã OTP mới nhất"));
+        assertEquals(0, currentToken.getAttemptCount());
+        verify(passwordResetTokenRepository, never()).save(currentToken);
     }
 
     @Test
@@ -259,12 +377,29 @@ class PasswordResetTest {
                 .newPassword("NewPass@123")
                 .build();
 
-        when(passwordResetTokenRepository.findFirstByUser_EmailIgnoreCaseAndUsedFalseOrderByCreatedAtDesc("student@sis.edu.vn"))
+        when(passwordResetTokenRepository.findFirstByUser_EmailIgnoreCaseOrderByCreatedAtDesc("student@sis.edu.vn"))
                 .thenReturn(Optional.of(expiredToken));
 
         BadRequestException ex = assertThrows(BadRequestException.class, () -> authService.resetPassword(request));
         assertTrue(ex.getMessage().contains("hết hạn"));
         assertTrue(expiredToken.isUsed());
         verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void resetPasswordLookup_shouldUsePessimisticWriteLock() throws Exception {
+        Lock lock = PasswordResetTokenRepository.class
+                .getMethod("findFirstByUser_EmailIgnoreCaseOrderByCreatedAtDesc", String.class)
+                .getAnnotation(Lock.class);
+
+        assertNotNull(lock);
+        assertEquals(LockModeType.PESSIMISTIC_WRITE, lock.value());
+    }
+
+    @Test
+    void resetPasswordTransaction_shouldCommitOutcomeBeforeAuthServiceThrows() throws Exception {
+        assertNotNull(PasswordResetService.class.getMethod(
+                "resetPassword", String.class, String.class, String.class)
+                .getAnnotation(org.springframework.transaction.annotation.Transactional.class));
     }
 }

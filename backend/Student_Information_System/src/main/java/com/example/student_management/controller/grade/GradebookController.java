@@ -1,6 +1,7 @@
 package com.example.student_management.controller.grade;
 
 import com.example.student_management.dto.grade.*;
+import com.example.student_management.service.grade.GradebookBulkActionService;
 import com.example.student_management.service.grade.GradebookService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,12 +11,16 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api")
 public class GradebookController {
     @Autowired
     private GradebookService gradebookService;
+
+    @Autowired
+    private GradebookBulkActionService gradebookBulkActionService;
 
     @GetMapping("/admin/gradebooks")
     @PreAuthorize("hasRole('ADMIN')")
@@ -27,6 +32,45 @@ public class GradebookController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<GradebookSummaryDto>> progress() {
         return ResponseEntity.ok(gradebookService.getGradebookSummaries());
+    }
+
+    @PostMapping("/admin/gradebooks/bulk-actions")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<GradebookBulkActionResponse> bulkAction(
+            @Valid @RequestBody GradebookBulkActionRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(gradebookBulkActionService.execute(request, authentication.getName()));
+    }
+
+    @PostMapping("/admin/gradebooks/bulk-actions/preview")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<GradebookBulkActionPreviewResponse> previewBulkAction(
+            @Valid @RequestBody GradebookBulkActionRequest request) {
+        return ResponseEntity.ok(gradebookBulkActionService.preview(request));
+    }
+
+    @GetMapping("/admin/gradebooks/bulk-actions/history")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<GradebookBulkOperationPageDto> bulkActionHistory(
+            @RequestParam(required = false) String actor,
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) LocalDateTime fromTime,
+            @RequestParam(required = false) LocalDateTime toTime,
+            @RequestParam(required = false) String course,
+            @RequestParam(required = false) String section,
+            @RequestParam(required = false) String semester,
+            @RequestParam(required = false) String result,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(gradebookBulkActionService.searchHistory(
+                actor, action, fromTime, toTime, course, section, semester, result, page, size));
+    }
+
+    @GetMapping("/admin/gradebooks/bulk-actions/history/{operationCode}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<GradebookBulkOperationDto> bulkActionHistoryDetail(
+            @PathVariable String operationCode) {
+        return ResponseEntity.ok(gradebookBulkActionService.getHistory(operationCode));
     }
 
     @GetMapping("/admin/gradebooks/{gradebookId}")

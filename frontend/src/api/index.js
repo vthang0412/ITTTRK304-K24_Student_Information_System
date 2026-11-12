@@ -54,12 +54,47 @@ export const courseSectionApi = {
   create: (data) => httpClient.post('/api/course-sections', data),
   update: (id, data) => httpClient.put(`/api/course-sections/${id}`, data),
   delete: (id) => httpClient.delete(`/api/course-sections/${id}`),
+  getRecurringSchedule: (id) => httpClient.get(`/api/course-sections/${id}/recurring-schedules`),
+  checkRecurringSchedule: (id, data) => httpClient.post(`/api/course-sections/${id}/recurring-schedules/check`, data),
+  saveRecurringSchedule: (id, data) => httpClient.put(`/api/course-sections/${id}/recurring-schedules`, data),
+  deleteRecurringSchedule: (id) => httpClient.delete(`/api/course-sections/${id}/recurring-schedules`),
 };
 
 export const enrollmentApi = {
   getMyEnrollments: () => httpClient.get('/api/enrollments/me'),
+  getPendingEnrollments: () => httpClient.get('/api/enrollments/pending'),
+  getAdminEnrollments: (status) => httpClient.get('/api/enrollments/admin', {
+    params: { status: status || undefined },
+  }),
   enroll: (sectionId) => httpClient.post(`/api/course-sections/${sectionId}/enroll`),
+  approve: (enrollmentId) => httpClient.post(`/api/enrollments/${enrollmentId}/approve`),
+  reject: (enrollmentId, reason) => httpClient.post(`/api/enrollments/${enrollmentId}/reject`, { reason }),
+  approveBulk: (enrollmentIds) => httpClient.post('/api/enrollments/bulk-approve', { enrollmentIds }),
+  rejectBulk: (enrollmentIds, reason, reasonsByEnrollmentId) =>
+    httpClient.post('/api/enrollments/bulk-reject', { enrollmentIds, reason, reasonsByEnrollmentId }),
+  previewBulk: (enrollmentIds, action) =>
+    httpClient.post('/api/enrollments/bulk-preview', { enrollmentIds, action }),
+  getBulkHistory: (params) => httpClient.get('/api/enrollments/bulk-history', { params }),
+  getBulkHistoryDetail: (operationId) => httpClient.get(`/api/enrollments/bulk-history/${operationId}`),
   withdraw: (enrollmentId) => httpClient.delete(`/api/enrollments/${enrollmentId}`),
+};
+
+export const timetableApi = {
+  getWeek: ({ semesterId, weekStart, page = 1, size = 10 }) => httpClient.get('/api/timetable', {
+    params: { semesterId: semesterId || undefined, weekStart, page, size },
+  }),
+  getAdminWeek: ({ semesterId, sectionId, lecturerId, classroom, weekStart, page = 1, size = 50 }) =>
+    httpClient.get('/api/timetable/admin', {
+      params: {
+        semesterId: semesterId || undefined,
+        sectionId: sectionId || undefined,
+        lecturerId: lecturerId || undefined,
+        classroom: classroom || undefined,
+        weekStart,
+        page,
+        size,
+      },
+    }),
 };
 
 export const gradeApi = {
@@ -77,6 +112,16 @@ export const gradebookApi = {
   unlock: (gradebookId) => httpClient.post(`/api/admin/gradebooks/${gradebookId}/unlock`),
   approve: (gradebookId) => httpClient.post(`/api/admin/gradebooks/${gradebookId}/approve`),
   publish: (gradebookId) => httpClient.post(`/api/admin/gradebooks/${gradebookId}/publish`),
+  bulkAction: (gradebookIds, action) => httpClient.post('/api/admin/gradebooks/bulk-actions', { gradebookIds, action }),
+  previewBulkAction: (gradebookIds, action) => httpClient.post('/api/admin/gradebooks/bulk-actions/preview', { gradebookIds, action }),
+  getBulkHistory: (filters) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') params.append(key, value);
+    });
+    return httpClient.get(`/api/admin/gradebooks/bulk-actions/history?${params.toString()}`);
+  },
+  getBulkHistoryDetail: (operationCode) => httpClient.get(`/api/admin/gradebooks/bulk-actions/history/${encodeURIComponent(operationCode)}`),
   getSectionDetail: (sectionId) => httpClient.get(`/api/course-sections/${sectionId}/gradebook`),
   getComponents: (sectionId) => httpClient.get(`/api/course-sections/${sectionId}/grade-components`),
   updateComponents: (sectionId, components) => httpClient.put(`/api/course-sections/${sectionId}/grade-components`, { components }),

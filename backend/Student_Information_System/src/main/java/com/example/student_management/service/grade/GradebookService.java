@@ -337,7 +337,7 @@ public class GradebookService {
 
     @Transactional
     public GradebookSummaryDto lock(Long gradebookId, String actor) {
-        Gradebook gradebook = requireGradebook(gradebookId);
+        Gradebook gradebook = requireGradebookForUpdate(gradebookId);
         if (gradebook.getStatus() != GradebookStatus.OPEN) {
             throw new ConflictException("Only an open gradebook can be locked");
         }
@@ -351,7 +351,7 @@ public class GradebookService {
 
     @Transactional
     public GradebookSummaryDto unlock(Long gradebookId, String actor) {
-        Gradebook gradebook = requireGradebook(gradebookId);
+        Gradebook gradebook = requireGradebookForUpdate(gradebookId);
         GradebookStatus previous = gradebook.getStatus();
         if (previous == GradebookStatus.OPEN) {
             throw new ConflictException("Gradebook is already open");
@@ -371,7 +371,7 @@ public class GradebookService {
 
     @Transactional
     public GradebookSummaryDto approve(Long gradebookId, String actor) {
-        Gradebook gradebook = requireGradebook(gradebookId);
+        Gradebook gradebook = requireGradebookForUpdate(gradebookId);
         if (gradebook.getStatus() != GradebookStatus.LOCKED) {
             throw new ConflictException("Gradebook must be locked before it can be approved");
         }
@@ -389,7 +389,7 @@ public class GradebookService {
 
     @Transactional
     public GradebookSummaryDto publish(Long gradebookId, String actor) {
-        Gradebook gradebook = requireGradebook(gradebookId);
+        Gradebook gradebook = requireGradebookForUpdate(gradebookId);
         if (gradebook.getStatus() != GradebookStatus.APPROVED) {
             throw new ConflictException("Gradebook must be approved before it can be published");
         }
@@ -471,6 +471,9 @@ public class GradebookService {
                 .totalStudents(progress.total)
                 .completedStudents(progress.complete)
                 .incompleteStudents(progress.incomplete)
+                .studentsWithAnyGrade(progress.withAnyGrade)
+                .studentsWithNoGrades(progress.withNoGrades)
+                .studentsWithPartialGrades(progress.withPartialGrades)
                 .status(gradebook.getStatus().name())
                 .gradingMode(componentCount > 0 ? "COMPONENT" : "FINAL")
                 .componentCount(componentCount)
@@ -491,11 +494,24 @@ public class GradebookService {
         long complete = enrollments.stream()
                 .filter(e -> isComplete(components, scoreMap.getOrDefault(e.getId(), Map.of()), grades.get(e.getId())))
                 .count();
+        long withAnyGrade = enrollments.stream()
+                .filter(e -> hasAnyGrade(scoreMap.getOrDefault(e.getId(), Map.of()), grades.get(e.getId())))
+                .count();
         Progress progress = new Progress();
         progress.total = enrollments.size();
         progress.complete = complete;
         progress.incomplete = enrollments.size() - complete;
+        progress.withAnyGrade = withAnyGrade;
+        progress.withNoGrades = enrollments.size() - withAnyGrade;
+        progress.withPartialGrades = withAnyGrade - complete;
         return progress;
+    }
+
+    private boolean hasAnyGrade(Map<Long, BigDecimal> scores, Grade grade) {
+        if (!scores.isEmpty()) {
+            return true;
+        }
+        return grade != null && (grade.getFinalScore() != null || grade.getComponentScore() != null);
     }
 
     private List<Enrollment> enrolledEnrollments(Long sectionId) {
@@ -682,6 +698,11 @@ public class GradebookService {
                 .orElseThrow(() -> new NotFoundException("Gradebook not found"));
     }
 
+    private Gradebook requireGradebookForUpdate(Long gradebookId) {
+        return gradebookRepository.findByIdForUpdate(gradebookId)
+                .orElseThrow(() -> new NotFoundException("Gradebook not found"));
+    }
+
     private CourseSection requireSection(Long sectionId) {
         return courseSectionRepository.findById(sectionId)
                 .orElseThrow(() -> new NotFoundException("Course section not found"));
@@ -769,5 +790,8 @@ public class GradebookService {
         private long total;
         private long complete;
         private long incomplete;
+        private long withAnyGrade;
+        private long withNoGrades;
+        private long withPartialGrades;
     }
 }

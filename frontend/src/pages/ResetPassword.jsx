@@ -30,6 +30,8 @@ const ResetPassword = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [remainingAttempts, setRemainingAttempts] = useState(null);
+  const [otpLocked, setOtpLocked] = useState(false);
 
   const toast = useToast();
   const navigate = useNavigate();
@@ -48,6 +50,11 @@ const ResetPassword = () => {
 
     if (!cleanOtp) {
       setError('Vui lòng nhập mã OTP xác thực (6 chữ số).');
+      return;
+    }
+
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setError('Vui lòng nhập email hợp lệ đã nhận mã OTP.');
       return;
     }
 
@@ -97,14 +104,25 @@ const ResetPassword = () => {
       const rawErrMsg = err?.response?.data?.message || '';
       const msg = rawErrMsg || 'Không thể đặt lại mật khẩu. Vui lòng kiểm tra lại mã OTP.';
       const lc = msg.toLowerCase();
+      const remainingMatch = msg.match(/còn\s+(\d+)\s+lần thử/i);
+      if (remainingMatch) {
+        setRemainingAttempts(Number(remainingMatch[1]));
+      }
 
       // Phân loại lỗi để hiển thị thông báo phù hợp
       const isExpiredOrInvalidated =
         lc.includes('hết hạn') ||
+        lc.includes('hết số lần thử') ||
         lc.includes('quá 5 lần') ||
         lc.includes('vô hiệu hóa') ||
+        lc.includes('đã được sử dụng') ||
+        lc.includes('không còn hợp lệ') ||
         lc.includes('thao tác lại từ đầu');
 
+      if (isExpiredOrInvalidated) {
+        setOtpLocked(true);
+        setRemainingAttempts(0);
+      }
       setError(msg);
       toast.showAuthModal({
         icon: 'error',
@@ -131,13 +149,20 @@ const ResetPassword = () => {
       {error && (
         <Alert tone="error">
           {error}
-          {error.includes('hết hạn') || error.includes('sử dụng') ? (
+          {error.includes('hết hạn') || error.includes('sử dụng') || otpLocked ? (
             <div style={{ marginTop: 8 }}>
               <Link to="/forgot-password" style={{ fontWeight: 600, textDecoration: 'underline' }}>
                 Bấm vào đây để yêu cầu mã OTP mới →
               </Link>
             </div>
           ) : null}
+        </Alert>
+      )}
+      {remainingAttempts !== null && !otpLocked && (
+        <Alert tone="warning">
+          {remainingAttempts === 1
+            ? 'Bạn chỉ còn 1 lần thử.'
+            : `Bạn còn ${remainingAttempts} lần thử.`}
         </Alert>
       )}
 
@@ -176,7 +201,7 @@ const ResetPassword = () => {
             <span>Mã OTP bảo mật có hiệu lực trong <strong>5 phút</strong> (tối đa 5 lần nhập sai, bảo mật SHA-256).</span>
           </div>
 
-          <Field label="Email tài khoản" hint="Không bắt buộc nếu đã có mã OTP hợp lệ">
+          <Field label="Email tài khoản" required hint="Nhập email đã nhận mã OTP">
             <div style={{ position: 'relative' }}>
               <MailIcon size={17} style={{ position: 'absolute', left: 12, top: 12, color: 'var(--muted)' }} />
               <input
@@ -210,7 +235,7 @@ const ResetPassword = () => {
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="000000"
                 autoFocus={!otp}
-                disabled={loading}
+                disabled={loading || otpLocked}
               />
             </div>
           </Field>
@@ -263,7 +288,7 @@ const ResetPassword = () => {
             </div>
           </Field>
 
-          <button className="btn btn-primary btn-block" type="submit" disabled={loading} style={{ marginTop: 10 }}>
+          <button className="btn btn-primary btn-block" type="submit" disabled={loading || otpLocked} style={{ marginTop: 10 }}>
             {loading ? (
               <>
                 <span className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,.35)' }} />

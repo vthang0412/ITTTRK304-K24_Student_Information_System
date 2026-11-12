@@ -4,6 +4,7 @@ package com.example.student_management.entity.academic;
 
 import com.example.student_management.entity.auth.AccountStatus;
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -35,4 +36,8 @@ public class Course {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private AccountStatus status;
+
+    @Transient
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String deleteBlockedReason;
 }

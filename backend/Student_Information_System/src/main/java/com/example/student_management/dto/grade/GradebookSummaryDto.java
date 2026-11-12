@@ -25,6 +25,9 @@ public class GradebookSummaryDto {
     private long totalStudents;
     private long completedStudents;
     private long incompleteStudents;
+    private long studentsWithAnyGrade;
+    private long studentsWithNoGrades;
+    private long studentsWithPartialGrades;
     private String status;
     private String gradingMode;
     private int componentCount;
