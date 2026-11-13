@@ -1,19 +1,30 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Swal from 'sweetalert2';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { courseApi, courseSectionApi, lecturerApi, semesterApi } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import {
-  BookIcon, CalendarIcon, ClockIcon, LayersIcon, PencilIcon, PlusIcon, TrashIcon, UserIcon, UsersIcon,
+  BookIcon, ClockIcon, LayersIcon, PencilIcon, PlusIcon, TrashIcon, UserIcon, UsersIcon,
 } from '../../components/Icons';
 import {
   EmptyState, Field, LoadingBlock, Modal, PageHeader, Pagination, SearchInput, StatCard, StatusBadge,
 } from '../../components/UI';
 import { getErrorMessage } from '../../utils/format';
+import RecurringScheduleModal from './RecurringScheduleModal';
 
-const PAGE_SIZE = 10;
+const todayInVietnam = () => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+};
 const EMPTY = {
   sectionCode: '', courseId: '', semesterId: '', lecturerId: '',
-  capacity: 40, schedule: '', status: 'DRAFT',
+  capacity: 40, schedule: '', scheduleEffectiveFrom: todayInVietnam(), status: 'DRAFT',
 };
 
 const AdminSections = () => {
@@ -26,12 +37,12 @@ const AdminSections = () => {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('ALL');
   const [semesterFilter, setSemesterFilter] = useState('ALL');
-  const [page, setPage] = useState(1);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [scheduleSection, setScheduleSection] = useState(null);
 
   const load = async () => {
     try {
@@ -65,7 +76,7 @@ const AdminSections = () => {
     });
   }, [sections, search, status, semesterFilter]);
 
-  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const { page, setPage, pageSize, setPageSize, totalItems, pageItems } = usePaginatedList(filtered);
   const totalCapacity = sections.reduce((sum, s) => sum + Number(s.capacity || 0), 0);
 
   const openCreate = () => { setEditing(null); setForm(EMPTY); setErrors({}); setOpen(true); };
@@ -79,6 +90,7 @@ const AdminSections = () => {
       lecturerId: section.lecturer?.id ? String(section.lecturer.id) : '',
       capacity: section.capacity ?? 40,
       schedule: section.schedule || '',
+      scheduleEffectiveFrom: todayInVietnam(),
       status: section.status || 'DRAFT',
     });
     setErrors({});
@@ -108,6 +120,7 @@ const AdminSections = () => {
         lecturer: form.lecturerId ? { id: Number(form.lecturerId) } : null,
         capacity: Number(form.capacity),
         schedule: form.schedule.trim(),
+        scheduleEffectiveFrom: form.scheduleEffectiveFrom,
         status: form.status,
       };
       if (editing) {
@@ -241,8 +254,20 @@ const AdminSections = () => {
                       <td><StatusBadge status={s.status} /></td>
                       <td>
                         <div className="row-actions">
+                          <button className="btn btn-secondary btn-sm" onClick={() => setScheduleSection(s)}>
+                            <ClockIcon size={14} /> Xem / thiết lập lịch
+                          </button>
                           <button className="btn btn-secondary btn-sm" onClick={() => openEdit(s)}><PencilIcon size={14} /> Sửa</button>
-                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(s)}><TrashIcon size={14} /> Xóa</button>
+                          <span title={s.deleteBlockedReason || 'Xóa lớp học phần'} style={{ display: 'inline-flex' }}>
+                            <button
+                              className="btn btn-danger btn-sm"
+                              onClick={() => handleDelete(s)}
+                              disabled={Boolean(s.deleteBlockedReason)}
+                              aria-label={s.deleteBlockedReason || `Xóa lớp học phần ${s.sectionCode}`}
+                            >
+                              <TrashIcon size={14} /> Xóa
+                            </button>
+                          </span>
                         </div>
                       </td>
                     </tr>
@@ -250,7 +275,7 @@ const AdminSections = () => {
                 </tbody>
               </table>
             </div>
-            <Pagination page={page} pageSize={PAGE_SIZE} totalItems={filtered.length} onPageChange={setPage} />
+            <Pagination page={page} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
           </>
         )}
       </div>
@@ -306,9 +331,27 @@ const AdminSections = () => {
             <Field label="Lịch học" className="full" hint="Ví dụ: Thứ 2, 07:30 – 09:30, Phòng A2-301">
               <input className="input" value={form.schedule} onChange={(e) => setForm({ ...form, schedule: e.target.value })} placeholder="Thứ 2, 07:30 – 09:30, Phòng A2-301" />
             </Field>
+            {editing && (
+              <Field label="Lịch mới có hiệu lực từ" className="full" hint="Lịch cũ được giữ lại để tra cứu các tuần trước ngày này.">
+                <input
+                  className="input"
+                  type="date"
+                  min={todayInVietnam()}
+                  value={form.scheduleEffectiveFrom}
+                  onChange={(e) => setForm({ ...form, scheduleEffectiveFrom: e.target.value })}
+                />
+              </Field>
+            )}
           </div>
         </form>
       </Modal>
+      {scheduleSection && (
+        <RecurringScheduleModal
+          section={scheduleSection}
+          onClose={() => setScheduleSection(null)}
+          onSaved={load}
+        />
+      )}
     </>
   );
 };

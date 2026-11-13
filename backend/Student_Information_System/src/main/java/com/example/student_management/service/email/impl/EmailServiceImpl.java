@@ -24,16 +24,9 @@ public class EmailServiceImpl implements EmailService {
 
     @Override
     public void sendOtpEmail(String toEmail, String fullName, String otp) {
-        log.info("\n" +
-                "========================================================================\n" +
-                "[EMAIL SERVICE] GỬI MÃ OTP ĐẶT LẠI MẬT KHẨU\n" +
-                "------------------------------------------------------------------------\n" +
-                "Người nhận : {} ({})\n" +
-                "Tiêu đề    : [SIS] Mã OTP đặt lại mật khẩu: {}\n" +
-                "MÃ OTP     : >>> {} <<<\n" +
-                "Thời hạn   : 5 phút (TTL - Tối đa 5 lần nhập sai)\n" +
-                "========================================================================",
-                toEmail, fullName != null ? fullName : "Người dùng", otp, otp);
+        // Không log OTP. Chỉ log người nhận đã được che bớt để phục vụ vận hành.
+        log.info("[EMAIL SERVICE] Đang gửi mã OTP đặt lại mật khẩu tới {} (hiệu lực 5 phút, tối đa 5 lần nhập sai)",
+                maskEmail(toEmail));
 
         if (mailSender != null && fromEmail != null && !fromEmail.isBlank()) {
             try {
@@ -41,7 +34,7 @@ public class EmailServiceImpl implements EmailService {
                 MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
                 helper.setFrom(fromEmail, "Student Information System");
                 helper.setTo(toEmail);
-                helper.setSubject("[SIS] Mã OTP xác thực đặt lại mật khẩu: " + otp);
+                helper.setSubject("[SIS] Mã OTP xác thực đặt lại mật khẩu");
 
                 String htmlContent = "<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;\">" +
                         "<h2 style=\"color: #1e3a8a; text-align: center;\">Student Information System</h2>" +
@@ -59,11 +52,23 @@ public class EmailServiceImpl implements EmailService {
 
                 helper.setText(htmlContent, true);
                 mailSender.send(message);
-                log.info("Đã gửi email chứa mã OTP thành công tới: {}", toEmail);
+                log.info("Đã gửi email chứa mã OTP thành công tới: {}", maskEmail(toEmail));
             } catch (Exception e) {
-                log.warn("Không thể gửi email qua SMTP ({}). Mã OTP vẫn có hiệu lực và được log tại console.", e.getMessage());
+                // Không log OTP và không hướng dẫn người dùng lấy OTP từ log.
+                log.warn("Không thể gửi email OTP qua SMTP tới {}: {}", maskEmail(toEmail), e.getMessage());
             }
         }
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return "(unknown)";
+        }
+        int at = email.indexOf('@');
+        if (at <= 1) {
+            return "***" + (at >= 0 ? email.substring(at) : "");
+        }
+        return email.charAt(0) + "***" + email.substring(at);
     }
 
     @Override

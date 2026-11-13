@@ -5,6 +5,7 @@ import com.example.student_management.entity.auth.Lecturer;
 import com.example.student_management.entity.auth.Student;
 import com.example.student_management.entity.auth.User;
 import com.example.student_management.exception.BadRequestException;
+import com.example.student_management.exception.ForbiddenException;
 import com.example.student_management.exception.NotFoundException;
 import com.example.student_management.repository.auth.LecturerRepository;
 import com.example.student_management.repository.auth.StudentRepository;
@@ -139,7 +140,11 @@ public class MeController {
             student.setFullName(fullName);
             student.setEmail(email);
             if (request.getDepartment() != null) {
-                student.setDepartment(request.getDepartment().trim());
+                String newDepartment = request.getDepartment().trim();
+                String currentDepartment = student.getDepartment() == null ? "" : student.getDepartment();
+                if (!newDepartment.equals(currentDepartment)) {
+                    throw new ForbiddenException("Sinh viên không được tự thay đổi Khoa/Bộ môn");
+                }
             }
             studentRepository.save(student);
         } else if (lecturer != null) {

@@ -54,8 +54,11 @@ cleanup() { rm -f "$tmp_file"; }
 trap cleanup EXIT
 
 log "Backing up MySQL database to ${backup_file}"
+# MYSQL_PWD keeps the password out of the container process list. The dump is
+# utf8mb4 to match the schema, and --single-transaction gives a consistent
+# snapshot without locking writes.
 if ! docker compose -f "$COMPOSE_FILE" exec -T mysql sh -c \
-  'exec mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" --single-transaction --quick --routines --triggers "$MYSQL_DATABASE"' \
+  'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysqldump -uroot --default-character-set=utf8mb4 --single-transaction --quick --routines --triggers "$MYSQL_DATABASE"' \
   | gzip -c > "$tmp_file"; then
   log "Database backup failed; aborting deployment."
   exit 1
@@ -68,6 +71,12 @@ if [[ ! -s "$tmp_file" ]]; then
 fi
 if ! gzip -t "$tmp_file"; then
   log "Database backup is not a valid gzip file; aborting deployment."
+  exit 1
+fi
+# mysqldump writes this marker only after every table was dumped. Its absence
+# means the dump was cut off (disk full, killed container, ...).
+if ! gzip -dc "$tmp_file" | tail -n 5 | grep -q '^-- Dump completed'; then
+  log "Database backup is incomplete (missing 'Dump completed' marker); aborting deployment."
   exit 1
 fi
 

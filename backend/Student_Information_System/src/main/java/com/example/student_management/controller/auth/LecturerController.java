@@ -5,6 +5,7 @@ import com.example.student_management.entity.auth.Lecturer;
 import com.example.student_management.entity.auth.Role;
 import com.example.student_management.entity.auth.User;
 import com.example.student_management.exception.BadRequestException;
+import com.example.student_management.exception.ConflictException;
 import com.example.student_management.exception.NotFoundException;
 import com.example.student_management.repository.auth.LecturerRepository;
 import com.example.student_management.repository.auth.UserRepository;
@@ -39,17 +40,32 @@ public class LecturerController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Lecturer> create(@RequestBody Lecturer lecturer) {
+        String fullName = lecturer.getFullName() == null ? "" : lecturer.getFullName().trim();
         String email = lecturer.getEmail() == null ? "" : lecturer.getEmail().trim();
+        String lecturerCode = lecturer.getLecturerCode() == null ? "" : lecturer.getLecturerCode().trim();
+        if (fullName.isBlank()) {
+            throw new BadRequestException("Full name is required");
+        }
         if (email.isBlank()) {
-            throw new IllegalArgumentException("Email is required");
+            throw new BadRequestException("Email is required");
+        }
+        if (lecturerCode.isBlank()) {
+            lecturerCode = generateUniqueLecturerCode();
+        } else if (lecturerRepository.existsByLecturerCode(lecturerCode)) {
+            throw new ConflictException("Lecturer code already exists");
         }
         if (userRepository.findByEmail(email).isPresent()
                 || userRepository.findByEmail(email.toLowerCase()).isPresent()
                 || lecturerRepository.findAll().stream().anyMatch(existing -> existing.getEmail() != null
                         && existing.getEmail().equalsIgnoreCase(email))) {
-            throw new IllegalArgumentException("Email already exists");
+            throw new ConflictException("Email already exists");
         }
+        lecturer.setFullName(fullName);
         lecturer.setEmail(email);
+        lecturer.setLecturerCode(lecturerCode);
+        if (lecturer.getStatus() == null) {
+            lecturer.setStatus(AccountStatus.ACTIVE);
+        }
         return ResponseEntity.ok(lecturerRepository.save(lecturer));
     }
 
@@ -76,7 +92,7 @@ public class LecturerController {
             throw new BadRequestException("Email is required");
         }
         if (statusValue != null && !statusValue.isBlank()) {
-            existing.setStatus(AccountStatus.valueOf(statusValue));
+            existing.setStatus(parseStatus(statusValue));
         }
 
         User user = existing.getUser();
@@ -148,5 +164,22 @@ public class LecturerController {
         }
 
         return ResponseEntity.noContent().build();
+    }
+
+    private AccountStatus parseStatus(String value) {
+        try {
+            return AccountStatus.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Trạng thái tài khoản không hợp lệ: " + value);
+        }
+    }
+
+    private String generateUniqueLecturerCode() {
+        String code;
+        do {
+            int random = (int) (Math.random() * 900000) + 100000;
+            code = "GV" + random;
+        } while (lecturerRepository.existsByLecturerCode(code));
+        return code;
     }
 }

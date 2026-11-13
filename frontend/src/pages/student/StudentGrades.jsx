@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { studentApi } from '../../api';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useToast } from '../../context/ToastContext';
 import { AwardIcon, BookIcon, EyeIcon, TrendingIcon } from '../../components/Icons';
 import {
@@ -8,14 +9,11 @@ import {
 } from '../../components/UI';
 import { formatDateTime, formatScore, getErrorMessage, gradeLabel, passesCourse } from '../../utils/format';
 
-const PAGE_SIZE = 10;
-
 const StudentGrades = () => {
   const toast = useToast();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
   const [detail, setDetail] = useState(null);
 
   useEffect(() => {
@@ -68,7 +66,7 @@ const StudentGrades = () => {
       .filter(Boolean).some((v) => String(v).toLowerCase().includes(keyword)));
   }, [items, search]);
 
-  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const { page, setPage, pageSize, setPageSize, totalItems, pageItems } = usePaginatedList(filtered);
 
   return (
     <>
@@ -159,7 +157,7 @@ const StudentGrades = () => {
                 </tbody>
               </table>
             </div>
-            <Pagination page={page} pageSize={PAGE_SIZE} totalItems={filtered.length} onPageChange={setPage} />
+            <Pagination page={page} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
           </>
         )}
       </div>
