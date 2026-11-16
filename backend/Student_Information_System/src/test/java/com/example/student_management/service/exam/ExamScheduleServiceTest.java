@@ -376,7 +376,9 @@ class ExamScheduleServiceTest {
 
         // Sinh viên SV001 cũng tham gia lớp section 2!
         Enrollment enrollment2 = Enrollment.builder().id(2L).student(student1).courseSection(section2).status(EnrollmentStatus.ENROLLED).build();
-        when(enrollmentRepository.findByCourseSectionIdAndStatus(20L, EnrollmentStatus.ENROLLED)).thenReturn(List.of(enrollment2));
+        when(enrollmentRepository.findByCourseSectionIdInAndStatus(
+                eq(java.util.Set.of(20L)), eq(EnrollmentStatus.ENROLLED)))
+                .thenReturn(List.of(enrollment2));
 
         ConflictException ex = assertThrows(ConflictException.class, () -> examScheduleService.createSchedule(request));
         assertTrue(ex.getMessage().contains("SV001"));
@@ -530,4 +532,3 @@ class ExamScheduleServiceTest {
         assertEquals("Nguyễn Văn Sinh", students.get(0).getFullName());
     }
 }
-
