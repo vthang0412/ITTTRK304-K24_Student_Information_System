@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { lecturerApi, notificationApi } from '../../api';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useToast } from '../../context/ToastContext';
 import {
   BellIcon, CheckCircleIcon, InboxIcon, PlusIcon, RefreshIcon, TrashIcon,
 } from '../../components/Icons';
 import {
-  ConfirmDialog, EmptyState, Field, LoadingBlock, Modal, PageHeader, StatCard,
+  ConfirmDialog, EmptyState, Field, LoadingBlock, Modal, PageHeader, Pagination, StatCard,
 } from '../../components/UI';
 import { formatDateTime } from '../../utils/format';
 import { getErrorMessage } from '../../utils/format';
@@ -196,6 +197,7 @@ const SendModal = ({ open, onClose, onSent }) => {
 const AdminNotifications = () => {
   const toast = useToast();
   const [notifications, setNotifications] = useState([]);
+  const { page, setPage, pageSize, setPageSize, totalItems, pageItems } = usePaginatedList(notifications);
   const [loading, setLoading] = useState(true);
   const [sendOpen, setSendOpen] = useState(false);
   const [detailTarget, setDetailTarget] = useState(null);
@@ -287,7 +289,7 @@ const AdminNotifications = () => {
                 </tr>
               </thead>
               <tbody>
-                {notifications.map((n) => (
+                {pageItems.map((n) => (
                   <tr key={n.id}>
                     <td className="cell-strong" style={{ maxWidth: 220 }}>
                       <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -331,6 +333,15 @@ const AdminNotifications = () => {
               </tbody>
             </table>
           </div>
+        )}
+        {!loading && (
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         )}
       </div>
 

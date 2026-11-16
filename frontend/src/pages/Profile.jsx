@@ -177,7 +177,7 @@ const Profile = () => {
       const payload = {
         fullName: form.fullName.trim(),
         email: form.email.trim(),
-        department: currentRole === 'ADMIN' ? null : form.department.trim(),
+        department: currentRole === 'LECTURER' ? form.department.trim() : null,
       };
       if (form.newPassword) {
         payload.currentPassword = form.currentPassword;
@@ -397,10 +397,15 @@ const Profile = () => {
           <Field label="Email" required error={errors.email}>
             <input className="input" type="email" value={form.email} onChange={(e) => setField('email', e.target.value)} />
           </Field>
-          {currentRole !== 'ADMIN' && (
+          {currentRole === 'LECTURER' && (
             <Field label="Khoa / Bộ môn" error={errors.department}>
               <input className="input" value={form.department} onChange={(e) => setField('department', e.target.value)} />
             </Field>
+          )}
+          {currentRole === 'STUDENT' && (
+            <p className="small muted" style={{ margin: 0 }}>
+              Khoa/Bộ môn do quản trị viên quản lý và không thể tự thay đổi.
+            </p>
           )}
           <div style={{ height: 1, background: 'var(--border)' }} />
           <p className="small muted" style={{ margin: 0 }}>Để trống nếu không đổi mật khẩu.</p>

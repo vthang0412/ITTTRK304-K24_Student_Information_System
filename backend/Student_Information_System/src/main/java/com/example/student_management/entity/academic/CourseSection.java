@@ -3,11 +3,14 @@ package com.example.student_management.entity.academic;
 
 
 import com.example.student_management.entity.auth.Lecturer;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "course_sections")
@@ -40,6 +43,18 @@ public class CourseSection {
 
     @Column(length = 500)
     private String schedule;
+
+    @Transient
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private LocalDate scheduleEffectiveFrom;
+
+    @Transient
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long registeredCount;
+
+    @Transient
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String deleteBlockedReason;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

@@ -44,7 +44,7 @@ sis-mysql (MySQL 8.0)                    <- volume sis_mysql_data, không publis
 | `deploy/rollback.sh` | Quay lại tag trước hoặc tag chỉ định. |
 | `deploy/restore.sh` | Khôi phục database từ file backup (có xác nhận, không tự chạy khi deploy). |
 | `deploy/env.production.example` | Mẫu `.env` production (chỉ placeholder, không chứa secret thật). |
-| `backend/.../application-dev.properties` | Profile development: Hibernate update, seed demo, Swagger, CORS localhost. |
+| `backend/.../application-dev.properties` | Profile development: Flyway + Hibernate validate, demo seed, Swagger, CORS localhost. |
 | `backend/.../application-prod.properties` | Profile production: Hibernate validate, không seed demo, Swagger tắt, Flyway. |
 | `backend/.../db/migration/V1__baseline_schema.sql` | Baseline schema cho database production mới. |
 | `deploy/nginx/sis.conf` | Mẫu reverse proxy Nginx trên host + hướng dẫn HTTPS. |
@@ -220,10 +220,13 @@ Lưu ý:
 - `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `JWT_SECRET` phải là giá trị thật, không dùng placeholder.
 - `SPRING_PROFILES_ACTIVE=prod` và `SPRING_SQL_INIT_MODE=never` là mặc định của production.
   Tài khoản demo `admin/123456` **không bao giờ** được seed vào production.
-- Flyway (`SPRING_FLYWAY_ENABLED=true`) tạo schema trên database production mới từ
-  `V1__baseline_schema.sql`. Với database đã có schema, Flyway baseline ở version 1 và **không**
-  sửa schema; khi đó Hibernate `validate` sẽ kiểm tra và báo lỗi nếu schema lệch. Hãy backup và
-  kiểm tra trước khi nâng cấp một database cũ.
+- Flyway (`SPRING_FLYWAY_ENABLED=true`) tạo schema trên database mới từ `V1` đến `V9`.
+  Với database đã có schema nhưng chưa có `flyway_schema_history`, Flyway baseline ở **version 6**
+  (V2/V4/V5 không idempotent nên phải bỏ qua), sau đó chạy `V7` để đồng bộ cấu trúc còn thiếu và
+  nới precision các cột điểm lên `DECIMAL(5,2)`, `V8` để chuẩn hóa duyệt đăng ký và trạng thái đọc
+  thông báo, `V9` để lưu lịch sử lịch học có ngày hiệu lực. **Không hạ
+  `spring.flyway.baseline-version` về 1.** Luôn backup và kiểm tra trước khi nâng cấp database cũ;
+  Hibernate `validate` sẽ báo lỗi nếu schema vẫn lệch sau migration.
 - Production mặc định tắt Swagger (`SWAGGER_ENABLED=false`).
 - `SPRING_SQL_INIT_MODE` chỉ nên đổi khỏi `never` khi thật sự cần chạy seed có kiểm soát.
 - Không commit file `.env` này.
@@ -340,9 +343,15 @@ docker volume ls | grep sis_
 cat .current_tag .previous_tag 2>/dev/null
 ```
 
-Compose project được tách riêng: development là `sis-dev` (container `sis-dev-*`), production là
-`sis-prod` (container `sis-*`). Nếu trước đây đã chạy compose cũ trên máy dev, hãy gỡ container cũ
-**không xoá volume** trước lần `up` đầu tiên: `docker compose down` (tuyệt đối không dùng `-v`).
+Compose project được tách riêng: development mới là `sis-dev-local` (container `sis-dev-local-*`),
+production là `sis-prod` (container `sis-*`). Project `sis-dev-local` dùng volume riêng; stack
+development cũ `sis-dev` và volume của nó được giữ nguyên, không cần gỡ để chạy project mới.
+Không dùng `docker compose down -v`.
+MySQL development mặc định publish tại `127.0.0.1:3308` để không đụng cổng `3307` của stack khác;
+không đổi `.env.local` sang một container khác nếu chưa xác minh profile và Database đích.
+Để chạy stack dev mới mà không đọc/ghi root `.env`, tạo `.env.isolated` từ `.env.example`, đặt credential
+local riêng và chạy `docker compose --env-file .env.isolated up --build -d`. Stack dùng volume
+`sis-dev-local_mysql_data`; không thêm `-v` khi dừng stack.
 
 ---
 
@@ -382,7 +391,8 @@ Không chạy `docker system prune -a` trên VPS nếu còn cần image cũ đ�
 
 ### 9.1. Backup
 
-`deploy.sh` tự chạy `backup.sh` trước mỗi lần deploy. Có thể chạy tay:
+`deploy.sh` bảo đảm container MySQL đang chạy rồi mới chạy `backup.sh` trước mỗi lần deploy (kể cả
+khi stack đang dừng), và **hủy deploy** nếu backup thất bại. Có thể chạy tay:
 
 ```bash
 cd /opt/sis
@@ -391,7 +401,8 @@ ls -lh backups/
 ```
 
 File được lưu tại `/opt/sis/backups/sis_<UTC timestamp>.sql.gz`; mặc định giữ 10 bản gần nhất
-(`BACKUP_RETENTION` có thể đổi).
+(`BACKUP_RETENTION` có thể đổi). Script kiểm tra gzip, file không rỗng và marker
+`-- Dump completed` để phát hiện dump bị cắt giữa chừng.
 
 ### 9.2. Khôi phục
 
@@ -403,7 +414,7 @@ docker compose -f docker-compose.prod.yml --env-file .env stop frontend backend
 
 gunzip -c backups/sis_YYYYMMDDTHHMMSSZ.sql.gz \
   | docker compose -f docker-compose.prod.yml --env-file .env exec -T mysql sh -c \
-      'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"'
+      'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot --default-character-set=utf8mb4 "$MYSQL_DATABASE"'
 
 docker compose -f docker-compose.prod.yml --env-file .env start backend frontend
 ```
@@ -417,12 +428,28 @@ cd /opt/sis
 # FORCE=1 ./restore.sh backups/sis_YYYYMMDDTHHMMSSZ.sql.gz
 ```
 
-`restore.sh` kiểm tra file tồn tại, kiểm tra `gzip -t`, hỏi xác nhận đúng tên database, dừng
+`restore.sh` kiểm tra file tồn tại, kiểm tra `gzip -t` + marker `Dump completed`, đối chiếu tên
+database với container, tự tạo một backup an toàn trước khi ghi đè (bỏ qua bằng
+`SKIP_PRE_RESTORE_BACKUP=1` khi database hiện tại đã hỏng), hỏi xác nhận đúng tên database, dừng
 backend/frontend trong lúc restore và không bao giờ xoá volume. Script này **không** được gọi tự động
 từ `deploy.sh` hay workflow CD.
 
-`data.sql` (chỉ dùng ở development) dùng `INSERT IGNORE` và **không có `TRUNCATE`/`DELETE`**, nên
-không xoá dữ liệu. Production luôn dùng `SPRING_SQL_INIT_MODE=never`, không seed demo.
+`data.sql` (chỉ dùng ở development) bổ sung seed bằng `INSERT IGNORE` và **không có
+`TRUNCATE`/`DELETE`**, nên không xoá dữ liệu. Bản ghi demo ADMIN được tự sửa trạng thái/mật khẩu
+chỉ khi username, email và role khớp chính xác; mật khẩu lưu dạng BCrypt hash. Production luôn dùng
+`SPRING_SQL_INIT_MODE=never`, không seed demo.
+
+Development cũng dùng Flyway làm nguồn schema duy nhất và Hibernate `validate`. Database local mới
+phải được tạo từ migration; profile dev không tự baseline một schema cũ. `schema.sql` đã được gỡ bỏ
+vì DDL thuộc Flyway; `data.sql` được cấu hình rõ là seed chỉ dành cho DEV và không chứa câu `CREATE`
+hay `ALTER`. `data_fixed.sql` là artifact bootstrap cũ, không được Spring Boot hoặc Docker tham chiếu.
+Flyway V7 quản lý precision điểm số; V12 mở rộng `day_of_week` sang `INT` và giới hạn giá trị 1–7 mà
+không xóa dữ liệu. Trước khi dùng profile dev trên database đã có schema nhưng chưa có Flyway history,
+cần backup và xác nhận đúng database local trước khi reset hoặc lập kế hoạch baseline riêng.
+
+Flyway validate checksum khi khởi động. Không sửa migration V1–V11 đã áp dụng để xử lý lỗi schema;
+hãy thêm migration tiến về phía trước và kiểm tra lịch sử database. Flyway chạy trước SQL
+initialization; chỉ profile DEV chạy `data.sql`, còn Production giữ `spring.sql.init.mode=never`.
 
 ### 9.3. Backup tự động (cron hoặc systemd timer)
 

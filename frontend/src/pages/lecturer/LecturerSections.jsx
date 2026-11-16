@@ -1,13 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { courseSectionApi, gradeApi } from '../../api';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useToast } from '../../context/ToastContext';
 import { BookIcon, ClockIcon, LayersIcon, StudentsIcon, UserIcon } from '../../components/Icons';
 import {
   EmptyState, LoadingBlock, PageHeader, Pagination, SearchInput, StatCard, StatusBadge,
 } from '../../components/UI';
-
-const PAGE_SIZE = 8;
 
 const LecturerSections = () => {
   const toast = useToast();
@@ -16,7 +15,6 @@ const LecturerSections = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('ALL');
-  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let mounted = true;
@@ -61,7 +59,7 @@ const LecturerSections = () => {
     });
   }, [sections, search, status]);
 
-  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const { page, setPage, pageSize, setPageSize, totalItems, pageItems } = usePaginatedList(filtered);
   const totalStudents = Object.values(counts).reduce((sum, v) => sum + v, 0);
   const openCount = sections.filter((s) => s.status === 'OPEN').length;
 
@@ -142,7 +140,7 @@ const LecturerSections = () => {
                 </tbody>
               </table>
             </div>
-            <Pagination page={page} pageSize={PAGE_SIZE} totalItems={filtered.length} onPageChange={setPage} />
+            <Pagination page={page} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
           </>
         )}
       </div>

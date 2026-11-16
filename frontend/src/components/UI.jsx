@@ -189,43 +189,69 @@ export const ConfirmDialog = ({
   </Modal>
 );
 
-export const Pagination = ({ page, pageSize, totalItems, onPageChange }) => {
-  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  if (totalItems === 0) return null;
-  const start = (page - 1) * pageSize + 1;
-  const end = Math.min(page * pageSize, totalItems);
+export const Pagination = ({
+  page,
+  pageSize,
+  totalItems,
+  onPageChange,
+  onPageSizeChange,
+  pageSizeOptions = [10, 20, 50, 100],
+}) => {
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const currentPage = totalPages === 0 ? 1 : Math.min(Math.max(page, 1), totalPages);
+  const start = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const end = Math.min(currentPage * pageSize, totalItems);
 
   const pages = [];
-  const from = Math.max(1, Math.min(page - 1, totalPages - 2));
-  const to = Math.min(totalPages, from + 2);
+  const from = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+  const to = Math.min(totalPages, from + 4);
   for (let i = from; i <= to; i += 1) pages.push(i);
 
   return (
     <div className="pagination">
-      <span className="pagination-info">Hiển thị {start}–{end} / {totalItems}</span>
-      <div className="pagination-controls">
-        <button className="page-btn" onClick={() => onPageChange(page - 1)} disabled={page <= 1} aria-label="Trang trước">
+      <div className="pagination-summary">
+        <span className="pagination-info">Hiển thị {start}–{end} / {totalItems}</span>
+        {onPageSizeChange && (
+          <label className="pagination-size">
+            <span>Số bản ghi/trang</span>
+            <select
+              className="select"
+              value={pageSize}
+              onChange={(event) => onPageSizeChange(Number(event.target.value))}
+              aria-label="Số bản ghi mỗi trang"
+            >
+              {pageSizeOptions.map((size) => <option key={size} value={size}>{size}</option>)}
+            </select>
+          </label>
+        )}
+      </div>
+      <nav className="pagination-controls" aria-label="Phân trang">
+        <button className="page-btn" onClick={() => onPageChange(1)} disabled={currentPage <= 1} aria-label="Trang đầu">
+          «
+        </button>
+        <button className="page-btn" onClick={() => onPageChange(currentPage - 1)} disabled={currentPage <= 1} aria-label="Trang trước">
           <ChevronLeftIcon size={15} />
         </button>
         {from > 1 && (
           <>
-            <button className="page-btn" onClick={() => onPageChange(1)}>1</button>
-            {from > 2 && <span className="muted small">…</span>}
+            <span className="muted small">…</span>
           </>
         )}
         {pages.map((p) => (
-          <button key={p} className={`page-btn${p === page ? ' active' : ''}`} onClick={() => onPageChange(p)}>{p}</button>
+          <button key={p} className={`page-btn${p === currentPage ? ' active' : ''}`} onClick={() => onPageChange(p)} aria-current={p === currentPage ? 'page' : undefined}>{p}</button>
         ))}
         {to < totalPages && (
           <>
-            {to < totalPages - 1 && <span className="muted small">…</span>}
-            <button className="page-btn" onClick={() => onPageChange(totalPages)}>{totalPages}</button>
+            <span className="muted small">…</span>
           </>
         )}
-        <button className="page-btn" onClick={() => onPageChange(page + 1)} disabled={page >= totalPages} aria-label="Trang sau">
+        <button className="page-btn" onClick={() => onPageChange(currentPage + 1)} disabled={currentPage >= totalPages} aria-label="Trang sau">
           <ChevronRightIcon size={15} />
         </button>
-      </div>
+        <button className="page-btn" onClick={() => onPageChange(totalPages)} disabled={currentPage >= totalPages} aria-label="Trang cuối">
+          »
+        </button>
+      </nav>
     </div>
   );
 };

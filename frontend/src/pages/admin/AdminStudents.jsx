@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Swal from 'sweetalert2';
-import { authApi, studentApi } from '../../api';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
+import { studentApi } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { BuildingIcon, EyeIcon, EyeOffIcon, PencilIcon, PlusIcon, StudentsIcon, TrashIcon, UsersIcon } from '../../components/Icons';
 import {
@@ -8,7 +9,6 @@ import {
 } from '../../components/UI';
 import { getErrorMessage } from '../../utils/format';
 
-const PAGE_SIZE = 10;
 const EMPTY = { fullName: '', email: '', department: '', status: 'ACTIVE', password: '', confirmPassword: '' };
 
 const generatePassword = () => {
@@ -44,7 +44,6 @@ const AdminStudents = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('ALL');
-  const [page, setPage] = useState(1);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
@@ -78,7 +77,7 @@ const AdminStudents = () => {
     });
   }, [students, search, status]);
 
-  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const { page, setPage, pageSize, setPageSize, totalItems, pageItems } = usePaginatedList(filtered);
   const departments = new Set(students.map((s) => s.department).filter(Boolean)).size;
 
   const openCreate = () => {
@@ -182,17 +181,18 @@ const AdminStudents = () => {
         let attempt = 0;
         while (attempt < 5) {
           try {
-            await authApi.register({
+            await studentApi.create({
               fullName: payload.fullName,
               username,
               email: payload.email,
               password: form.password,
-              role: 'STUDENT',
+              department: payload.department,
+              status: payload.status,
             });
             break;
           } catch (err) {
             const message = getErrorMessage(err).toLowerCase();
-            if (!message.includes('username already exists') && !message.includes('email already exists')) {
+            if (!message.includes('username already exists')) {
               throw err;
             }
             username = `${usernameBase}${Math.random().toString(36).slice(2, 6)}`;
@@ -204,26 +204,7 @@ const AdminStudents = () => {
           throw new Error('Không thể tạo tên đăng nhập duy nhất cho tài khoản này.');
         }
 
-        // Backend authApi.register mặc định đặt department="CNTT" và status=ACTIVE.
-        // Đồng bộ lại department và status theo form nếu người dùng nhập khác mặc định.
-        if (payload.department || payload.status !== 'ACTIVE') {
-          try {
-            const listRes = await studentApi.getAll();
-            const created = (listRes.data || []).find((s) => s.email?.toLowerCase() === payload.email.toLowerCase());
-            if (created && (created.department !== payload.department || created.status !== payload.status)) {
-              await studentApi.update(created.id, {
-                fullName: payload.fullName,
-                email: payload.email,
-                department: payload.department,
-                status: payload.status,
-              });
-            }
-          } catch (syncErr) {
-            console.warn('Could not sync department/status for new student:', syncErr);
-          }
-        }
-
-        toast.success('Tạo tài khoản thành công', `${payload.fullName} đã được tạo trong hệ thống với mật khẩu khởi tạo đã được thiết lập.`);
+        toast.success('Tạo tài khoản thành công', `${payload.fullName} đã được tạo cùng hồ sơ sinh viên và tài khoản đăng nhập.`);
       }
       setOpen(false);
       load();
@@ -342,7 +323,7 @@ const AdminStudents = () => {
                 </tbody>
               </table>
             </div>
-            <Pagination page={page} pageSize={PAGE_SIZE} totalItems={filtered.length} onPageChange={setPage} />
+            <Pagination page={page} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
           </>
         )}
       </div>

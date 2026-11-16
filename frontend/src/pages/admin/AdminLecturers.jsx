@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Swal from 'sweetalert2';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { authApi, lecturerApi } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { BuildingIcon, EyeIcon, EyeOffIcon, PencilIcon, PlusIcon, TrashIcon, UserIcon, UsersIcon } from '../../components/Icons';
@@ -8,7 +9,6 @@ import {
 } from '../../components/UI';
 import { getErrorMessage } from '../../utils/format';
 
-const PAGE_SIZE = 10;
 const EMPTY = { fullName: '', email: '', department: '', status: 'ACTIVE', password: '', confirmPassword: '' };
 
 const generatePassword = () => {
@@ -44,7 +44,6 @@ const AdminLecturers = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('ALL');
-  const [page, setPage] = useState(1);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
@@ -78,7 +77,7 @@ const AdminLecturers = () => {
     });
   }, [lecturers, search, status]);
 
-  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const { page, setPage, pageSize, setPageSize, totalItems, pageItems } = usePaginatedList(filtered);
   const departments = new Set(lecturers.map((l) => l.department).filter(Boolean)).size;
 
   const openCreate = () => {
@@ -330,7 +329,7 @@ const AdminLecturers = () => {
                 </tbody>
               </table>
             </div>
-            <Pagination page={page} pageSize={PAGE_SIZE} totalItems={filtered.length} onPageChange={setPage} />
+            <Pagination page={page} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
           </>
         )}
       </div>

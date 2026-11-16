@@ -58,9 +58,21 @@ DB_NAME="${DB_NAME:-sis_db}"
 
 log "Checking backup integrity: $BACKUP_FILE"
 gzip -t "$BACKUP_FILE" || { fail "Invalid gzip backup file: $BACKUP_FILE"; exit 1; }
+if ! gzip -dc "$BACKUP_FILE" | tail -n 5 | grep -q '^-- Dump completed'; then
+  fail "Backup is incomplete (missing 'Dump completed' marker): $BACKUP_FILE"
+  exit 1
+fi
 
 if ! docker compose -f "$COMPOSE_FILE" ps --status running --services 2>/dev/null | grep -qx 'mysql'; then
   fail "MySQL container is not running. Start it before restoring."
+  exit 1
+fi
+
+# Make sure the database named in .env is the one the container actually
+# exposes; restoring into a different database would silently lose data.
+ACTUAL_DB="$(docker compose -f "$COMPOSE_FILE" --env-file .env exec -T mysql printenv MYSQL_DATABASE | tr -d '\r\n' || true)"
+if [[ -n "$ACTUAL_DB" && "$ACTUAL_DB" != "$DB_NAME" ]]; then
+  fail "DB_NAME ('${DB_NAME}') does not match the container database ('${ACTUAL_DB}'). Restore aborted."
   exit 1
 fi
 
@@ -78,12 +90,24 @@ if [[ "${FORCE:-0}" != "1" ]]; then
   [[ "$answer" == "$DB_NAME" ]] || { fail "Confirmation did not match. Restore aborted."; exit 1; }
 fi
 
+# Snapshot the current data before overwriting it. Skipping is only for the
+# case where the current database is already unusable.
+if [[ "${SKIP_PRE_RESTORE_BACKUP:-0}" != "1" ]]; then
+  log "Creating a safety backup of the current database"
+  COMPOSE_FILE="$COMPOSE_FILE" bash ./backup.sh || {
+    fail "Pre-restore backup failed. Set SKIP_PRE_RESTORE_BACKUP=1 only if the current database is unusable."
+    exit 1
+  }
+else
+  log "SKIP_PRE_RESTORE_BACKUP=1; not creating a safety backup."
+fi
+
 log "Stopping backend and frontend"
 docker compose -f "$COMPOSE_FILE" --env-file .env stop frontend backend
 
 log "Restoring into database ${DB_NAME}"
 if ! gunzip -c "$BACKUP_FILE" | docker compose -f "$COMPOSE_FILE" --env-file .env exec -T mysql sh -c \
-  'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --default-character-set=utf8mb4 "$MYSQL_DATABASE"'; then
+  'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot --default-character-set=utf8mb4 "$MYSQL_DATABASE"'; then
   fail "Restore failed. The MySQL container is still running; inspect it before restarting the app."
   exit 1
 fi

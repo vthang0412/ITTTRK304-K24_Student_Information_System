@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Swal from 'sweetalert2';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { semesterApi } from '../../api';
 import { useToast } from '../../context/ToastContext';
 import { CalendarIcon, ClockIcon, PencilIcon, PlusIcon, TrashIcon } from '../../components/Icons';
@@ -8,7 +9,6 @@ import {
 } from '../../components/UI';
 import { formatDate, formatDateTime, getErrorMessage, toDateInput, toDateTimeInput } from '../../utils/format';
 
-const PAGE_SIZE = 10;
 const EMPTY = {
   semesterCode: '', semesterName: '', startDate: '', endDate: '',
   registrationStart: '', registrationEnd: '', status: 'PLANNED',
@@ -20,7 +20,6 @@ const AdminSemesters = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('ALL');
-  const [page, setPage] = useState(1);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
@@ -49,7 +48,7 @@ const AdminSemesters = () => {
     });
   }, [semesters, search, status]);
 
-  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const { page, setPage, pageSize, setPageSize, totalItems, pageItems } = usePaginatedList(filtered);
 
   const openCreate = () => { setEditing(null); setForm(EMPTY); setErrors({}); setOpen(true); };
 
@@ -211,7 +210,16 @@ const AdminSemesters = () => {
                       <td>
                         <div className="row-actions">
                           <button className="btn btn-secondary btn-sm" onClick={() => openEdit(s)}><PencilIcon size={14} /> Sửa</button>
-                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(s)}><TrashIcon size={14} /> Xóa</button>
+                          <span title={s.deleteBlockedReason || 'Xóa học kỳ'} style={{ display: 'inline-flex' }}>
+                            <button
+                              className="btn btn-danger btn-sm"
+                              onClick={() => handleDelete(s)}
+                              disabled={Boolean(s.deleteBlockedReason)}
+                              aria-label={s.deleteBlockedReason || `Xóa học kỳ ${s.semesterName}`}
+                            >
+                              <TrashIcon size={14} /> Xóa
+                            </button>
+                          </span>
                         </div>
                       </td>
                     </tr>
@@ -219,7 +227,7 @@ const AdminSemesters = () => {
                 </tbody>
               </table>
             </div>
-            <Pagination page={page} pageSize={PAGE_SIZE} totalItems={filtered.length} onPageChange={setPage} />
+            <Pagination page={page} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
           </>
         )}
       </div>

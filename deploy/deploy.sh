@@ -140,12 +140,13 @@ run_stack() {
   wait_for_health "Frontend" "sis-frontend" 120 || return 1
 
   # Smoke test the frontend and the Nginx -> backend proxy from inside the
-  # frontend container. /actuator/health returns a real application status.
+  # frontend container. Nginx listens on 8080 (nginx-unprivileged image).
+  # /actuator/health returns a real application status.
   log "Running smoke tests"
   docker compose -f "$COMPOSE_FILE" --env-file .env exec -T frontend \
-    wget -q -O /dev/null http://127.0.0.1/ || return 1
+    wget -q -O /dev/null http://127.0.0.1:8080/ || return 1
   docker compose -f "$COMPOSE_FILE" --env-file .env exec -T frontend \
-    wget -q -O /dev/null http://127.0.0.1/actuator/health || return 1
+    wget -q -O /dev/null http://127.0.0.1:8080/actuator/health || return 1
 }
 
 record_success() {
@@ -167,10 +168,16 @@ record_success() {
   printf '%s\n' "$deployed_tag" > .current_tag
 }
 
-# 1. Back up the database before touching the running containers.
+# 1. Ensure MySQL is running, then back up the database before touching the
+#    application containers. Starting only the MySQL service does not recreate
+#    the backend/frontend and never removes a volume, so the backup always sees
+#    the current data even if the stack was stopped before this deploy.
 if [[ "${SKIP_BACKUP:-0}" == "1" ]]; then
   log "SKIP_BACKUP=1; skipping database backup (emergency use only)."
 else
+  log "Ensuring MySQL is running before the pre-deploy backup"
+  docker compose -f "$COMPOSE_FILE" --env-file .env up -d mysql || { fail "Could not start MySQL."; exit 1; }
+  wait_for_health "MySQL" "sis-mysql" 180 || { fail "MySQL is not healthy; aborting deployment."; exit 1; }
   COMPOSE_FILE="$COMPOSE_FILE" bash ./backup.sh || { fail "Database backup failed; aborting deployment."; exit 1; }
 fi
 

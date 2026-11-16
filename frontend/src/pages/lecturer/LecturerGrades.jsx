@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { courseSectionApi, gradeApi, gradebookApi } from '../../api';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useToast } from '../../context/ToastContext';
 import { AwardIcon, BookIcon, ClipboardIcon, LockIcon, SaveIcon, UsersIcon } from '../../components/Icons';
 import {
   Alert, EmptyState, Field, LoadingBlock, PageHeader, Pagination, StatusBadge,
 } from '../../components/UI';
 import { formatScore, getErrorMessage, gradeLabel } from '../../utils/format';
-
-const PAGE_SIZE = 10;
 
 const DEFAULT_COMPONENTS = [
   { id: 'fallback-att', componentName: 'Chuyên cần', weight: 10, maxScore: 10, componentType: 'ATTENDANCE' },
@@ -58,7 +57,8 @@ const LecturerGrades = () => {
   const [loadingSections, setLoadingSections] = useState(true);
   const [loadingList, setLoadingList] = useState(false);
   const [savingId, setSavingId] = useState(null);
-  const [page, setPage] = useState(1);
+  const enrollments = detail?.enrollments || [];
+  const { page, setPage, pageSize, setPageSize, totalItems, pageItems } = usePaginatedList(enrollments);
 
   useEffect(() => {
     let mounted = true;
@@ -108,8 +108,6 @@ const LecturerGrades = () => {
     ? detail.components
     : DEFAULT_COMPONENTS;
   const editable = detail?.status === 'OPEN';
-  const enrollments = detail?.enrollments || [];
-  const pageItems = enrollments.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const totalWeight = components.reduce((sum, c) => sum + Number(c.weight || 0), 0);
 
@@ -287,7 +285,7 @@ const LecturerGrades = () => {
                       const gl = gradeLabel(finalValue, attScore);
                       return (
                         <tr key={row.enrollmentId}>
-                          <td>{(page - 1) * PAGE_SIZE + index + 1}</td>
+                          <td>{(page - 1) * pageSize + index + 1}</td>
                           <td>
                             <div className="cell-strong">{row.fullName || '—'}</div>
                             <div className="cell-muted">{row.studentCode || '—'} · {row.email || '—'}</div>
@@ -339,7 +337,7 @@ const LecturerGrades = () => {
                   </tbody>
                 </table>
               </div>
-              <Pagination page={page} pageSize={PAGE_SIZE} totalItems={enrollments.length} onPageChange={setPage} />
+              <Pagination page={page} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
             </>
           )}
         </div>

@@ -1,0 +1,48 @@
+CREATE TABLE enrollment_batch_operations (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    batch_code VARCHAR(36) NOT NULL,
+    admin_username VARCHAR(100) NOT NULL,
+    action VARCHAR(20) NOT NULL,
+    semester_id BIGINT NULL,
+    semester_name VARCHAR(150) NULL,
+    selected_count INT NOT NULL DEFAULT 0,
+    success_count INT NOT NULL DEFAULT 0,
+    failure_count INT NOT NULL DEFAULT 0,
+    skipped_count INT NOT NULL DEFAULT 0,
+    rejection_reason VARCHAR(500) NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_enrollment_batch_operations_code (batch_code),
+    KEY idx_enrollment_batch_operations_created_at (created_at),
+    KEY idx_enrollment_batch_operations_admin (admin_username),
+    KEY idx_enrollment_batch_operations_semester (semester_id),
+    KEY idx_enrollment_batch_operations_action (action)
+);
+
+CREATE TABLE enrollment_batch_operation_items (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    batch_id BIGINT NOT NULL,
+    enrollment_id BIGINT NULL,
+    student_code VARCHAR(50) NULL,
+    student_name VARCHAR(255) NULL,
+    student_email VARCHAR(255) NULL,
+    course_code VARCHAR(50) NULL,
+    course_name VARCHAR(255) NULL,
+    section_code VARCHAR(100) NULL,
+    semester_name VARCHAR(150) NULL,
+    registered_at DATETIME(6) NULL,
+    action VARCHAR(20) NOT NULL,
+    result_status VARCHAR(20) NOT NULL,
+    message VARCHAR(1000) NULL,
+    rejection_reason VARCHAR(500) NULL,
+    schedule_configured BOOLEAN NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    KEY idx_enrollment_batch_items_batch (batch_id),
+    KEY idx_enrollment_batch_items_student (student_code),
+    KEY idx_enrollment_batch_items_course (course_code),
+    KEY idx_enrollment_batch_items_section (section_code),
+    KEY idx_enrollment_batch_items_result (result_status),
+    CONSTRAINT fk_enrollment_batch_items_batch
+        FOREIGN KEY (batch_id) REFERENCES enrollment_batch_operations (id) ON DELETE CASCADE
+);

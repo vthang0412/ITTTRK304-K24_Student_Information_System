@@ -4,6 +4,7 @@ import com.example.student_management.entity.auth.AccountStatus;
 import com.example.student_management.entity.auth.Role;
 import com.example.student_management.entity.auth.Student;
 import com.example.student_management.entity.auth.User;
+import com.example.student_management.dto.auth.StudentAccountCreateRequest;
 import com.example.student_management.exception.BadRequestException;
 import com.example.student_management.exception.ConflictException;
 import com.example.student_management.exception.NotFoundException;
@@ -11,11 +12,13 @@ import com.example.student_management.repository.auth.StudentRepository;
 import com.example.student_management.repository.auth.UserRepository;
 import com.example.student_management.service.auth.StudentService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.security.SecureRandom;
 
 @Service
 public class StudentServiceImpl implements StudentService {
@@ -24,6 +27,11 @@ public class StudentServiceImpl implements StudentService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Override
     public List<Student> findAll() {
@@ -37,30 +45,37 @@ public class StudentServiceImpl implements StudentService {
 
     @Override
     @Transactional
-    public Student create(Student student) {
-        String studentCode = student.getStudentCode() == null ? "" : student.getStudentCode().trim();
-        if (studentCode.isBlank()) {
-            studentCode = generateUniqueStudentCode();
+    public Student createAccount(StudentAccountCreateRequest request) {
+        String username = request.getUsername().trim();
+        String email = request.getEmail().trim();
+        String fullName = request.getFullName().trim();
+        if (userRepository.existsByUsername(username)) {
+            throw new ConflictException("Username already exists");
         }
-
-        String email = student.getEmail() == null ? "" : student.getEmail().trim();
-        if (studentRepository.existsByStudentCode(studentCode)) {
-            throw new ConflictException("Student code already exists");
-        }
-        if (email.isBlank()) {
-            throw new BadRequestException("Email is required");
-        }
-        if (userRepository.findByEmail(email).isPresent()
-                || userRepository.findByEmail(email.toLowerCase()).isPresent()
-                || studentRepository.findAll().stream().anyMatch(existing -> existing.getEmail() != null
-                        && existing.getEmail().equalsIgnoreCase(email))
-                || studentRepository.findAll().stream().anyMatch(existing -> existing.getEmail() != null
-                        && existing.getEmail().equalsIgnoreCase(email.toLowerCase()))) {
+        if (userRepository.existsByEmail(email) || studentRepository.existsByEmail(email)) {
             throw new ConflictException("Email already exists");
         }
 
-        student.setStudentCode(studentCode);
-        student.setEmail(email);
+        AccountStatus status = request.getStatus() == null ? AccountStatus.ACTIVE : request.getStatus();
+        User user = User.builder()
+                .username(username)
+                .email(email)
+                .fullName(fullName)
+                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .role(Role.STUDENT)
+                .status(status)
+                .build();
+        user = userRepository.save(user);
+
+        Student student = Student.builder()
+                .studentCode(generateUniqueStudentCode())
+                .fullName(fullName)
+                .email(email)
+                .department(request.getDepartment() == null ? "" : request.getDepartment().trim())
+                .status(status)
+                .user(user)
+                .build();
+        user.setStudent(student);
         return studentRepository.save(student);
     }
 
@@ -128,7 +143,7 @@ public class StudentServiceImpl implements StudentService {
     private String generateUniqueStudentCode() {
         String code;
         do {
-            int random = (int) (Math.random() * 900000) + 100000;
+            int random = SECURE_RANDOM.nextInt(900000) + 100000;
             code = "SV" + random;
         } while (studentRepository.existsByStudentCode(code));
         return code;

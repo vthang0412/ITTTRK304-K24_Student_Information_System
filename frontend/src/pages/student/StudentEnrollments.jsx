@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { enrollmentApi } from '../../api';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { useToast } from '../../context/ToastContext';
 import { CalendarIcon, ClipboardIcon, ClockIcon, UserIcon } from '../../components/Icons';
 import {
@@ -8,15 +9,12 @@ import {
 } from '../../components/UI';
 import { formatDateTime } from '../../utils/format';
 
-const PAGE_SIZE = 8;
-
 const StudentEnrollments = () => {
   const toast = useToast();
   const [enrollments, setEnrollments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('ALL');
-  const [page, setPage] = useState(1);
   const [target, setTarget] = useState(null);
   const [withdrawing, setWithdrawing] = useState(false);
 
@@ -43,8 +41,9 @@ const StudentEnrollments = () => {
     });
   }, [enrollments, search, status]);
 
-  const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const { page, setPage, pageSize, setPageSize, totalItems, pageItems } = usePaginatedList(filtered);
   const activeCount = enrollments.filter((e) => e.status === 'ENROLLED').length;
+  const pendingCount = enrollments.filter((e) => e.status === 'PENDING').length;
   const totalCredits = enrollments
     .filter((e) => e.status === 'ENROLLED')
     .reduce((sum, e) => sum + Number(e.courseSection?.course?.credits || 0), 0);
@@ -83,6 +82,10 @@ const StudentEnrollments = () => {
         </div>
         <div className="stat-card">
           <div className="stat-icon tone-amber"><ClockIcon /></div>
+          <div className="stat-info"><small>Chờ duyệt</small><strong>{pendingCount}</strong></div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon tone-indigo"><ClipboardIcon /></div>
           <div className="stat-info"><small>Tín chỉ đang học</small><strong>{totalCredits}</strong></div>
         </div>
       </div>
@@ -91,7 +94,9 @@ const StudentEnrollments = () => {
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Tìm theo môn học hoặc mã lớp..." />
         <select className="select" style={{ width: 180 }} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
           <option value="ALL">Tất cả trạng thái</option>
+          <option value="PENDING">Chờ duyệt</option>
           <option value="ENROLLED">Đã đăng ký</option>
+          <option value="REJECTED">Bị từ chối</option>
           <option value="WITHDRAWN">Đã huỷ</option>
         </select>
         <div className="toolbar-spacer" />
@@ -136,11 +141,26 @@ const StudentEnrollments = () => {
                       <td className="cell-muted">{e.courseSection?.schedule || '—'}</td>
                       <td>{e.courseSection?.course?.credits ?? '—'}</td>
                       <td className="cell-muted">{formatDateTime(e.registeredAt)}</td>
-                      <td><StatusBadge status={e.status} /></td>
+                      <td>
+                        <StatusBadge
+                          status={e.status}
+                          label={e.status === 'PENDING' ? 'Chờ duyệt'
+                            : e.status === 'REJECTED' ? 'Bị từ chối'
+                              : e.status === 'ENROLLED' ? 'Đã duyệt'
+                                : undefined}
+                        />
+                        {e.status === 'REJECTED' && e.rejectionReason && (
+                          <div className="cell-muted" style={{ marginTop: 4, maxWidth: 220 }} title={e.rejectionReason}>
+                            Lý do: {e.rejectionReason}
+                          </div>
+                        )}
+                      </td>
                       <td>
                         <div className="row-actions">
-                          {e.status === 'ENROLLED' ? (
-                            <button className="btn btn-secondary btn-sm" onClick={() => setTarget(e)}>Huỷ đăng ký</button>
+                          {e.status === 'ENROLLED' || e.status === 'PENDING' ? (
+                            <button className="btn btn-secondary btn-sm" onClick={() => setTarget(e)}>
+                              {e.status === 'PENDING' ? 'Huỷ đơn' : 'Huỷ đăng ký'}
+                            </button>
                           ) : (
                             <span className="cell-muted">—</span>
                           )}
@@ -151,16 +171,16 @@ const StudentEnrollments = () => {
                 </tbody>
               </table>
             </div>
-            <Pagination page={page} pageSize={PAGE_SIZE} totalItems={filtered.length} onPageChange={setPage} />
+            <Pagination page={page} pageSize={pageSize} totalItems={totalItems} onPageChange={setPage} onPageSizeChange={setPageSize} />
           </>
         )}
       </div>
 
       <ConfirmDialog
         open={!!target}
-        title="Huỷ đăng ký học phần"
-        message={`Bạn có chắc muốn huỷ đăng ký lớp ${target?.courseSection?.sectionCode} — ${target?.courseSection?.course?.courseName}? Thao tác này không thể hoàn tác.`}
-        confirmLabel="Huỷ đăng ký"
+        title={target?.status === 'PENDING' ? 'Huỷ đơn đăng ký học phần' : 'Huỷ đăng ký học phần'}
+        message={`Bạn có chắc muốn huỷ ${target?.status === 'PENDING' ? 'đơn đăng ký' : 'đăng ký'} lớp ${target?.courseSection?.sectionCode} — ${target?.courseSection?.course?.courseName}? Thao tác này không thể hoàn tác.`}
+        confirmLabel="Huỷ"
         loading={withdrawing}
         onConfirm={handleWithdraw}
         onCancel={() => setTarget(null)}

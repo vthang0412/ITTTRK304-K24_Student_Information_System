@@ -1,9 +1,12 @@
 package com.example.student_management.controller.auth;
 
 import com.example.student_management.entity.auth.AccountStatus;
+import com.example.student_management.entity.auth.Role;
 import com.example.student_management.entity.auth.Student;
 import com.example.student_management.entity.auth.User;
+import com.example.student_management.dto.auth.StudentAccountCreateRequest;
 import com.example.student_management.exception.BadRequestException;
+import com.example.student_management.exception.ForbiddenException;
 import com.example.student_management.exception.NotFoundException;
 import com.example.student_management.repository.auth.StudentRepository;
 import com.example.student_management.repository.auth.UserRepository;
@@ -13,6 +16,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -42,7 +46,18 @@ public class StudentController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('STUDENT')")
-    public ResponseEntity<Student> getById(@PathVariable Long id) {
+    public ResponseEntity<Student> getById(@PathVariable Long id, Authentication authentication) {
+        // Chống IDOR: sinh viên chỉ được xem hồ sơ của chính mình.
+        User currentUser = userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new ForbiddenException("Không xác định được người dùng hiện tại"));
+
+        if (currentUser.getRole() != Role.ADMIN) {
+            Student ownProfile = studentRepository.findByUserId(currentUser.getId()).orElse(null);
+            if (ownProfile == null || !ownProfile.getId().equals(id)) {
+                throw new ForbiddenException("Bạn không có quyền xem hồ sơ của sinh viên khác");
+            }
+        }
+
         return studentService.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
@@ -50,8 +65,8 @@ public class StudentController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Student> create(@Valid @RequestBody Student student) {
-        return ResponseEntity.ok(studentService.create(student));
+    public ResponseEntity<Student> create(@Valid @RequestBody StudentAccountCreateRequest request) {
+        return ResponseEntity.ok(studentService.createAccount(request));
     }
 
     @PutMapping("/{id}")
@@ -74,7 +89,7 @@ public class StudentController {
             throw new BadRequestException("Email is required");
         }
         if (statusValue != null && !statusValue.isBlank()) {
-            existing.setStatus(AccountStatus.valueOf(statusValue));
+            existing.setStatus(parseStatus(statusValue));
         }
 
         User user = existing.getUser();
@@ -115,5 +130,13 @@ public class StudentController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         studentService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    private AccountStatus parseStatus(String value) {
+        try {
+            return AccountStatus.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("Trạng thái tài khoản không hợp lệ: " + value);
+        }
     }
 }

@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Swal from 'sweetalert2';
 import { feedbackApi, lecturerApi } from '../../api';
+import { usePaginatedList } from '../../hooks/usePaginatedList';
 import { ClockIcon, FileTextIcon, RefreshIcon, SupportIcon, UsersIcon } from '../../components/Icons';
 import { useToast } from '../../context/ToastContext';
-import { EmptyState, Field, LoadingBlock, Modal, PageHeader, SearchInput, StatCard, StatusBadge } from '../../components/UI';
+import { EmptyState, Field, LoadingBlock, Modal, PageHeader, Pagination, SearchInput, StatCard, StatusBadge } from '../../components/UI';
 import { formatDateTime, getErrorMessage } from '../../utils/format';
 
 const FEEDBACK_TYPE_OPTIONS = [
@@ -98,6 +99,7 @@ const AdminFeedbacks = () => {
             String(ticket.id),
         ].some((value) => String(value || '').toLowerCase().includes(normalized)));
     }, [tickets, searchTerm]);
+    const { page, setPage, pageSize, setPageSize, totalItems, pageItems } = usePaginatedList(filteredTickets);
 
     const openTicket = async (ticketId) => {
         setDetailLoading(true);
@@ -119,6 +121,7 @@ const AdminFeedbacks = () => {
         setStatusFilter('');
         setTypeFilter('');
         setSearchTerm('');
+        setPage(1);
     };
 
     const handleAssign = async () => {
@@ -229,11 +232,11 @@ const AdminFeedbacks = () => {
                 </div>
                 <div className="card-body">
                     <div className="toolbar">
-                        <SearchInput value={searchTerm} onChange={setSearchTerm} placeholder="Tìm mã, tiêu đề, nội dung hoặc sinh viên..." />
-                        <select className="select" style={{ width: 200 }} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                        <SearchInput value={searchTerm} onChange={(value) => { setSearchTerm(value); setPage(1); }} placeholder="Tìm mã, tiêu đề, nội dung hoặc sinh viên..." />
+                        <select className="select" style={{ width: 200 }} value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}>
                             {STATUS_OPTIONS.map((option) => <option key={option.value || 'all-status'} value={option.value}>{option.label}</option>)}
                         </select>
-                        <select className="select" style={{ width: 210 }} value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+                        <select className="select" style={{ width: 210 }} value={typeFilter} onChange={(event) => { setTypeFilter(event.target.value); setPage(1); }}>
                             {FEEDBACK_TYPE_OPTIONS.map((option) => <option key={option.value || 'all-type'} value={option.value}>{option.label}</option>)}
                         </select>
                         <button className="btn btn-secondary" onClick={clearFilters}>Xóa lọc</button>
@@ -265,7 +268,7 @@ const AdminFeedbacks = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredTickets.map((ticket) => (
+                                    {pageItems.map((ticket) => (
                                         <tr key={ticket.id}>
                                             <td className="cell-strong">#{ticket.id}</td>
                                             <td>
@@ -291,6 +294,15 @@ const AdminFeedbacks = () => {
                                 </tbody>
                             </table>
                         </div>
+                    )}
+                    {!loading && (
+                        <Pagination
+                            page={page}
+                            pageSize={pageSize}
+                            totalItems={totalItems}
+                            onPageChange={setPage}
+                            onPageSizeChange={setPageSize}
+                        />
                     )}
                 </div>
             </div>
