@@ -1,5 +1,5 @@
 -- ============================================================
--- Migration V7: Create Exam Management Tables
+-- Migration V15: Create Exam Management Tables
 -- Module: Exam Rooms and Exam Schedules
 -- ============================================================
 
