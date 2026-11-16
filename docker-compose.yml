@@ -51,7 +51,7 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: dev
-      DB_URL: jdbc:mysql://${DB_HOST:-mysql}:${DB_PORT:-3306}/${DB_NAME:-sis_db}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
+      DB_URL: jdbc:mysql://${DB_HOST:-mysql}:${DB_PORT:-3306}/${DB_NAME:-sis_db}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&zeroDateTimeBehavior=CONVERT_TO_NULL
       DB_USERNAME: ${DB_USERNAME:-sis_user}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required, copy .env.example to .env}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required, copy .env.example to .env}
