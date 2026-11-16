@@ -394,28 +394,33 @@ CREATE TABLE IF NOT EXISTS exam_schedules (
     CONSTRAINT fk_exam_sched_room FOREIGN KEY (room_id) REFERENCES exam_rooms(id) ON DELETE RESTRICT
 );
 
-INSERT IGNORE INTO exam_rooms (room_code, room_name, building, capacity, description, status) VALUES
-('P101-A2', 'Phòng thi máy 101', 'Nhà A2', 40, 'Trang bị 40 máy tính cấu hình cao', 'ACTIVE'),
-('P202-B1', 'Phòng thi lý thuyết 202', 'Nhà B1', 50, 'Phòng thi chuẩn có điều hòa và máy chiếu', 'ACTIVE'),
-('P303-C1', 'Phòng thi máy 303', 'Nhà C1', 45, 'Phòng máy thực hành và thi lập trình', 'ACTIVE'),
-('HT-A1', 'Hội trường lớn A1', 'Nhà A1', 120, 'Hội trường thi trắc nghiệm tập trung', 'ACTIVE'),
-('P105-D', 'Phòng thi dự phòng 105', 'Nhà D', 30, 'Phòng thi nhỏ đang sửa chữa điều hòa', 'INACTIVE');
+INSERT IGNORE INTO exam_rooms (room_code, room_name, building, capacity, description, status, created_at, updated_at) VALUES
+('P101-A2', 'Phòng thi máy 101', 'Nhà A2', 40, 'Trang bị 40 máy tính cấu hình cao', 'ACTIVE', NOW(), NOW()),
+('P202-B1', 'Phòng thi lý thuyết 202', 'Nhà B1', 50, 'Phòng thi chuẩn có điều hòa và máy chiếu', 'ACTIVE', NOW(), NOW()),
+('P303-C1', 'Phòng thi máy 303', 'Nhà C1', 45, 'Phòng máy thực hành và thi lập trình', 'ACTIVE', NOW(), NOW()),
+('HT-A1', 'Hội trường lớn A1', 'Nhà A1', 120, 'Hội trường thi trắc nghiệm tập trung', 'ACTIVE', NOW(), NOW()),
+('P105-D', 'Phòng thi dự phòng 105', 'Nhà D', 30, 'Phòng thi nhỏ đang sửa chữa điều hòa', 'INACTIVE', NOW(), NOW());
 
-INSERT IGNORE INTO exam_schedules (course_section_id, exam_date, start_time, end_time, exam_type, room_id, exam_location, exam_link, status, notes)
-SELECT cs.id, DATE_ADD(CURDATE(), INTERVAL 14 DAY), '08:00:00', '10:00:00', 'OFFLINE', r.id, 'Phòng thi máy 101 - Nhà A2', NULL, 'SCHEDULED', 'Thi thực hành trên máy 120 phút. Mang theo thẻ sinh viên.'
+INSERT IGNORE INTO exam_schedules (course_section_id, exam_date, start_time, end_time, exam_type, room_id, exam_location, exam_link, status, notes, created_at, updated_at)
+SELECT cs.id, DATE_ADD(CURDATE(), INTERVAL 14 DAY), '08:00:00', '10:00:00', 'OFFLINE', r.id, 'Phòng thi máy 101 - Nhà A2', NULL, 'SCHEDULED', 'Thi thực hành trên máy 120 phút. Mang theo thẻ sinh viên.', NOW(), NOW()
 FROM course_sections cs, exam_rooms r
 WHERE cs.section_code = 'INT2204-03' AND r.room_code = 'P101-A2'
   AND NOT EXISTS (SELECT 1 FROM exam_schedules WHERE course_section_id = cs.id);
 
-INSERT IGNORE INTO exam_schedules (course_section_id, exam_date, start_time, end_time, exam_type, room_id, exam_location, exam_link, status, notes)
-SELECT cs.id, DATE_ADD(CURDATE(), INTERVAL 15 DAY), '13:30:00', '15:30:00', 'OFFLINE', r.id, 'Phòng thi lý thuyết 202 - Nhà B1', NULL, 'SCHEDULED', 'Thi viết tự luận 120 phút. Không sử dụng tài liệu.'
+INSERT IGNORE INTO exam_schedules (course_section_id, exam_date, start_time, end_time, exam_type, room_id, exam_location, exam_link, status, notes, created_at, updated_at)
+SELECT cs.id, DATE_ADD(CURDATE(), INTERVAL 15 DAY), '13:30:00', '15:30:00', 'OFFLINE', r.id, 'Phòng thi lý thuyết 202 - Nhà B1', NULL, 'SCHEDULED', 'Thi viết tự luận 120 phút. Không sử dụng tài liệu.', NOW(), NOW()
 FROM course_sections cs, exam_rooms r
 WHERE cs.section_code = 'INT3306-03' AND r.room_code = 'P202-B1'
   AND NOT EXISTS (SELECT 1 FROM exam_schedules WHERE course_section_id = cs.id);
 
-INSERT IGNORE INTO exam_schedules (course_section_id, exam_date, start_time, end_time, exam_type, room_id, exam_location, exam_link, status, notes)
-SELECT cs.id, DATE_ADD(CURDATE(), INTERVAL 16 DAY), '09:00:00', '11:00:00', 'ONLINE', NULL, 'Google Meet', 'https://meet.google.com/abc-defg-hij', 'SCHEDULED', 'Thi phỏng vấn vấn đáp và demo sản phẩm theo từng nhóm.'
+INSERT IGNORE INTO exam_schedules (course_section_id, exam_date, start_time, end_time, exam_type, room_id, exam_location, exam_link, status, notes, created_at, updated_at)
+SELECT cs.id, DATE_ADD(CURDATE(), INTERVAL 16 DAY), '09:00:00', '11:00:00', 'ONLINE', NULL, 'Google Meet', 'https://meet.google.com/abc-defg-hij', 'SCHEDULED', 'Thi phỏng vấn vấn đáp và demo sản phẩm theo từng nhóm.', NOW(), NOW()
 FROM course_sections cs
 WHERE cs.section_code = 'INT3304-02'
   AND NOT EXISTS (SELECT 1 FROM exam_schedules WHERE course_section_id = cs.id);
+
+-- Tự động sửa các dòng có giá trị zero date (0000-00-00) nếu có trong cơ sở dữ liệu
+UPDATE exam_rooms SET created_at = NOW(), updated_at = NOW() WHERE created_at IS NULL OR CAST(created_at AS CHAR) LIKE '0000%';
+UPDATE exam_schedules SET created_at = NOW(), updated_at = NOW() WHERE created_at IS NULL OR CAST(created_at AS CHAR) LIKE '0000%';
+
 
