@@ -1,0 +1,185 @@
+.toolbar.admin-exam-rooms-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 3fr) minmax(0, 3fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.admin-exam-rooms-filters .search-box,
+.admin-exam-rooms-filters .input,
+.admin-exam-rooms-filters .select {
+  width: 100%;
+  min-width: 0;
+  height: 43px;
+  min-height: 43px;
+  box-sizing: border-box;
+}
+
+.admin-exam-rooms-filters .search-box {
+  flex: none;
+}
+
+.table-wrap.admin-exam-rooms-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: visible;
+}
+
+.admin-exam-rooms-table {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.admin-exam-rooms-table .exam-room-col-code { width: 12%; }
+.admin-exam-rooms-table .exam-room-col-name { width: 19%; }
+.admin-exam-rooms-table .exam-room-col-building { width: 11%; }
+.admin-exam-rooms-table .exam-room-col-capacity { width: 9%; }
+.admin-exam-rooms-table .exam-room-col-status { width: 15%; }
+.admin-exam-rooms-table .exam-room-col-usage { width: 17%; }
+.admin-exam-rooms-table .exam-room-col-actions { width: 17%; }
+
+.admin-exam-rooms-table thead th {
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-align: left;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.admin-exam-rooms-table tbody td {
+  padding: 10px;
+  border-bottom: 1px solid #eef2f7;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+
+.admin-exam-rooms-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.admin-exam-rooms-table tbody tr:hover {
+  background: #f8fbff;
+}
+
+.admin-exam-rooms-table .exam-room-header-capacity,
+.admin-exam-rooms-table .exam-room-header-status,
+.admin-exam-rooms-table .exam-room-header-actions,
+.admin-exam-rooms-table .exam-room-cell-capacity,
+.admin-exam-rooms-table .exam-room-cell-status,
+.admin-exam-rooms-table .exam-room-cell-actions {
+  text-align: center;
+}
+
+.admin-exam-rooms-table .exam-room-cell-code {
+  white-space: nowrap;
+}
+
+.admin-exam-rooms-table .exam-room-cell-code strong {
+  display: block;
+}
+
+.admin-exam-rooms-table .exam-room-cell-name,
+.admin-exam-rooms-table .exam-room-cell-building {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.admin-exam-rooms-table .exam-room-cell-capacity {
+  white-space: nowrap;
+}
+
+.admin-exam-rooms-table .exam-room-cell-status .badge {
+  white-space: nowrap;
+}
+
+.admin-exam-rooms-table .exam-room-cell-usage {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.admin-exam-rooms-table .exam-room-cell-usage .chip {
+  max-width: 100%;
+  box-sizing: border-box;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+
+.admin-exam-rooms-table .exam-room-cell-actions {
+  white-space: nowrap;
+}
+
+.admin-exam-rooms-table .exam-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.admin-exam-rooms-table .exam-row-actions .btn {
+  flex: 0 0 auto;
+  height: 32px;
+  min-height: 32px;
+  box-sizing: border-box;
+  font-size: 12px;
+}
+
+.admin-exam-rooms-table .exam-room-action-edit,
+.admin-exam-rooms-table .exam-room-action-delete {
+  flex: 0 0 36px;
+  width: 36px;
+  min-width: 36px;
+  padding: 0 4px;
+}
+
+.admin-exam-rooms-table .exam-room-action-status {
+  flex: 0 0 86px;
+  width: 86px;
+  min-width: 86px;
+  padding: 0 4px;
+}
+
+@media (max-width: 1199px) {
+  .toolbar.admin-exam-rooms-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-exam-rooms-filters .search-box {
+    grid-column: 1 / -1;
+  }
+
+  .table-wrap.admin-exam-rooms-table-wrap {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-exam-rooms-table {
+    min-width: 980px;
+    max-width: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .toolbar.admin-exam-rooms-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-exam-rooms-filters .search-box {
+    grid-column: auto;
+  }
+}

@@ -1068,6 +1068,13 @@ table.data-table { width: 100%; border-collapse: separate; border-spacing: 0; mi
 .timetable-week-event.has-conflict { border-color: #f59e0b; background: #fef3c7; color: #78350f; }
 .timetable-week-event b { color: #b45309; }
 
+.exam-print-title { display: none; }
+.exam-filter-date { width: 160px; min-width: 0; }
+.exam-filter-building { width: 190px; }
+.exam-readonly-field { display: flex; align-items: center; background: var(--surface-2); color: var(--text-2); }
+.exam-row-actions { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.exam-row-actions .btn { padding-left: 9px; padding-right: 9px; }
+
 /* ---------------- Misc ---------------- */
 .split { display: grid; grid-template-columns: 1.6fr 1fr; gap: 18px; }
 .stack { display: grid; gap: 18px; }
@@ -1186,4 +1193,30 @@ table.data-table { width: 100%; border-collapse: separate; border-spacing: 0; mi
   .timetable-week-scroll { overflow: visible; border-color: #9ca3af; }
   .timetable-week-grid { min-width: 0; width: 100%; }
   .timetable-week-event { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  @page { size: A4 landscape; margin: 12mm; }
+  body * { visibility: hidden !important; }
+  .exam-print-area, .exam-print-area * { visibility: visible !important; }
+  .exam-print-area {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  .exam-print-area .no-print,
+  .exam-print-area .pagination,
+  .exam-print-area .toolbar,
+  .exam-print-area .modal-overlay,
+  .exam-print-title { display: none !important; }
+  .exam-print-area > .page-head,
+  .exam-print-area > .stats-grid { display: none !important; }
+  .exam-print-area .exam-print-title { display: block !important; margin: 0 0 12px; }
+  .exam-print-area .exam-print-title h1 { font-size: 18pt; }
+  .exam-print-area .exam-print-title p { font-size: 9pt; }
+  .exam-print-area .card { border: 0 !important; box-shadow: none !important; }
+  .exam-print-area .table-wrap { overflow: visible !important; }
+  .exam-print-area .table { width: 100% !important; font-size: 8pt !important; }
+  .exam-print-area .table th, .exam-print-area .table td { padding: 5px !important; }
 }

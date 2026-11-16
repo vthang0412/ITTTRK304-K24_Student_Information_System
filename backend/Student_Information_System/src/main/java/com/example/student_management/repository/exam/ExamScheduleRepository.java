@@ -34,6 +34,8 @@ public interface ExamScheduleRepository extends JpaRepository<ExamSchedule, Long
             "LEFT JOIN s.room r " +
             "WHERE " +
             "(:semesterId IS NULL OR sem.id = :semesterId) AND " +
+
+            "(:courseId IS NULL OR c.id = :courseId) AND " +
             "(:status IS NULL OR s.status = :status) AND " +
             "(:examType IS NULL OR s.examType = :examType) AND " +
             "(:fromDate IS NULL OR s.examDate >= :fromDate) AND " +
@@ -46,6 +48,7 @@ public interface ExamScheduleRepository extends JpaRepository<ExamSchedule, Long
     Page<ExamSchedule> searchSchedules(
             @Param("keyword") String keyword,
             @Param("semesterId") Long semesterId,
+            @Param("courseId") Long courseId,
             @Param("status") ExamScheduleStatus status,
             @Param("examType") ExamType examType,
             @Param("fromDate") LocalDate fromDate,

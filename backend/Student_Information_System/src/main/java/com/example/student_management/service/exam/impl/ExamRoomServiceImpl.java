@@ -126,6 +126,7 @@ public class ExamRoomServiceImpl implements ExamRoomService {
                 .capacity(room.getCapacity())
                 .description(room.getDescription())
                 .status(room.getStatus())
+                .inUse(examScheduleRepository.existsByRoomId(room.getId()))
                 .createdAt(room.getCreatedAt())
                 .updatedAt(room.getUpdatedAt())
                 .build();

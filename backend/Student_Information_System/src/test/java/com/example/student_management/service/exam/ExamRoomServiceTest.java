@@ -169,6 +169,19 @@ class ExamRoomServiceTest {
     }
 
     @Test
+    void testUpdateRoomStatus_CanReactivateInactiveRoom() {
+        room1.setStatus(ExamRoomStatus.INACTIVE);
+        when(examRoomRepository.findById(1L)).thenReturn(Optional.of(room1));
+        when(examRoomRepository.save(any(ExamRoom.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ExamRoomDto result = examRoomService.updateRoomStatus(1L, ExamRoomStatus.ACTIVE);
+
+        assertEquals(ExamRoomStatus.ACTIVE, result.getStatus());
+        assertEquals(ExamRoomStatus.ACTIVE, room1.getStatus());
+        verify(examRoomRepository).save(room1);
+    }
+
+    @Test
     void testSearchRooms_Success() {
         PageRequest pageRequest = PageRequest.of(0, 10);
         when(examRoomRepository.searchRooms(any(), any(), any(), any(), eq(pageRequest)))

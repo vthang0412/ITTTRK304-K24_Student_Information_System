@@ -21,4 +21,3 @@ public interface NotificationService {
 
     void sendSystemNotification(User recipient, String title, String content, String type);
 }
-

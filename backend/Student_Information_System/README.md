@@ -16,6 +16,7 @@ Copy `.env` example or set environment variables:
 ## Run
 ```bash
 ./gradlew bootRun
+gradlew.bat bootRun
 ```
 
 ## API Docs
@@ -31,3 +32,10 @@ Copy `.env` example or set environment variables:
 ```bash
 ./gradlew build
 ```
+
+## Exam schedule APIs
+- Admin schedule and room management uses `/api/admin/exam-schedules` and `/api/admin/exam-rooms`.
+- Schedule filters include `keyword`, `semesterId`, `courseId`, `status`, `fromDate`, and `toDate`.
+- Admin Excel exports are available at `/api/admin/exam-schedules/export` and `/api/admin/exam-schedules/{id}/students/export`.
+- Student schedule and Excel endpoints are `/api/student/exam-schedules` and `/api/student/exam-schedules/export`; the backend derives the student from the authenticated JWT.
+- All exam management endpoints require an authenticated account with the matching ADMIN or STUDENT role.

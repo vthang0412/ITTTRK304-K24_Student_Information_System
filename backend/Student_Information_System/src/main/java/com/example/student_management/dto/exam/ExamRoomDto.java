@@ -20,6 +20,7 @@ public class ExamRoomDto {
     private Integer capacity;
     private String description;
     private ExamRoomStatus status;
+    private boolean inUse;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
