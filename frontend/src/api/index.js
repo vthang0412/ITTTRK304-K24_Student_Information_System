@@ -156,3 +156,16 @@ export const notificationApi = {
   create: (data) => httpClient.post('/api/notifications', data),
   delete: (id) => httpClient.delete(`/api/notifications/${id}`),
 };
+
+export const aiChatApi = {
+  getOverview: () => httpClient.get('/api/student/ai/overview'),
+  getConversations: () => httpClient.get('/api/student/ai/chat/conversations'),
+  createConversation: (data) => httpClient.post('/api/student/ai/chat/conversations', data || {}),
+  getMessages: (conversationId) => httpClient.get(`/api/student/ai/chat/conversations/${conversationId}/messages`),
+  sendMessage: (conversationId, data) => httpClient.post(
+    `/api/student/ai/chat/conversations/${conversationId}/messages`,
+    data,
+    { timeout: 35000 },
+  ),
+  deleteConversation: (conversationId) => httpClient.delete(`/api/student/ai/chat/conversations/${conversationId}`),
+};
