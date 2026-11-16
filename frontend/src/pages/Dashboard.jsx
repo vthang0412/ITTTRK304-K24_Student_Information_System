@@ -344,12 +344,12 @@ const AdminDashboard = ({ data }) => {
               <div style={{ height: 300 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={passRateByDepartment} margin={{ top: 20, right: 10, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                    <YAxis domain={[0, 100]} tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--chart-grid)" />
+                    <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: 'var(--chart-tick)', fontSize: 12 }} />
+                    <YAxis domain={[0, 100]} tickLine={false} axisLine={false} tick={{ fill: 'var(--chart-tick)', fontSize: 12 }} />
                     <Tooltip
                       formatter={(value) => [`${value}%`, 'Tỷ lệ']}
-                      contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: 'var(--shadow-sm)' }}
+                      contentStyle={{ borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', boxShadow: 'var(--shadow-sm)' }}
                     />
                     <Legend />
                     <Bar dataKey="passRate" name="Đạt" fill="#16a34a" radius={[6, 6, 0, 0]} />
@@ -560,14 +560,14 @@ const StudentDashboard = ({ data }) => {
               <div style={{ height: 260 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={gpaTrend} margin={{ top: 10, right: 10, left: -18, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                    <XAxis dataKey="semester" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                    <YAxis domain={[0, 10]} tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+                    <XAxis dataKey="semester" tickLine={false} axisLine={false} tick={{ fill: 'var(--chart-tick)', fontSize: 12 }} />
+                    <YAxis domain={[0, 10]} tickLine={false} axisLine={false} tick={{ fill: 'var(--chart-tick)', fontSize: 12 }} />
                     <Tooltip
                       formatter={(value) => [`${Number(value).toFixed(2)}`, 'GPA']}
-                      contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: 'var(--shadow-sm)' }}
+                      contentStyle={{ borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', boxShadow: 'var(--shadow-sm)' }}
                     />
-                    <Line type="monotone" dataKey="gpa" stroke="#2563eb" strokeWidth={3} dot={{ r: 5, fill: '#2563eb', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} />
+                    <Line type="monotone" dataKey="gpa" stroke="var(--blue-600)" strokeWidth={3} dot={{ r: 5, fill: 'var(--blue-600)', strokeWidth: 2, stroke: 'var(--surface)' }} activeDot={{ r: 7 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -590,17 +590,17 @@ const StudentDashboard = ({ data }) => {
                 <div style={{ height: 220 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={passRatioData.length ? passRatioData : [{ name: 'Không có dữ liệu', value: 1, color: '#e2e8f0' }]} dataKey="value" nameKey="name" innerRadius={52} outerRadius={82} paddingAngle={3}>
-                        {(passRatioData.length ? passRatioData : [{ name: 'Không có dữ liệu', value: 1, color: '#e2e8f0' }]).map((entry) => (
+                      <Pie data={passRatioData.length ? passRatioData : [{ name: 'Không có dữ liệu', value: 1, color: 'var(--chart-empty)' }]} dataKey="value" nameKey="name" innerRadius={52} outerRadius={82} paddingAngle={3}>
+                        {(passRatioData.length ? passRatioData : [{ name: 'Không có dữ liệu', value: 1, color: 'var(--chart-empty)' }]).map((entry) => (
                           <Cell key={entry.name} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value) => [`${value}`, 'Số môn']} contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0' }} />
+                      <Tooltip formatter={(value) => [`${value}`, 'Số môn']} contentStyle={{ borderRadius: 12, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
                 <div className="chart-legend">
-                  {(passRatioData.length ? passRatioData : [{ name: 'Không có dữ liệu', value: 0, color: '#e2e8f0' }]).map((item) => (
+                  {(passRatioData.length ? passRatioData : [{ name: 'Không có dữ liệu', value: 0, color: 'var(--chart-empty)' }]).map((item) => (
                     <div key={item.name} className="chart-legend-item">
                       <span className="chart-dot" style={{ background: item.color }} />
                       <div style={{ flex: 1 }}>
@@ -630,7 +630,7 @@ const StudentDashboard = ({ data }) => {
                 <span className="small muted">Đã tích lũy</span>
                 <strong>{completeCredits} / {totalRequiredCredits ?? totalCredits} tín chỉ</strong>
               </div>
-              <div style={{ height: 16, background: '#eef2f7', borderRadius: 999, overflow: 'hidden' }}>
+              <div style={{ height: 16, background: 'var(--border)', borderRadius: 999, overflow: 'hidden' }}>
                 <div style={{ width: `${Math.max(0, Math.min(100, progressPercent))}%`, height: '100%', background: 'linear-gradient(90deg, #22c55e, #16a34a)', borderRadius: 999 }} />
               </div>
               <div className="flex-between small muted">

@@ -157,8 +157,8 @@ const AdminSections = () => {
         icon: 'swal-auth-icon',
       },
       buttonsStyling: false,
-      background: '#ffffff',
-      color: '#0f172a',
+      background: 'var(--surface)',
+      color: 'var(--text)',
       width: 440,
     });
 

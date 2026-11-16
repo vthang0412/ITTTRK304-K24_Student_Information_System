@@ -141,12 +141,19 @@ public class NotificationServiceImpl implements NotificationService {
         Notification notification = notificationRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Notification not found"));
 
-        if (user.getRole() != Role.ADMIN &&
-                (notification.getRecipient() == null || !notification.getRecipient().getId().equals(user.getId()))) {
-            throw new ForbiddenException("You do not have permission to delete this notification");
+        if (user.getRole() == Role.ADMIN) {
+            notificationRepository.delete(notification);
+            return;
         }
 
-        notificationRepository.delete(notification);
+        ensureCanAccess(notification, user);
+        NotificationRead read = notificationReadRepository.findByNotificationIdAndUserId(id, user.getId())
+                .orElseGet(() -> NotificationRead.builder()
+                        .notification(notification)
+                        .user(user)
+                        .build());
+        read.setIsDismissed(true);
+        notificationReadRepository.save(read);
     }
 
     @Override

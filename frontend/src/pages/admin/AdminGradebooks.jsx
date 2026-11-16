@@ -12,6 +12,7 @@ import {
   SearchInput, StatCard, StatusBadge,
 } from '../../components/UI';
 import { formatDateTime, formatScore, getErrorMessage } from '../../utils/format';
+import './AdminGradebooks.css';
 
 const ACTIONS = {
   lock: { label: 'Khoá bảng điểm', tone: 'danger', title: 'Khoá bảng điểm' },
@@ -466,17 +467,17 @@ const AdminGradebooks = () => {
         )}
       </div>
 
-      <section className="card" style={{ marginTop: 20 }}>
+      <section className="card bulk-history-card" style={{ marginTop: 20 }}>
         <div className="card-header">
           <div>
             <h2 className="card-title">Lịch sử thao tác hàng loạt</h2>
             <p className="cell-muted">Các đợt mở, khóa, duyệt và công bố bảng điểm; nhật ký cá nhân vẫn được lưu riêng.</p>
           </div>
         </div>
-        <div className="toolbar" style={{ flexWrap: 'wrap' }}>
-          <input className="input" aria-label="Lọc người thao tác" placeholder="ADMIN thực hiện" value={bulkHistoryFilters.actor}
+        <div className="toolbar bulk-history-filters">
+          <input className="input bulk-history-filter-actor" aria-label="Lọc người thao tác" placeholder="ADMIN thực hiện" value={bulkHistoryFilters.actor}
             onChange={(e) => setBulkHistoryFilters((prev) => ({ ...prev, actor: e.target.value }))} />
-          <select className="select" aria-label="Lọc hành động" value={bulkHistoryFilters.action}
+          <select className="select bulk-history-filter-action" aria-label="Lọc hành động" value={bulkHistoryFilters.action}
             onChange={(e) => setBulkHistoryFilters((prev) => ({ ...prev, action: e.target.value }))}>
             <option value="">Tất cả thao tác</option>
             <option value="OPEN">Mở</option>
@@ -484,31 +485,33 @@ const AdminGradebooks = () => {
             <option value="APPROVE">Duyệt</option>
             <option value="PUBLISH">Công bố</option>
           </select>
-          <input className="input" aria-label="Lọc mã hoặc tên môn học" placeholder="Mã / tên môn" value={bulkHistoryFilters.course}
+          <input className="input bulk-history-filter-course" aria-label="Lọc mã hoặc tên môn học" placeholder="Mã / tên môn" value={bulkHistoryFilters.course}
             onChange={(e) => setBulkHistoryFilters((prev) => ({ ...prev, course: e.target.value }))} />
-          <input className="input" aria-label="Lọc lớp học phần" placeholder="Lớp học phần" value={bulkHistoryFilters.section}
+          <input className="input bulk-history-filter-section" aria-label="Lọc lớp học phần" placeholder="Lớp học phần" value={bulkHistoryFilters.section}
             onChange={(e) => setBulkHistoryFilters((prev) => ({ ...prev, section: e.target.value }))} />
-          <input className="input" aria-label="Lọc học kỳ" placeholder="Học kỳ" value={bulkHistoryFilters.semester}
+          <input className="input bulk-history-filter-semester" aria-label="Lọc học kỳ" placeholder="Học kỳ" value={bulkHistoryFilters.semester}
             onChange={(e) => setBulkHistoryFilters((prev) => ({ ...prev, semester: e.target.value }))} />
-          <select className="select" aria-label="Lọc kết quả" value={bulkHistoryFilters.result}
+          <select className="select bulk-history-filter-result" aria-label="Lọc kết quả" value={bulkHistoryFilters.result}
             onChange={(e) => setBulkHistoryFilters((prev) => ({ ...prev, result: e.target.value }))}>
             <option value="">Mọi kết quả</option>
             <option value="SUCCESS">Thành công</option>
             <option value="FAILURE">Thất bại</option>
             <option value="SKIPPED">Bỏ qua</option>
           </select>
-          <input className="input" type="date" aria-label="Từ ngày" value={bulkHistoryFilters.fromTime}
+          <input className="input bulk-history-filter-from" type="date" aria-label="Từ ngày" value={bulkHistoryFilters.fromTime}
             onChange={(e) => setBulkHistoryFilters((prev) => ({ ...prev, fromTime: e.target.value }))} />
-          <input className="input" type="date" aria-label="Đến ngày" value={bulkHistoryFilters.toTime}
+          <input className="input bulk-history-filter-to" type="date" aria-label="Đến ngày" value={bulkHistoryFilters.toTime}
             onChange={(e) => setBulkHistoryFilters((prev) => ({ ...prev, toTime: e.target.value }))} />
-          <button type="button" className="btn btn-primary btn-sm" onClick={applyBulkHistoryFilters}>Lọc lịch sử</button>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => {
-            const emptyFilters = { actor: '', action: '', fromTime: '', toTime: '', course: '', section: '', semester: '', result: '' };
-            setBulkHistoryFilters(emptyFilters);
-            setAppliedBulkHistoryFilters({});
-            setBulkHistoryPage(0);
-            loadBulkHistory(0, {});
-          }}>Xóa lọc</button>
+          <div className="bulk-history-filter-actions">
+            <button type="button" className="btn btn-primary btn-sm" onClick={applyBulkHistoryFilters}>Lọc lịch sử</button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => {
+              const emptyFilters = { actor: '', action: '', fromTime: '', toTime: '', course: '', section: '', semester: '', result: '' };
+              setBulkHistoryFilters(emptyFilters);
+              setAppliedBulkHistoryFilters({});
+              setBulkHistoryPage(0);
+              loadBulkHistory(0, {});
+            }}>Xóa lọc</button>
+          </div>
         </div>
         {bulkHistoryLoading ? <LoadingBlock /> : bulkHistory.content?.length ? (
           <>

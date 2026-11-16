@@ -2,10 +2,6 @@ package com.example.student_management.service.ai;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -39,10 +35,10 @@ public class AIProviderService {
             .connectTimeout(Duration.ofSeconds(10))
             .build();
 
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
+    @lombok.Data
+    @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
     public static class AIProviderResult {
         private String content;
         private String providerUsed;
@@ -52,68 +48,74 @@ public class AIProviderService {
         private List<String> sources;
     }
 
+    // Backward-compatible overload for existing callers (insights/advisor/planner/older chat)
+    @SuppressWarnings("unchecked")
     public AIProviderResult generateChatResponse(
             String systemContext,
             List<Map<String, String>> conversationHistory,
             String userQuestion,
             Map<String, Object> academicSummary
     ) {
-        long start = System.currentTimeMillis();
+        String fallback = generateLegacySisFallback(userQuestion, academicSummary == null ? Map.of() : academicSummary);
+        List<String> sources = detectSources(userQuestion, academicSummary == null ? Map.of() : academicSummary);
+        return generateChatResponse(systemContext, conversationHistory, userQuestion, fallback, sources);
+    }
 
-        // 1. Ưu tiên gọi Gemini API nếu có GEMINI_API_KEY
+    public AIProviderResult generateChatResponse(
+            String systemContext,
+            List<Map<String, String>> conversationHistory,
+            String userQuestion,
+            String fallbackContent,
+            List<String> sources
+    ) {
+        long start = System.currentTimeMillis();
+        List<String> safeSources = (sources == null || sources.isEmpty()) ? List.of("Student SIS Profile") : sources;
+
         if ("gemini".equalsIgnoreCase(provider) && geminiApiKey != null && !geminiApiKey.isBlank()) {
             try {
                 String answer = callGeminiApi(systemContext, conversationHistory, userQuestion);
                 if (answer != null && !answer.isBlank()) {
                     return AIProviderResult.builder()
-                            .content(answer)
+                            .content(answer.trim())
                             .providerUsed("GEMINI")
                             .modelUsed(model)
                             .success(true)
                             .latencyMs(System.currentTimeMillis() - start)
-                            .sources(List.of("Academic Records", "Published Grades", "Enrollments"))
+                            .sources(safeSources)
                             .build();
                 }
-            } catch (Exception e) {
-                // Nếu Gemini lỗi/timeout -> rơi xuống fallback xử lý dữ liệu thật cục bộ để không làm sập trải nghiệm
-            }
+            } catch (Exception ignored) {}
         }
 
-        // 2. Hoặc gọi OpenAI API nếu được cấu hình
         if ("openai".equalsIgnoreCase(provider) && openaiApiKey != null && !openaiApiKey.isBlank()) {
             try {
                 String answer = callOpenAiApi(systemContext, conversationHistory, userQuestion);
                 if (answer != null && !answer.isBlank()) {
                     return AIProviderResult.builder()
-                            .content(answer)
+                            .content(answer.trim())
                             .providerUsed("OPENAI")
                             .modelUsed(model)
                             .success(true)
                             .latencyMs(System.currentTimeMillis() - start)
-                            .sources(List.of("Academic Records", "Published Grades", "Enrollments"))
+                            .sources(safeSources)
                             .build();
                 }
-            } catch (Exception e) {
-                // Fallback
-            }
+            } catch (Exception ignored) {}
         }
 
-        // 3. Fallback Engine thông minh truy vấn trực tiếp từ dữ liệu thật SIS
-        String fallbackAnswer = generateSmartSisFallback(userQuestion, academicSummary);
+        String content = (fallbackContent == null || fallbackContent.isBlank())
+                ? "Hiện tại trợ lý AI chưa thể phản hồi. Vui lòng thử lại sau."
+                : fallbackContent;
         return AIProviderResult.builder()
-                .content(fallbackAnswer)
+                .content(content)
                 .providerUsed("SIS-ASSISTANT-ENGINE")
                 .modelUsed("sis-local-v1")
                 .success(true)
                 .latencyMs(System.currentTimeMillis() - start)
-                .sources(detectSources(userQuestion))
+                .sources(safeSources)
                 .build();
     }
 
-    /**
-     * Gọi AI Provider cho các tác vụ phân tích (Insights, Advisor, Planner).
-     * Trả về success=false nếu chưa cấu hình API key hoặc gọi lỗi để service gọi fallback cục bộ.
-     */
     public AIProviderResult generateExternalAnalysis(String systemPrompt, String userPrompt) {
         long start = System.currentTimeMillis();
         if ("gemini".equalsIgnoreCase(provider) && geminiApiKey != null && !geminiApiKey.isBlank()) {
@@ -130,7 +132,6 @@ public class AIProviderService {
                 }
             } catch (Exception ignored) {}
         }
-
         if ("openai".equalsIgnoreCase(provider) && openaiApiKey != null && !openaiApiKey.isBlank()) {
             try {
                 String answer = callOpenAiApi(systemPrompt, List.of(), userPrompt);
@@ -145,7 +146,6 @@ public class AIProviderService {
                 }
             } catch (Exception ignored) {}
         }
-
         return AIProviderResult.builder()
                 .content(null)
                 .providerUsed("SIS-ASSISTANT-ENGINE")
@@ -157,36 +157,24 @@ public class AIProviderService {
 
     private String callGeminiApi(String systemContext, List<Map<String, String>> history, String userQuestion) throws Exception {
         String url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + geminiApiKey.trim();
-
         Map<String, Object> body = new LinkedHashMap<>();
+        body.put("systemInstruction", Map.of("parts", List.of(Map.of("text", systemContext == null ? "" : systemContext))));
 
-        // System instruction
-        Map<String, Object> sysPart = Map.of("text", systemContext);
-        body.put("systemInstruction", Map.of("parts", List.of(sysPart)));
-
-        // Contents (history + current question)
         List<Map<String, Object>> contents = new ArrayList<>();
         if (history != null) {
-            int startIdx = Math.max(0, history.size() - 6); // Giới hạn 6 tin nhắn gần nhất để tiết kiệm token
+            int startIdx = Math.max(0, history.size() - 12);
             for (int i = startIdx; i < history.size(); i++) {
                 Map<String, String> msg = history.get(i);
-                String geminiRole = "ASSISTANT".equalsIgnoreCase(msg.get("role")) ? "model" : "user";
-                contents.add(Map.of(
-                        "role", geminiRole,
-                        "parts", List.of(Map.of("text", msg.get("content")))
-                ));
+                String role = msg.getOrDefault("role", "user");
+                String geminiRole = "assistant".equalsIgnoreCase(role) || "ASSISTANT".equalsIgnoreCase(role) ? "model" : "user";
+                String content = msg.getOrDefault("content", "");
+                if (content == null || content.isBlank()) continue;
+                contents.add(Map.of("role", geminiRole, "parts", List.of(Map.of("text", content))));
             }
         }
-        contents.add(Map.of(
-                "role", "user",
-                "parts", List.of(Map.of("text", userQuestion))
-        ));
+        contents.add(Map.of("role", "user", "parts", List.of(Map.of("text", userQuestion == null ? "" : userQuestion))));
         body.put("contents", contents);
-
-        body.put("generationConfig", Map.of(
-                "temperature", 0.3,
-                "maxOutputTokens", 1024
-        ));
+        body.put("generationConfig", Map.of("temperature", 0.3, "maxOutputTokens", 1024));
 
         String jsonBody = objectMapper.writeValueAsString(body);
         HttpRequest request = HttpRequest.newBuilder()
@@ -195,7 +183,6 @@ public class AIProviderService {
                 .timeout(Duration.ofSeconds(25))
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
                 .build();
-
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() >= 200 && response.statusCode() < 300) {
             JsonNode root = objectMapper.readTree(response.body());
@@ -212,19 +199,20 @@ public class AIProviderService {
 
     private String callOpenAiApi(String systemContext, List<Map<String, String>> history, String userQuestion) throws Exception {
         String url = "https://api.openai.com/v1/chat/completions";
-
         List<Map<String, String>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", systemContext));
-
+        messages.add(Map.of("role", "system", "content", systemContext == null ? "" : systemContext));
         if (history != null) {
-            int startIdx = Math.max(0, history.size() - 6);
+            int startIdx = Math.max(0, history.size() - 12);
             for (int i = startIdx; i < history.size(); i++) {
                 Map<String, String> msg = history.get(i);
-                String role = "ASSISTANT".equalsIgnoreCase(msg.get("role")) ? "assistant" : "user";
-                messages.add(Map.of("role", role, "content", msg.get("content")));
+                String role = msg.getOrDefault("role", "user");
+                String oaiRole = "assistant".equalsIgnoreCase(role) || "ASSISTANT".equalsIgnoreCase(role) ? "assistant" : "user";
+                String content = msg.getOrDefault("content", "");
+                if (content == null || content.isBlank()) continue;
+                messages.add(Map.of("role", oaiRole, "content", content));
             }
         }
-        messages.add(Map.of("role", "user", "content", userQuestion));
+        messages.add(Map.of("role", "user", "content", userQuestion == null ? "" : userQuestion));
 
         Map<String, Object> body = Map.of(
                 "model", model,
@@ -232,7 +220,6 @@ public class AIProviderService {
                 "temperature", 0.3,
                 "max_tokens", 1024
         );
-
         String jsonBody = objectMapper.writeValueAsString(body);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -241,7 +228,6 @@ public class AIProviderService {
                 .timeout(Duration.ofSeconds(25))
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
                 .build();
-
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() >= 200 && response.statusCode() < 300) {
             JsonNode root = objectMapper.readTree(response.body());
@@ -254,121 +240,64 @@ public class AIProviderService {
     }
 
     @SuppressWarnings("unchecked")
-    private String generateSmartSisFallback(String question, Map<String, Object> data) {
-        String q = question.toLowerCase();
+    private String generateLegacySisFallback(String question, Map<String, Object> data) {
+        String q = question == null ? "" : question.toLowerCase(Locale.ROOT);
         String fullName = String.valueOf(data.getOrDefault("fullName", "bạn"));
-        int accumulatedCredits = (int) data.getOrDefault("accumulatedCredits", 0);
+        int accumulatedCredits = toInt(data.get("accumulatedCredits"));
         Object gpa10 = data.getOrDefault("gpa10", "0.00");
         Object gpa4 = data.getOrDefault("gpa4", "0.00");
         List<Map<String, Object>> passed = (List<Map<String, Object>>) data.getOrDefault("passedCourses", List.of());
         List<Map<String, Object>> failed = (List<Map<String, Object>>) data.getOrDefault("failedCourses", List.of());
         List<Map<String, Object>> active = (List<Map<String, Object>>) data.getOrDefault("activeEnrollments", List.of());
 
-        // Câu hỏi về tín chỉ tích lũy
         if (q.contains("tín chỉ") || q.contains("tin chi") || q.contains("tích lũy") || q.contains("tich luy") || q.contains("credit")) {
-            int activeCredits = active.stream().mapToInt(a -> (int) a.getOrDefault("credits", 0)).sum();
+            int activeCredits = active.stream().mapToInt(a -> toInt(a.get("credits"))).sum();
+            return "Chào **" + fullName + "**,\n\n- **Tín chỉ tích lũy:** **" + accumulatedCredits + " TC**\n- **Tín chỉ đang học:** **" + activeCredits + " TC** (" + active.size() + " lớp)\n- **Môn chưa đạt:** " + failed.size();
+        }
+        if (q.contains("điểm") || q.contains("diem") || q.contains("gpa") || q.contains("kết quả") || q.contains("ket qua")) {
             StringBuilder sb = new StringBuilder();
-            sb.append("Chào **").append(fullName).append("**, theo dữ liệu thực tế từ hệ thống SIS:\n\n");
-            sb.append("- **Tổng số tín chỉ đã tích lũy (đã đạt):** **").append(accumulatedCredits).append(" tín chỉ** (qua ").append(passed.size()).append(" môn học).\n");
-            sb.append("- **Số tín chỉ đang theo học trong kỳ:** **").append(activeCredits).append(" tín chỉ** (").append(active.size()).append(" lớp học phần).\n");
-            if (!failed.isEmpty()) {
-                sb.append("- **Số môn chưa đạt:** ").append(failed.size()).append(" môn.\n");
-            }
+            sb.append("Tổng hợp kết quả học tập của **").append(fullName).append("**:\n- GPA hệ 10: **").append(gpa10).append("**\n- GPA hệ 4: **").append(gpa4).append("**\n");
+            for (Map<String, Object> p : passed) sb.append("- ").append(p.get("courseCode")).append(" - ").append(p.get("courseName")).append(": ").append(p.get("finalScore")).append("\n");
+            for (Map<String, Object> f : failed) sb.append("- [Chưa đạt] ").append(f.get("courseCode")).append(" - ").append(f.get("courseName")).append(": ").append(f.get("finalScore")).append("\n");
+            if (passed.isEmpty() && failed.isEmpty()) sb.append("- Hiện hệ thống chưa có dữ liệu điểm công bố.\n");
             return sb.toString();
         }
-
-        // Câu hỏi về điểm số / GPA
-        if (q.contains("điểm") || q.contains("diem") || q.contains("gpa") || q.contains("kết quả") || q.contains("ket qua") || q.contains("score")) {
-            StringBuilder sb = new StringBuilder();
-            sb.append("Tổng hợp kết quả học tập của **").append(fullName).append("**:\n\n");
-            sb.append("- **Điểm trung bình tích lũy (GPA hệ 10):** **").append(gpa10).append(" / 10**\n");
-            sb.append("- **Điểm trung bình tích lũy (GPA hệ 4):** **").append(gpa4).append(" / 4.0**\n\n");
-            if (passed.isEmpty() && failed.isEmpty()) {
-                sb.append("Hiện tại hệ thống **chưa có bảng điểm chính thức** nào được công bố cho bạn.");
-            } else {
-                sb.append("**Chi tiết điểm các môn đã công bố:**\n");
-                for (Map<String, Object> p : passed) {
-                    sb.append("- **").append(p.get("courseCode")).append(" - ").append(p.get("courseName"))
-                            .append("**: Điểm **").append(p.get("finalScore")).append("** (").append(p.get("classification")).append(")\n");
-                }
-                for (Map<String, Object> f : failed) {
-                    sb.append("- **[Chưa đạt]** ").append(f.get("courseCode")).append(" - ").append(f.get("courseName"))
-                            .append(": Điểm **").append(f.get("finalScore")).append("** (").append(f.get("classification")).append(")\n");
-                }
-            }
-            return sb.toString();
-        }
-
-        // Câu hỏi về môn học chưa hoàn thành / môn rớt / nợ môn
         if (q.contains("chưa hoàn thành") || q.contains("chua hoan thanh") || q.contains("nợ") || q.contains("rớt") || q.contains("rot") || q.contains("học lại")) {
             StringBuilder sb = new StringBuilder();
-            if (failed.isEmpty() && active.isEmpty()) {
-                sb.append("Hiện tại hệ thống chưa ghi nhận môn học nào bị rớt hoặc chưa hoàn thành đối với bạn.");
-            } else {
-                if (!failed.isEmpty()) {
-                    sb.append("**Các môn chưa đạt (cần học lại / cải thiện):**\n");
-                    for (Map<String, Object> f : failed) {
-                        sb.append("- **").append(f.get("courseCode")).append(" - ").append(f.get("courseName"))
-                                .append("** (").append(f.get("credits")).append(" TC) - Điểm: ").append(f.get("finalScore")).append("\n");
-                    }
-                    sb.append("\n");
-                } else {
-                    sb.append("Tuyệt vời! Bạn **không có môn học nào bị trượt/nợ điểm**.\n\n");
-                }
-                if (!active.isEmpty()) {
-                    sb.append("**Các lớp học phần bạn đang theo học (chưa kết thúc):**\n");
-                    for (Map<String, Object> a : active) {
-                        sb.append("- ").append(a.get("sectionCode")).append(" - **").append(a.get("courseName")).append("**\n");
-                    }
-                }
+            if (failed.isEmpty()) sb.append("Hiện hệ thống chưa ghi nhận môn chưa đạt theo dữ liệu điểm công bố.");
+            else {
+                sb.append("**Môn chưa đạt/cần cải thiện:**\n");
+                for (Map<String, Object> f : failed) sb.append("- ").append(f.get("courseCode")).append(" - ").append(f.get("courseName")).append(" (").append(f.get("credits")).append(" TC): ").append(f.get("finalScore")).append("\n");
             }
             return sb.toString();
         }
-
-        // Câu hỏi về đăng ký học phần / thời khóa biểu / đang học môn gì
-        if (q.contains("đăng ký") || q.contains("dang ky") || q.contains("môn nào") || q.contains("lớp") || q.contains("lịch") || q.contains("thời khóa biểu")) {
+        if (q.contains("đăng ký") || q.contains("dang ky") || q.contains("lớp") || q.contains("lop") || q.contains("lịch") || q.contains("lich") || q.contains("thời khóa biểu")) {
             StringBuilder sb = new StringBuilder();
-            if (active.isEmpty()) {
-                sb.append("Hiện tại bạn **chưa đăng ký lớp học phần nào** trong hệ thống.");
-            } else {
-                sb.append("**Danh sách các lớp học phần bạn đã đăng ký (").append(active.size()).append(" lớp):**\n\n");
-                for (Map<String, Object> a : active) {
-                    sb.append("- **").append(a.get("sectionCode")).append("** — ").append(a.get("courseName"))
-                            .append(" (").append(a.get("credits")).append(" TC)\n")
-                            .append("  + Giảng viên: ").append(a.get("lecturer")).append("\n")
-                            .append("  + Lịch học: ").append(a.get("schedule")).append("\n");
-                }
-            }
+            sb.append("**Lớp học phần đang học:** ").append(active.size()).append("\n");
+            for (Map<String, Object> a : active) sb.append("- ").append(a.get("sectionCode")).append(" - ").append(a.get("courseName")).append(" (").append(a.get("credits")).append(" TC), lịch: ").append(a.get("schedule")).append("\n");
+            if (active.isEmpty()) sb.append("- Hiện bạn chưa có lớp học phần ENROLLED trong hệ thống.\n");
             return sb.toString();
         }
-
-        // Câu hỏi tổng quát hoặc lời chào
-        return "Chào **" + fullName + "**! Tôi là **AI Study Assistant** của hệ thống SIS.\n\n"
-                + "Tóm tắt tình hình học tập thực tế hiện tại của bạn:\n"
-                + "- **Mã SV:** " + data.get("studentCode") + " | **Khoa:** " + data.get("department") + "\n"
-                + "- **Tín chỉ tích lũy:** **" + accumulatedCredits + " tín chỉ**\n"
-                + "- **GPA tích lũy:** **" + gpa10 + "/10** (" + gpa4 + "/4.0)\n"
-                + "- **Số lớp đang theo học:** **" + active.size() + " lớp**\n\n"
-                + "Bạn có thể hỏi cụ thể hơn như:\n"
-                + "- *\"Tôi đã tích lũy bao nhiêu tín chỉ?\"*\n"
-                + "- *\"Tôi đã đăng ký những môn nào?\"*\n"
-                + "- *\"Điểm môn học gần đây của tôi thế nào?\"*\n"
-                + "- *\"Tôi còn những môn nào chưa hoàn thành?\"*";
+        return "Chào **" + fullName + "**. GPA hiện tại **" + gpa10 + "/10** (" + gpa4 + "/4.0), tín chỉ tích lũy **" + accumulatedCredits + " TC**, đang học **" + active.size() + " lớp**. Bạn có thể hỏi về GPA, tín chỉ, điểm môn, môn chưa đạt, hoặc lớp đang đăng ký.";
     }
 
-    private List<String> detectSources(String question) {
-        String q = question.toLowerCase();
+    private List<String> detectSources(String question, Map<String, Object> data) {
+        String q = question == null ? "" : question.toLowerCase(Locale.ROOT);
         List<String> sources = new ArrayList<>();
-        if (q.contains("điểm") || q.contains("gpa") || q.contains("tín chỉ") || q.contains("hoàn thành")) {
-            sources.add("Academic Records & Grades");
+        if (q.contains("điểm") || q.contains("diem") || q.contains("gpa") || q.contains("tín chỉ") || q.contains("tin chi") || q.contains("hoàn thành") || data.containsKey("gpa10")) {
+            sources.add("Published Grades & Academic Records");
         }
-        if (q.contains("đăng ký") || q.contains("lớp") || q.contains("lịch") || q.contains("thời khóa biểu")) {
-            sources.add("Course Enrollments");
+        if (q.contains("đăng ký") || q.contains("dang ky") || q.contains("lớp") || q.contains("lop") || q.contains("lịch") || q.contains("lich") || data.containsKey("activeEnrollments")) {
+            sources.add("Enrollment Records");
         }
-        if (sources.isEmpty()) {
-            sources.add("Student SIS Profile");
-        }
+        if (sources.isEmpty()) sources.add("Student SIS Profile");
         return sources;
     }
-}
 
+    private int toInt(Object o) {
+        if (o instanceof Integer i) return i;
+        if (o instanceof Long l) return l.intValue();
+        if (o instanceof Number n) return n.intValue();
+        try { return Integer.parseInt(String.valueOf(o)); } catch (Exception e) { return 0; }
+    }
+}

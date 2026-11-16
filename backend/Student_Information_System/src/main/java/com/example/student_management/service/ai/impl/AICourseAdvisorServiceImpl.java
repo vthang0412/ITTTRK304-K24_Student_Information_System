@@ -19,6 +19,7 @@ import com.example.student_management.repository.auth.UserRepository;
 import com.example.student_management.service.ai.AICourseAdvisorService;
 import com.example.student_management.service.ai.AIProviderService;
 import com.example.student_management.service.grade.GradebookService;
+import com.example.student_management.service.timetable.ScheduleParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -28,8 +29,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -39,14 +38,14 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
 
     // Ma trận môn tiên quyết chuẩn ngành CNTT
     private static final Map<String, List<String>> PREREQUISITES = Map.of(
-            "INT3401", List.of("INT2204"),                     // Cấu trúc dữ liệu & giải thuật <- Lập trình hướng đối tượng
-            "INT3507", List.of("INT2204"),                     // Công nghệ phần mềm <- Lập trình hướng đối tượng
-            "INT3303", List.of("INT2204", "INT3306"),          // Lập trình web <- OOP, CSDL
-            "INT3405", List.of("INT3401", "MAT1013"),          // Trí tuệ nhân tạo <- CTDL&GT, Đại số tuyến tính
-            "INT3501", List.of("INT3306"),                     // Phân tích thiết kế hệ thống <- CSDL
-            "INT3305", List.of("INT3102"),                     // An toàn thông tin <- Mạng máy tính
-            "INT3202", List.of("INT3102", "INT3401"),          // Hệ điều hành <- Mạng máy tính, CTDL&GT
-            "INT3301", List.of("INT2204")                      // Ngôn ngữ lập trình <- OOP
+            "INT3401", List.of("INT2204"), // Cấu trúc dữ liệu & giải thuật <- Lập trình hướng đối tượng
+            "INT3507", List.of("INT2204"), // Công nghệ phần mềm <- Lập trình hướng đối tượng
+            "INT3303", List.of("INT2204", "INT3306"), // Lập trình web <- OOP, CSDL
+            "INT3405", List.of("INT3401", "MAT1013"), // Trí tuệ nhân tạo <- CTDL&GT, Đại số tuyến tính
+            "INT3501", List.of("INT3306"), // Phân tích thiết kế hệ thống <- CSDL
+            "INT3305", List.of("INT3102"), // An toàn thông tin <- Mạng máy tính
+            "INT3202", List.of("INT3102", "INT3401"), // Hệ điều hành <- Mạng máy tính, CTDL&GT
+            "INT3301", List.of("INT2204") // Ngôn ngữ lập trình <- OOP
     );
 
     @Autowired
@@ -96,14 +95,16 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
         long recentCalls = usageLogRepository.countByStudentIdAndCreatedAtAfter(
                 student.getId(), LocalDateTime.now().minusHours(1));
         if (recentCalls >= rateLimitPerHour) {
-            throw new BadRequestException("Bạn đã dùng hết " + rateLimitPerHour + " lượt gọi AI trong 1 giờ. Vui lòng chờ ít phút.");
+            throw new BadRequestException(
+                    "Bạn đã dùng hết " + rateLimitPerHour + " lượt gọi AI trong 1 giờ. Vui lòng chờ ít phút.");
         }
 
         advisorCache.remove(student.getId());
         return generateCourseAdvice(user, student, request);
     }
 
-    private CourseAdvisorResponseDto generateCourseAdvice(User user, Student student, CourseAdvisorRequestDto preferences) {
+    private CourseAdvisorResponseDto generateCourseAdvice(User user, Student student,
+            CourseAdvisorRequestDto preferences) {
         long startTime = System.currentTimeMillis();
 
         // 1. Lấy dữ liệu học tập thực tế từ SIS
@@ -118,10 +119,13 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
             boolean passed = Boolean.TRUE.equals(g.getPassed())
                     || (g.getFinalScore() != null && g.getFinalScore().compareTo(new BigDecimal("4.00")) >= 0);
             if (passed) {
-                if (g.getCourseCode() != null) completedCourseCodes.add(g.getCourseCode());
-                if (g.getCredits() != null) accumulatedCredits += g.getCredits();
+                if (g.getCourseCode() != null)
+                    completedCourseCodes.add(g.getCourseCode());
+                if (g.getCredits() != null)
+                    accumulatedCredits += g.getCredits();
             } else {
-                if (g.getCourseCode() != null) failedCourseCodes.add(g.getCourseCode());
+                if (g.getCourseCode() != null)
+                    failedCourseCodes.add(g.getCourseCode());
             }
         }
 
@@ -133,8 +137,10 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
         for (Enrollment e : enrollments) {
             if (e.getStatus() == EnrollmentStatus.ENROLLED && e.getCourseSection() != null) {
                 CourseSection sec = e.getCourseSection();
-                // Bỏ qua các lớp học phần đã hoàn thành, bị hủy hoặc thuộc môn sinh viên đã thi đạt
-                if (sec.getStatus() == CourseSectionStatus.COMPLETED || sec.getStatus() == CourseSectionStatus.CANCELLED) {
+                // Bỏ qua các lớp học phần đã hoàn thành, bị hủy hoặc thuộc môn sinh viên đã thi
+                // đạt
+                if (sec.getStatus() == CourseSectionStatus.COMPLETED
+                        || sec.getStatus() == CourseSectionStatus.CANCELLED) {
                     continue;
                 }
                 Course c = sec.getCourse();
@@ -143,8 +149,10 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
                 }
                 activeSections.add(sec);
                 if (c != null) {
-                    if (c.getCourseCode() != null) currentlyEnrolledCourseCodes.add(c.getCourseCode());
-                    if (c.getCredits() != null) activeCredits += c.getCredits();
+                    if (c.getCourseCode() != null)
+                        currentlyEnrolledCourseCodes.add(c.getCourseCode());
+                    if (c.getCredits() != null)
+                        activeCredits += c.getCredits();
                 }
             }
         }
@@ -221,7 +229,8 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
                         .missingPrerequisites(missingPrereqs)
                         .status("PREREQUISITE_NOT_MET")
                         .priority("LOW")
-                        .reason("Chưa đủ điều kiện tiên quyết. Cần hoàn thành các môn trước: " + String.join(", ", missingPrereqs) + ".")
+                        .reason("Chưa đủ điều kiện tiên quyết. Cần hoàn thành các môn trước: "
+                                + String.join(", ", missingPrereqs) + ".")
                         .availableSections(sectionOptions)
                         .build());
                 continue;
@@ -231,7 +240,8 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
             if (failedCourseCodes.contains(code)) {
                 String retakeReason = hasConflictFreeSection
                         ? "Môn học chưa đạt yêu cầu. Đã có lớp mở phù hợp, bạn nên ưu tiên đăng ký học lại sớm nhất để tích lũy tín chỉ."
-                        : (hasOpenSection ? "Môn học cần học lại nhưng các lớp mở đang bị trùng lịch hoặc hết chỗ." : "Môn học cần học lại nhưng hiện tại chưa có lớp học phần nào mở.");
+                        : (hasOpenSection ? "Môn học cần học lại nhưng các lớp mở đang bị trùng lịch hoặc hết chỗ."
+                                : "Môn học cần học lại nhưng hiện tại chưa có lớp học phần nào mở.");
 
                 recommendedList.add(0, CourseRecommendationItemDto.builder() // Đưa lên đầu danh sách
                         .courseId(course.getId())
@@ -282,7 +292,8 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
                 // Đủ điều kiện và có lớp hợp lệ
                 String priority = isPreferredCourse(code, preferences) ? "HIGH" : "MEDIUM";
                 String reason = isPreferredCourse(code, preferences)
-                        ? "Môn học thuộc đúng định hướng chuyên sâu (" + preferences.getCareerOrientation() + ") của bạn, đủ điều kiện tiên quyết và có lớp trống lịch."
+                        ? "Môn học thuộc đúng định hướng chuyên sâu (" + preferences.getCareerOrientation()
+                                + ") của bạn, đủ điều kiện tiên quyết và có lớp trống lịch."
                         : "Đã hoàn thành các môn tiên quyết, có lớp học phần đang mở còn chỗ và không bị trùng lịch học.";
 
                 recommendedList.add(CourseRecommendationItemDto.builder()
@@ -303,13 +314,16 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
 
         // Sắp xếp ưu tiên đề xuất: HIGH trước, sau đó đến MEDIUM
         recommendedList.sort((a, b) -> {
-            if ("HIGH".equals(a.getPriority()) && !"HIGH".equals(b.getPriority())) return -1;
-            if (!"HIGH".equals(a.getPriority()) && "HIGH".equals(b.getPriority())) return 1;
+            if ("HIGH".equals(a.getPriority()) && !"HIGH".equals(b.getPriority()))
+                return -1;
+            if (!"HIGH".equals(a.getPriority()) && "HIGH".equals(b.getPriority()))
+                return 1;
             return a.getCourseCode().compareTo(b.getCourseCode());
         });
 
         // 3. Tạo lời khuyên tổng quan AI (Advisor Summary)
-        String advisorSummary = buildAdvisorSummary(student, accumulatedCredits, activeCredits, recommendedList, preferences, startTime);
+        String advisorSummary = buildAdvisorSummary(student, accumulatedCredits, activeCredits, recommendedList,
+                preferences, startTime);
 
         String disclaimer = "Lưu ý: Các đề xuất môn học trên chỉ mang tính chất tham khảo học thuật từ dữ liệu thực tế hệ thống SIS. "
                 + "Hệ thống AI không tự động đăng ký hoặc hủy học phần; sinh viên vui lòng chủ động sử dụng chức năng Đăng ký học phần để hoàn tất đăng ký.";
@@ -333,11 +347,13 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
         return response;
     }
 
-    private List<CourseSectionOptionDto> buildSectionOptions(List<CourseSection> sections, List<CourseSection> activeSections) {
+    private List<CourseSectionOptionDto> buildSectionOptions(List<CourseSection> sections,
+            List<CourseSection> activeSections) {
         List<CourseSectionOptionDto> list = new ArrayList<>();
         for (CourseSection sec : sections) {
             int capacity = sec.getCapacity() != null ? sec.getCapacity() : 40;
-            long enrolledCount = enrollmentRepository.countByCourseSectionIdAndStatus(sec.getId(), EnrollmentStatus.ENROLLED);
+            long enrolledCount = enrollmentRepository.countByCourseSectionIdAndStatus(sec.getId(),
+                    EnrollmentStatus.ENROLLED);
             int remaining = Math.max(0, capacity - (int) enrolledCount);
             boolean isOpen = sec.getStatus() == CourseSectionStatus.OPEN;
 
@@ -347,7 +363,9 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
             list.add(CourseSectionOptionDto.builder()
                     .sectionId(sec.getId())
                     .sectionCode(sec.getSectionCode())
-                    .lecturerName((sec.getLecturer() != null && sec.getLecturer().getFullName() != null) ? sec.getLecturer().getFullName() : "Chưa phân công")
+                    .lecturerName((sec.getLecturer() != null && sec.getLecturer().getFullName() != null)
+                            ? sec.getLecturer().getFullName()
+                            : "Chưa phân công")
                     .schedule(sec.getSchedule() != null ? sec.getSchedule() : "Chưa xếp lịch")
                     .capacity(capacity)
                     .enrolledCount(enrolledCount)
@@ -366,7 +384,8 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
             return false;
         }
         String orient = pref.getCareerOrientation().toLowerCase();
-        if (orient.contains("di động") || orient.contains("mobile") || orient.contains("android") || orient.contains("ios")) {
+        if (orient.contains("di động") || orient.contains("mobile") || orient.contains("android")
+                || orient.contains("ios")) {
             return "INT3304".equals(courseCode);
         }
         if (orient.contains("ai") || orient.contains("trí tuệ nhân tạo")) {
@@ -390,23 +409,26 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
             int activeCredits,
             List<CourseRecommendationItemDto> recommended,
             CourseAdvisorRequestDto pref,
-            long startTime
-    ) {
+            long startTime) {
         StringBuilder prompt = new StringBuilder();
-        prompt.append("Sinh viên: ").append(student.getFullName()).append(" (").append(student.getStudentCode()).append(").\n");
-        prompt.append("Tín chỉ tích lũy: ").append(accumulatedCredits).append(", Tín chỉ đang học: ").append(activeCredits).append(".\n");
+        prompt.append("Sinh viên: ").append(student.getFullName()).append(" (").append(student.getStudentCode())
+                .append(").\n");
+        prompt.append("Tín chỉ tích lũy: ").append(accumulatedCredits).append(", Tín chỉ đang học: ")
+                .append(activeCredits).append(".\n");
         if (pref != null && pref.getCareerOrientation() != null && !pref.getCareerOrientation().isBlank()) {
             prompt.append("Định hướng chuyên sâu: ").append(pref.getCareerOrientation()).append(".\n");
         }
         prompt.append("Danh sách môn học đề xuất đăng ký: ");
         for (CourseRecommendationItemDto r : recommended) {
-            prompt.append(r.getCourseCode()).append(" - ").append(r.getCourseName()).append(" (").append(r.getCredits()).append(" TC, Ưu tiên: ").append(r.getPriority()).append("); ");
+            prompt.append(r.getCourseCode()).append(" - ").append(r.getCourseName()).append(" (").append(r.getCredits())
+                    .append(" TC, Ưu tiên: ").append(r.getPriority()).append("); ");
         }
 
         String sysInstruction = "Bạn là AI Course Advisor của trường đại học SIS. Hãy viết một đoạn tư vấn học tập ngắn gọn (3-4 câu tiếng Việt, định dạng Markdown) "
                 + "gợi ý sinh viên nên chọn đăng ký môn nào trong học kỳ tới dựa trên các môn đã thỏa mãn điều kiện tiên quyết và định hướng của họ. Không suy đoán số liệu.";
 
-        AIProviderService.AIProviderResult external = providerService.generateExternalAnalysis(sysInstruction, prompt.toString());
+        AIProviderService.AIProviderResult external = providerService.generateExternalAnalysis(sysInstruction,
+                prompt.toString());
 
         // Ghi log sử dụng AI
         try {
@@ -419,7 +441,8 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
                     .latencyMs(System.currentTimeMillis() - startTime)
                     .createdAt(LocalDateTime.now())
                     .build());
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         if (external.isSuccess() && external.getContent() != null && !external.getContent().isBlank()) {
             return external.getContent();
@@ -432,17 +455,22 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
 
         int totalRecCredits = recommended.stream().mapToInt(r -> r.getCredits() != null ? r.getCredits() : 0).sum();
         StringBuilder fallback = new StringBuilder();
-        fallback.append("Chào **").append(student.getFullName()).append("**, hệ thống đã phân tích dữ liệu tích lũy hiện tại (**")
+        fallback.append("Chào **").append(student.getFullName())
+                .append("**, hệ thống đã phân tích dữ liệu tích lũy hiện tại (**")
                 .append(accumulatedCredits).append(" tín chỉ**) và đề xuất **").append(recommended.size())
                 .append(" môn học phù hợp** (tổng cộng **").append(totalRecCredits).append(" tín chỉ**).\n\n");
 
-        Optional<CourseRecommendationItemDto> retake = recommended.stream().filter(r -> "MUST_RETAKE".equals(r.getStatus())).findFirst();
+        Optional<CourseRecommendationItemDto> retake = recommended.stream()
+                .filter(r -> "MUST_RETAKE".equals(r.getStatus())).findFirst();
         if (retake.isPresent()) {
-            fallback.append("- ⚠️ **Ưu tiên hàng đầu:** Bạn nên đăng ký học lại môn **").append(retake.get().getCourseName())
-                    .append(" (").append(retake.get().getCourseCode()).append(")** để hoàn thiện điều kiện tốt nghiệp.\n");
+            fallback.append("- ⚠️ **Ưu tiên hàng đầu:** Bạn nên đăng ký học lại môn **")
+                    .append(retake.get().getCourseName())
+                    .append(" (").append(retake.get().getCourseCode())
+                    .append(")** để hoàn thiện điều kiện tốt nghiệp.\n");
         }
 
-        List<CourseRecommendationItemDto> high = recommended.stream().filter(r -> "HIGH".equals(r.getPriority())).collect(Collectors.toList());
+        List<CourseRecommendationItemDto> high = recommended.stream().filter(r -> "HIGH".equals(r.getPriority()))
+                .collect(Collectors.toList());
         if (!high.isEmpty()) {
             fallback.append("- 🎯 **Môn học định hướng:** ");
             for (CourseRecommendationItemDto h : high) {
@@ -451,80 +479,47 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
             fallback.append("đây là các môn đã đủ điều kiện tiên quyết và có lớp mở thuận lợi.\n");
         }
 
-        fallback.append("- 💡 **Lưu ý tín chỉ:** Bạn đang học ").append(activeCredits).append(" tín chỉ. Khối lượng đăng ký tối đa mỗi kỳ là ")
+        fallback.append("- 💡 **Lưu ý tín chỉ:** Bạn đang học ").append(activeCredits)
+                .append(" tín chỉ. Khối lượng đăng ký tối đa mỗi kỳ là ")
                 .append(MAX_CREDITS_PER_SEMESTER).append(" tín chỉ để đảm bảo kết quả học tập tốt nhất.");
 
         return fallback.toString();
     }
 
     /**
-     * Kiểm tra xem lịch học của lớp mới có bị trùng với bất kỳ lớp nào sinh viên đang học không.
+     * Kiểm tra xem lịch học của lớp mới có bị trùng với bất kỳ lớp nào sinh viên
+     * đang học không.
      * Trả về tên lớp và lịch bị trùng nếu có xung đột, hoặc null nếu không trùng.
+     */
+    /**
+     * Kiểm tra xung đột lịch học giữa lớp mới và các lớp sinh viên đang học,
+     * dùng chung ScheduleParser với nghiệp vụ đăng ký/lịch lặp.
      */
     private String findScheduleConflict(String newSchedule, List<CourseSection> activeSections) {
         if (newSchedule == null || newSchedule.isBlank() || activeSections == null) {
             return null;
         }
-        List<ScheduleSlot> newSlots = parseSchedule(newSchedule);
-        if (newSlots.isEmpty()) return null;
+        List<ScheduleParser.Slot> newSlots = ScheduleParser.parse(newSchedule);
+        if (newSlots.isEmpty()) {
+            return null;
+        }
 
         for (CourseSection activeSec : activeSections) {
-            if (activeSec.getSchedule() == null || activeSec.getSchedule().isBlank()) continue;
-            List<ScheduleSlot> activeSlots = parseSchedule(activeSec.getSchedule());
-            for (ScheduleSlot n : newSlots) {
-                for (ScheduleSlot a : activeSlots) {
-                    if (n.day == a.day && Math.max(n.startMinutes, a.startMinutes) < Math.min(n.endMinutes, a.endMinutes)) {
+            if (activeSec.getSchedule() == null || activeSec.getSchedule().isBlank()) {
+                continue;
+            }
+            List<ScheduleParser.Slot> activeSlots = ScheduleParser.parse(activeSec.getSchedule());
+            for (ScheduleParser.Slot n : newSlots) {
+                for (ScheduleParser.Slot a : activeSlots) {
+                    if (n.dayOfWeek() == a.dayOfWeek()
+                            && n.startTime().isBefore(a.endTime())
+                            && a.startTime().isBefore(n.endTime())) {
                         return activeSec.getSectionCode() + " (" + activeSec.getSchedule() + ")";
                     }
                 }
             }
         }
         return null;
-    }
-
-    private static class ScheduleSlot {
-        int day; // 1: CN, 2: T2, 3: T3, ..., 7: T7
-        int startMinutes;
-        int endMinutes;
-
-        ScheduleSlot(int day, int startMinutes, int endMinutes) {
-            this.day = day;
-            this.startMinutes = startMinutes;
-            this.endMinutes = endMinutes;
-        }
-    }
-
-    private List<ScheduleSlot> parseSchedule(String scheduleText) {
-        List<ScheduleSlot> slots = new ArrayList<>();
-        if (scheduleText == null) return slots;
-
-        String[] parts = scheduleText.split(";");
-        Pattern timePattern = Pattern.compile("(\\d{1,2}):(\\d{2})\\s*[-–]\\s*(\\d{1,2}):(\\d{2})");
-
-        for (String part : parts) {
-            String lower = part.toLowerCase();
-            int day = 0;
-            if (lower.contains("thứ 2") || lower.contains("thứ hai") || lower.contains("thu 2")) day = 2;
-            else if (lower.contains("thứ 3") || lower.contains("thứ ba") || lower.contains("thu 3")) day = 3;
-            else if (lower.contains("thứ 4") || lower.contains("thứ tư") || lower.contains("thu 4")) day = 4;
-            else if (lower.contains("thứ 5") || lower.contains("thứ năm") || lower.contains("thu 5")) day = 5;
-            else if (lower.contains("thứ 6") || lower.contains("thứ sáu") || lower.contains("thu 6")) day = 6;
-            else if (lower.contains("thứ 7") || lower.contains("thứ bảy") || lower.contains("thu 7")) day = 7;
-            else if (lower.contains("chủ nhật") || lower.contains("cn")) day = 1;
-
-            if (day == 0) continue;
-
-            Matcher matcher = timePattern.matcher(part);
-            if (matcher.find()) {
-                int startHour = Integer.parseInt(matcher.group(1));
-                int startMin = Integer.parseInt(matcher.group(2));
-                int endHour = Integer.parseInt(matcher.group(3));
-                int endMin = Integer.parseInt(matcher.group(4));
-
-                slots.add(new ScheduleSlot(day, startHour * 60 + startMin, endHour * 60 + endMin));
-            }
-        }
-        return slots;
     }
 
     private User getStudentUser(String username) {
@@ -536,4 +531,3 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
         return user;
     }
 }
-

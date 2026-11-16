@@ -46,7 +46,7 @@ class AIChatServiceTest {
     private AIUsageLogRepository usageLogRepository;
 
     @Mock
-    private AIContextService contextService;
+    private AIChatToolsService toolsService;
 
     @Mock
     private AIProviderService providerService;
@@ -113,14 +113,14 @@ class AIChatServiceTest {
         when(conversationRepository.findByIdAndStudentId(100L, 10L)).thenReturn(Optional.of(sampleConversation));
         when(usageLogRepository.countByStudentIdAndCreatedAtAfter(eq(10L), any(LocalDateTime.class))).thenReturn(5L);
 
-        when(contextService.buildSystemContextPrompt(any(Student.class), any(User.class)))
-                .thenReturn("System prompt with real SIS student data");
-        when(contextService.getStudentAcademicSummary(any(Student.class), any(User.class)))
+        when(toolsService.getPublishedGrades(any(User.class))).thenReturn(List.of());
+        when(toolsService.computeGpaAndCredits(anyList()))
                 .thenReturn(Map.of("accumulatedCredits", 45, "gpa10", "3.20"));
 
         when(messageRepository.findByConversationIdOrderByCreatedAtAsc(100L)).thenReturn(List.of());
 
-        when(providerService.generateChatResponse(anyString(), anyList(), eq("Tôi đã tích lũy bao nhiêu tín chỉ?"), anyMap()))
+        when(providerService.generateChatResponse(
+                anyString(), anyList(), eq("Tôi đã tích lũy bao nhiêu tín chỉ?"), anyString(), anyList()))
                 .thenReturn(AIProviderService.AIProviderResult.builder()
                         .content("Bạn đã tích lũy được 45 tín chỉ.")
                         .providerUsed("SIS-ASSISTANT-ENGINE")
@@ -160,8 +160,14 @@ class AIChatServiceTest {
     @Test
     void getAcademicOverview_shouldReturnStudentSummary() {
         when(userRepository.findByUsername("student_an")).thenReturn(Optional.of(sampleUser));
-        when(contextService.getStudentAcademicSummary(sampleStudent, sampleUser))
-                .thenReturn(Map.of("studentCode", "SV24001", "accumulatedCredits", 45));
+        when(toolsService.getStudentProfile(sampleStudent))
+                .thenReturn(Map.of("studentCode", "SV24001"));
+        when(toolsService.getPublishedGrades(sampleUser)).thenReturn(List.of());
+        when(toolsService.computeGpaAndCredits(List.of()))
+                .thenReturn(Map.of("accumulatedCredits", 45));
+        when(toolsService.getAllEnrollments(sampleStudent)).thenReturn(List.of());
+        when(toolsService.summarizeEnrollments(List.of()))
+                .thenReturn(Map.of("items", List.of(), "activeCredits", 0));
 
         Map<String, Object> overview = aiChatService.getAcademicOverview("student_an");
 
@@ -170,4 +176,3 @@ class AIChatServiceTest {
         assertEquals(45, overview.get("accumulatedCredits"));
     }
 }
-

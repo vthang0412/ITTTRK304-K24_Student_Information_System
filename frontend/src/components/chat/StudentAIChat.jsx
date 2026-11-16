@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { aiChatApi } from '../../api';
 import { getErrorMessage } from '../../utils/format';
 import { BotIcon } from '../Icons';
+import { Modal, Spinner } from '../UI';
 import ChatHeader from './ChatHeader';
 import ChatMessages from './ChatMessages';
 import ChatInput from './ChatInput';
@@ -11,6 +13,7 @@ import './chat.css';
 
 const StudentAIChat = () => {
   const { user } = useAuth();
+  const toast = useToast();
 
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -25,6 +28,8 @@ const StudentAIChat = () => {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const [lastFailedText, setLastFailedText] = useState(null);
+  const [deleteConversationId, setDeleteConversationId] = useState(null);
+  const [deletingConversation, setDeletingConversation] = useState(false);
 
   // Tải danh sách các cuộc hội thoại
   const loadConversations = async (autoSelect = false) => {
@@ -104,12 +109,17 @@ const StudentAIChat = () => {
     loadMessages(id);
   };
 
-  // Xóa một cuộc hội thoại
-  const handleDeleteConversation = async (id) => {
+  const handleConfirmDeleteConversation = async () => {
+    if (deleteConversationId == null || deletingConversation) return;
+
+    const id = deleteConversationId;
+    setDeletingConversation(true);
     try {
       await aiChatApi.deleteConversation(id);
       const remaining = conversations.filter((c) => c.id !== id);
       setConversations(remaining);
+      setDeleteConversationId(null);
+      toast.success('Đã xóa cuộc trò chuyện', 'Cuộc trò chuyện và toàn bộ tin nhắn đã được xóa.');
 
       if (activeConversationId === id) {
         if (remaining.length > 0) {
@@ -123,7 +133,11 @@ const StudentAIChat = () => {
         }
       }
     } catch (err) {
-      setError(getErrorMessage(err, 'Không thể xóa cuộc trò chuyện.'));
+      const message = getErrorMessage(err, 'Không thể xóa cuộc trò chuyện.');
+      setError(message);
+      toast.error('Không thể xóa cuộc trò chuyện', message);
+    } finally {
+      setDeletingConversation(false);
     }
   };
 
@@ -246,7 +260,7 @@ const StudentAIChat = () => {
                 loading={loadingConversations}
                 onSelect={handleSelectConversation}
                 onNew={handleCreateNewConversation}
-                onDelete={handleDeleteConversation}
+                onDelete={setDeleteConversationId}
               />
             ) : (
               <>
@@ -268,6 +282,38 @@ const StudentAIChat = () => {
           </div>
         </div>
       )}
+      <Modal
+        open={deleteConversationId !== null}
+        title="Xóa cuộc trò chuyện?"
+        size="sm"
+        onClose={() => {
+          if (!deletingConversation) setDeleteConversationId(null);
+        }}
+        footer={(
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setDeleteConversationId(null)}
+              disabled={deletingConversation}
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={handleConfirmDeleteConversation}
+              disabled={deletingConversation}
+            >
+              {deletingConversation ? <><Spinner /> Đang xóa...</> : 'Xóa cuộc trò chuyện'}
+            </button>
+          </>
+        )}
+      >
+        <p className="muted" style={{ lineHeight: 1.65 }}>
+          Bạn có chắc chắn muốn xóa cuộc trò chuyện này không? Toàn bộ nội dung tin nhắn trong cuộc trò chuyện sẽ bị xóa và không thể khôi phục.
+        </p>
+      </Modal>
     </>
   );
 };

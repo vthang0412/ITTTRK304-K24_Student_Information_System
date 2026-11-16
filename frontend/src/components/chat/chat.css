@@ -266,7 +266,7 @@
   width: 52px;
   height: 52px;
   border-radius: 16px;
-  background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+  background: linear-gradient(135deg, var(--blue-100) 0%, var(--blue-50) 100%);
   color: var(--blue-600);
   display: flex;
   align-items: center;
@@ -418,7 +418,7 @@
 }
 
 .ai-bubble-text code {
-  background: rgba(15, 23, 42, 0.08);
+  background: var(--surface-2);
   padding: 2px 5px;
   border-radius: 4px;
   font-size: 12px;
@@ -505,7 +505,7 @@
 /* Error message banner */
 .ai-error-banner {
   background: var(--danger-bg);
-  border: 1px solid #fecaca;
+  border: 1px solid var(--danger);
   color: var(--danger);
   padding: 10px 14px;
   border-radius: 12px;
@@ -580,7 +580,7 @@
   height: 34px;
   border-radius: 10px;
   border: none;
-  background: var(--blue-600);
+  background: var(--button-primary);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -591,7 +591,7 @@
 }
 
 .ai-send-btn:hover:not(:disabled) {
-  background: var(--blue-700);
+  background: var(--button-primary-hover);
   transform: scale(1.05);
 }
 
@@ -652,7 +652,7 @@
 }
 
 .ai-new-chat-btn:hover {
-  background: var(--blue-600);
+  background: var(--button-primary);
   color: #ffffff;
   border-color: var(--blue-600);
 }

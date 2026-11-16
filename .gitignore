@@ -1,6 +1,8 @@
 # ---------- Secrets / environment ----------
 .env
 .env.*
+*.env
+*.env.*
 !.env.example
 *.local
 
@@ -45,6 +47,8 @@ backend/Student_Information_System/Student_Information_System_Postman_Collection
 # ---------- Deployment runtime state (created on the VPS) ----------
 deploy/.current_tag
 deploy/.previous_tag
+deploy/.current_schema_version
+deploy/.previous_schema_version
 deploy/.images.env
 deploy/backups/
 

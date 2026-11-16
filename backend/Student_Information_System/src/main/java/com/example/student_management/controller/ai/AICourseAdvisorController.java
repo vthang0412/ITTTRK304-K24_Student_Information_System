@@ -3,6 +3,7 @@ package com.example.student_management.controller.ai;
 import com.example.student_management.dto.ai.CourseAdvisorRequestDto;
 import com.example.student_management.dto.ai.CourseAdvisorResponseDto;
 import com.example.student_management.service.ai.AICourseAdvisorService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -43,7 +44,7 @@ public class AICourseAdvisorController {
     @PostMapping("/recommend")
     public ResponseEntity<Map<String, Object>> recommendCoursesWithPreferences(
             Authentication authentication,
-            @RequestBody(required = false) CourseAdvisorRequestDto request) {
+            @Valid @RequestBody(required = false) CourseAdvisorRequestDto request) {
         CourseAdvisorResponseDto recommendations = aiCourseAdvisorService.recommendCoursesWithPreferences(
                 authentication.getName(),
                 request != null ? request : new CourseAdvisorRequestDto()

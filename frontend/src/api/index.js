@@ -97,10 +97,43 @@ export const timetableApi = {
     }),
 };
 
+export const examScheduleApi = {
+  getAdmin: (params) => httpClient.get('/api/admin/exam-schedules', { params }),
+  getAdminById: (id) => httpClient.get(`/api/admin/exam-schedules/${id}`),
+  create: (data) => httpClient.post('/api/admin/exam-schedules', data),
+  update: (id, data) => httpClient.put(`/api/admin/exam-schedules/${id}`, data),
+  cancel: (id) => httpClient.patch(`/api/admin/exam-schedules/${id}/cancel`),
+  delete: (id) => httpClient.delete(`/api/admin/exam-schedules/${id}`),
+  getStudents: (id) => httpClient.get(`/api/admin/exam-schedules/${id}/students`),
+  getEligibleStudentCount: (sectionId) => httpClient.get(
+    `/api/admin/exam-schedules/course-sections/${sectionId}/eligible-student-count`,
+  ),
+  exportAdmin: (params) => httpClient.get('/api/admin/exam-schedules/export', {
+    params,
+    responseType: 'blob',
+  }),
+  exportStudents: (id) => httpClient.get(`/api/admin/exam-schedules/${id}/students/export`, {
+    responseType: 'blob',
+  }),
+  getMine: (params) => httpClient.get('/api/student/exam-schedules', { params }),
+  getMineById: (id) => httpClient.get(`/api/student/exam-schedules/${id}`),
+  exportMine: (params) => httpClient.get('/api/student/exam-schedules/export', {
+    params,
+    responseType: 'blob',
+  }),
+};
+
+export const examRoomApi = {
+  getAll: (params) => httpClient.get('/api/admin/exam-rooms', { params }),
+  create: (data) => httpClient.post('/api/admin/exam-rooms', data),
+  update: (id, data) => httpClient.put(`/api/admin/exam-rooms/${id}`, data),
+  delete: (id) => httpClient.delete(`/api/admin/exam-rooms/${id}`),
+  setStatus: (id, status) => httpClient.patch(`/api/admin/exam-rooms/${id}/status`, { status }),
+};
+
 export const gradeApi = {
   getGradesBySection: (sectionId) => httpClient.get(`/api/course-sections/${sectionId}/grades`),
   updateGrade: (enrollmentId, data) => httpClient.put(`/api/enrollments/${enrollmentId}/grade`, data),
-  getMyGrades: () => httpClient.get('/api/grades/me'),
 };
 
 export const gradebookApi = {

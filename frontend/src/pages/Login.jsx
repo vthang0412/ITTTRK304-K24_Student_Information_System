@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import AuthShell from '../components/AuthShell';
 import { Alert, Field } from '../components/UI';
 import { EyeIcon, EyeOffIcon, LockIcon, MailIcon } from '../components/Icons';
@@ -26,11 +26,25 @@ const Login = () => {
   const [skipAutoRedirect, setSkipAutoRedirect] = useState(false);
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const toast = useToast();
 
+  const redirectTarget = useMemo(() => {
+    const target = searchParams.get('redirect');
+    if (!target || !target.startsWith('/') || target.startsWith('//')) return '/dashboard';
+    if (['/login', '/register', '/forgot-password', '/reset-password'].includes(target)) return '/dashboard';
+    return target;
+  }, [searchParams]);
+
   useEffect(() => {
-    if (isAuthenticated && !skipAutoRedirect) navigate('/dashboard', { replace: true });
-  }, [isAuthenticated, navigate, skipAutoRedirect]);
+    if (searchParams.get('reason') === 'session_expired') {
+      setError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (isAuthenticated && !skipAutoRedirect) navigate(redirectTarget, { replace: true });
+  }, [isAuthenticated, navigate, redirectTarget, skipAutoRedirect]);
 
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -104,7 +118,7 @@ const Login = () => {
         duration: 1000,
       });
       window.setTimeout(() => {
-        navigate('/dashboard', { replace: true });
+        navigate(redirectTarget, { replace: true });
       }, 2200);
     } catch (err) {
       if (isDisabledAccount(err)) {

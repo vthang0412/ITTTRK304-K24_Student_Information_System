@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { authApi, enrollmentApi, gradeApi } from '../../api';
+import { authApi, enrollmentApi, studentApi } from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { LoadingBlock, PageHeader, StatCard, StatusBadge } from '../../components/UI';
@@ -27,7 +27,7 @@ const StudentProfile = () => {
         const [meRes, enrollRes, gradeRes] = await Promise.all([
           authApi.me(),
           enrollmentApi.getMyEnrollments(),
-          gradeApi.getMyGrades().catch(() => ({ data: [] })),
+          studentApi.getMyGrades().catch(() => ({ data: [] })),
         ]);
         if (!mounted) return;
         const me = meRes.data || {};
@@ -36,10 +36,14 @@ const StudentProfile = () => {
 
         const active = (enrollRes.data || []).filter((e) => e.status === 'ENROLLED');
         const grades = gradeRes.data || [];
-        const merged = active.map((e) => ({ ...e, grade: grades.find((g) => g.id === e.id)?.grade ?? e.grade }));
-        const credits = merged.reduce((sum, e) => sum + Number(e.courseSection?.course?.credits || 0), 0);
-        const scores = merged.map((e) => e.grade?.finalScore).filter((v) => v !== null && v !== undefined && v !== '');
-        const avg = scores.length ? (scores.reduce((s, v) => s + Number(v), 0) / scores.length).toFixed(2) : '—';
+        const gradeByEnrollmentId = new Map(grades.map((g) => [g.enrollmentId ?? g.id, g]));
+        const credits = active.reduce((sum, e) => sum + Number(e.courseSection?.course?.credits || 0), 0);
+        const scores = active
+          .map((e) => gradeByEnrollmentId.get(e.id)?.finalScore)
+          .filter((v) => v !== null && v !== undefined && v !== '')
+          .map(Number)
+          .filter((v) => Number.isFinite(v));
+        const avg = scores.length ? (scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(2) : '—';
         setStats({ enrollments: active.length, credits, average: avg });
       } catch {
         if (mounted) toast.error('Không tải được hồ sơ', 'Vui lòng thử lại sau.');
