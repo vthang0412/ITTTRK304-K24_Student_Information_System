@@ -332,7 +332,7 @@ const StudentNotifications = () => {
               padding: '7px 16px', borderRadius: 8, border: 'none',
               fontSize: 13, fontWeight: 600, cursor: 'pointer',
               transition: 'all .15s',
-              background: filter === key ? 'var(--primary)' : 'var(--surface-2)',
+              background: filter === key ? 'var(--button-primary)' : 'var(--surface-2)',
               color: filter === key ? '#fff' : 'var(--muted)',
             }}
           >

@@ -35,7 +35,8 @@ const LecturerSections = () => {
         const nextCounts = {};
         results.forEach((result, index) => {
           if (result.status === 'fulfilled') {
-            nextCounts[list[index].id] = (result.value.data || []).filter((e) => e.status === 'ENROLLED').length;
+            const enrollments = result.value.data;
+            nextCounts[list[index].id] = Array.isArray(enrollments) ? enrollments.length : 0;
           }
         });
         setCounts(nextCounts);

@@ -19,6 +19,7 @@ import com.example.student_management.repository.auth.UserRepository;
 import com.example.student_management.service.ai.AICourseAdvisorService;
 import com.example.student_management.service.ai.AIProviderService;
 import com.example.student_management.service.grade.GradebookService;
+import com.example.student_management.service.timetable.ScheduleParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -28,8 +29,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -492,82 +491,35 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
      * đang học không.
      * Trả về tên lớp và lịch bị trùng nếu có xung đột, hoặc null nếu không trùng.
      */
+    /**
+     * Kiểm tra xung đột lịch học giữa lớp mới và các lớp sinh viên đang học,
+     * dùng chung ScheduleParser với nghiệp vụ đăng ký/lịch lặp.
+     */
     private String findScheduleConflict(String newSchedule, List<CourseSection> activeSections) {
         if (newSchedule == null || newSchedule.isBlank() || activeSections == null) {
             return null;
         }
-        List<ScheduleSlot> newSlots = parseSchedule(newSchedule);
-        if (newSlots.isEmpty())
+        List<ScheduleParser.Slot> newSlots = ScheduleParser.parse(newSchedule);
+        if (newSlots.isEmpty()) {
             return null;
+        }
 
         for (CourseSection activeSec : activeSections) {
-            if (activeSec.getSchedule() == null || activeSec.getSchedule().isBlank())
+            if (activeSec.getSchedule() == null || activeSec.getSchedule().isBlank()) {
                 continue;
-            List<ScheduleSlot> activeSlots = parseSchedule(activeSec.getSchedule());
-            for (ScheduleSlot n : newSlots) {
-                for (ScheduleSlot a : activeSlots) {
-                    if (n.day == a.day
-                            && Math.max(n.startMinutes, a.startMinutes) < Math.min(n.endMinutes, a.endMinutes)) {
+            }
+            List<ScheduleParser.Slot> activeSlots = ScheduleParser.parse(activeSec.getSchedule());
+            for (ScheduleParser.Slot n : newSlots) {
+                for (ScheduleParser.Slot a : activeSlots) {
+                    if (n.dayOfWeek() == a.dayOfWeek()
+                            && n.startTime().isBefore(a.endTime())
+                            && a.startTime().isBefore(n.endTime())) {
                         return activeSec.getSectionCode() + " (" + activeSec.getSchedule() + ")";
                     }
                 }
             }
         }
         return null;
-    }
-
-    private static class ScheduleSlot {
-        int day; // 1: CN, 2: T2, 3: T3, ..., 7: T7
-        int startMinutes;
-        int endMinutes;
-
-        ScheduleSlot(int day, int startMinutes, int endMinutes) {
-            this.day = day;
-            this.startMinutes = startMinutes;
-            this.endMinutes = endMinutes;
-        }
-    }
-
-    private List<ScheduleSlot> parseSchedule(String scheduleText) {
-        List<ScheduleSlot> slots = new ArrayList<>();
-        if (scheduleText == null)
-            return slots;
-
-        String[] parts = scheduleText.split(";");
-        Pattern timePattern = Pattern.compile("(\\d{1,2}):(\\d{2})\\s*[-–]\\s*(\\d{1,2}):(\\d{2})");
-
-        for (String part : parts) {
-            String lower = part.toLowerCase();
-            int day = 0;
-            if (lower.contains("thứ 2") || lower.contains("thứ hai") || lower.contains("thu 2"))
-                day = 2;
-            else if (lower.contains("thứ 3") || lower.contains("thứ ba") || lower.contains("thu 3"))
-                day = 3;
-            else if (lower.contains("thứ 4") || lower.contains("thứ tư") || lower.contains("thu 4"))
-                day = 4;
-            else if (lower.contains("thứ 5") || lower.contains("thứ năm") || lower.contains("thu 5"))
-                day = 5;
-            else if (lower.contains("thứ 6") || lower.contains("thứ sáu") || lower.contains("thu 6"))
-                day = 6;
-            else if (lower.contains("thứ 7") || lower.contains("thứ bảy") || lower.contains("thu 7"))
-                day = 7;
-            else if (lower.contains("chủ nhật") || lower.contains("cn"))
-                day = 1;
-
-            if (day == 0)
-                continue;
-
-            Matcher matcher = timePattern.matcher(part);
-            if (matcher.find()) {
-                int startHour = Integer.parseInt(matcher.group(1));
-                int startMin = Integer.parseInt(matcher.group(2));
-                int endHour = Integer.parseInt(matcher.group(3));
-                int endMin = Integer.parseInt(matcher.group(4));
-
-                slots.add(new ScheduleSlot(day, startHour * 60 + startMin, endHour * 60 + endMin));
-            }
-        }
-        return slots;
     }
 
     private User getStudentUser(String username) {

@@ -134,7 +134,6 @@ export const examRoomApi = {
 export const gradeApi = {
   getGradesBySection: (sectionId) => httpClient.get(`/api/course-sections/${sectionId}/grades`),
   updateGrade: (enrollmentId, data) => httpClient.put(`/api/enrollments/${enrollmentId}/grade`, data),
-  getMyGrades: () => httpClient.get('/api/grades/me'),
 };
 
 export const gradebookApi = {

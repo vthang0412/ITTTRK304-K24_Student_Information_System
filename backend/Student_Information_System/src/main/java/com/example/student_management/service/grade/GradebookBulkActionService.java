@@ -95,67 +95,72 @@ public class GradebookBulkActionService {
         Set<Long> uniqueIds = new HashSet<>();
         int skippedCount = 0;
 
-        for (Long gradebookId : request.getGradebookIds()) {
-            if (!uniqueIds.add(gradebookId)) {
-                skippedCount++;
-                GradebookBulkActionItemResult skipped = skipped(gradebookId, "Bảng điểm bị trùng trong danh sách yêu cầu.");
-                results.add(skipped);
-                saveHistoryItem(operation, request.getAction(), skipped);
-                continue;
-            }
+        try {
+            for (Long gradebookId : request.getGradebookIds()) {
+                if (!uniqueIds.add(gradebookId)) {
+                    skippedCount++;
+                    GradebookBulkActionItemResult skipped = skipped(gradebookId, "Bảng điểm bị trùng trong danh sách yêu cầu.");
+                    results.add(skipped);
+                    saveHistoryItem(operation, request.getAction(), skipped);
+                    continue;
+                }
 
-            GradebookSummaryDto current;
-            try {
-                current = gradebookService.getGradebookSummary(gradebookId);
-            } catch (NotFoundException ex) {
-                GradebookBulkActionItemResult missing = failure(gradebookId, null, null, null, null,
-                        "Không tìm thấy bảng điểm.");
-                results.add(missing);
-                saveHistoryItem(operation, request.getAction(), missing);
-                continue;
-            }
+                GradebookSummaryDto current;
+                try {
+                    current = gradebookService.getGradebookSummary(gradebookId);
+                } catch (NotFoundException ex) {
+                    GradebookBulkActionItemResult missing = failure(gradebookId, null, null, null, null,
+                            "Không tìm thấy bảng điểm.");
+                    results.add(missing);
+                    saveHistoryItem(operation, request.getAction(), missing);
+                    continue;
+                }
 
-            String reason = eligibilityReason(request.getAction(), current);
-            if (reason != null) {
-                GradebookBulkActionItemResult failure = failure(gradebookId, current.getCourseCode(),
-                        current.getCourseName(), current.getSectionCode(), current.getSemesterName(), reason,
-                        current.getStatus());
-                results.add(failure);
-                saveHistoryItem(operation, request.getAction(), failure);
-                continue;
-            }
+                String reason = eligibilityReason(request.getAction(), current);
+                if (reason != null) {
+                    GradebookBulkActionItemResult failure = failure(gradebookId, current.getCourseCode(),
+                            current.getCourseName(), current.getSectionCode(), current.getSemesterName(), reason,
+                            current.getStatus());
+                    results.add(failure);
+                    saveHistoryItem(operation, request.getAction(), failure);
+                    continue;
+                }
 
-            try {
-                GradebookSummaryDto updated = apply(request.getAction(), gradebookId, actor);
-                GradebookBulkActionItemResult success = GradebookBulkActionItemResult.builder()
-                        .gradebookId(gradebookId)
-                        .courseCode(updated.getCourseCode())
-                        .courseName(updated.getCourseName())
-                        .sectionCode(updated.getSectionCode())
-                        .semesterName(updated.getSemesterName())
-                        .previousStatus(current.getStatus())
-                        .status(updated.getStatus())
-                        .successful(true)
-                        .message(successMessage(request.getAction()))
-                        .build();
-                results.add(success);
-                saveHistoryItem(operation, request.getAction(), success);
-            } catch (BadRequestException | ConflictException | NotFoundException ex) {
-                GradebookBulkActionItemResult failure = failure(gradebookId, current.getCourseCode(),
-                        current.getCourseName(), current.getSectionCode(), current.getSemesterName(),
-                        localizedFailure(ex.getMessage()), current.getStatus());
-                results.add(failure);
-                saveHistoryItem(operation, request.getAction(), failure);
+                try {
+                    GradebookSummaryDto updated = apply(request.getAction(), gradebookId, actor);
+                    GradebookBulkActionItemResult success = GradebookBulkActionItemResult.builder()
+                            .gradebookId(gradebookId)
+                            .courseCode(updated.getCourseCode())
+                            .courseName(updated.getCourseName())
+                            .sectionCode(updated.getSectionCode())
+                            .semesterName(updated.getSemesterName())
+                            .previousStatus(current.getStatus())
+                            .status(updated.getStatus())
+                            .successful(true)
+                            .message(successMessage(request.getAction()))
+                            .build();
+                    results.add(success);
+                    saveHistoryItem(operation, request.getAction(), success);
+                } catch (BadRequestException | ConflictException | NotFoundException ex) {
+                    GradebookBulkActionItemResult failure = failure(gradebookId, current.getCourseCode(),
+                            current.getCourseName(), current.getSectionCode(), current.getSemesterName(),
+                            localizedFailure(ex.getMessage()), current.getStatus());
+                    results.add(failure);
+                    saveHistoryItem(operation, request.getAction(), failure);
+                }
             }
+        } finally {
+            int successCount = (int) results.stream().filter(GradebookBulkActionItemResult::isSuccessful).count();
+            int failureCount = results.size() - successCount - skippedCount;
+            operation.setSuccessCount(successCount);
+            operation.setFailureCount(failureCount);
+            operation.setSkippedCount(skippedCount);
+            operation.setCompletedAt(LocalDateTime.now());
+            operationRepository.save(operation);
         }
 
         int successCount = (int) results.stream().filter(GradebookBulkActionItemResult::isSuccessful).count();
         int failureCount = results.size() - successCount - skippedCount;
-        operation.setSuccessCount(successCount);
-        operation.setFailureCount(failureCount);
-        operation.setSkippedCount(skippedCount);
-        operation.setCompletedAt(LocalDateTime.now());
-        operationRepository.save(operation);
         return GradebookBulkActionResponse.builder()
                 .operationCode(operation.getOperationCode())
                 .selectedCount(request.getGradebookIds().size())

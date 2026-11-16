@@ -58,14 +58,17 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:mysql://mysql:3306/${DB_NAME:-sis_db}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci
-      DB_USERNAME: ${DB_USERNAME:-sis_user}
+      DB_USERNAME: ${DB_USERNAME:?DB_USERNAME is required in .env}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required in .env}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required in .env}
-      # Demo seed data must never run in production.
-      SPRING_SQL_INIT_MODE: ${SPRING_SQL_INIT_MODE:-never}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
+      # Fixed in Compose so an .env override can never enable demo seeding.
+      SPRING_SQL_INIT_MODE: never
       SPRING_FLYWAY_ENABLED: ${SPRING_FLYWAY_ENABLED:-true}
-      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
-      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-}
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: ${SPRING_FLYWAY_BASELINE_ON_MIGRATE:-true}
+      SWAGGER_ENABLED: "false"
+      # Use a production-specific allowlist; never inherit the Dev variable.
+      APP_CORS_ALLOWED_ORIGINS: ${PROD_CORS_ALLOWED_ORIGINS:-}
       # Mail & OTP configuration
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp.gmail.com}
       SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
@@ -73,6 +76,12 @@ services:
       SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
       OTP_COOLDOWN_SECONDS: ${OTP_COOLDOWN_SECONDS:-60}
       OTP_MAX_REQUESTS_PER_HOUR: ${OTP_MAX_REQUESTS_PER_HOUR:-5}
+      ENROLLMENT_MAX_CREDITS_PER_SEMESTER: ${ENROLLMENT_MAX_CREDITS_PER_SEMESTER:-24}
+      AI_PROVIDER: ${AI_PROVIDER:-gemini}
+      AI_MODEL: ${AI_MODEL:-gemini-2.0-flash}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_RATE_LIMIT_PER_HOUR: ${AI_RATE_LIMIT_PER_HOUR:-60}
     volumes:
       - backend_uploads:/app/uploads
     healthcheck:

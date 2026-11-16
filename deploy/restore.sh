@@ -1,38 +1,33 @@
 #!/usr/bin/env bash
-# Restore a MySQL backup created by backup.sh.
-#
-# Usage:
-#   ./restore.sh backups/sis_YYYYMMDDTHHMMSSZ.sql.gz
-#   FORCE=1 ./restore.sh <file>   # non-interactive (CI/emergency only)
-#
-# This script is never called automatically by deploy.sh or the CD workflow.
-# It overwrites the current database contents. A confirmation is required
-# unless FORCE=1. Database volumes are never deleted.
+# Restore a matched MySQL + uploads backup set created by backup.sh.
 set -euo pipefail
 umask 077
 
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
+UPLOADS_VOLUME="${UPLOADS_VOLUME:-sis_backend_uploads}"
 DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DEPLOY_DIR"
 
 log()  { printf '==> %s\n' "$*"; }
 fail() { printf 'ERROR: %s\n' "$*" >&2; }
 
-if [[ $# -lt 1 ]]; then
-  fail "Missing backup file."
-  echo "Usage: ./restore.sh backups/sis_YYYYMMDDTHHMMSSZ.sql.gz" >&2
-  echo "Available backups:" >&2
-  find "${BACKUP_DIR:-$DEPLOY_DIR/backups}" -maxdepth 1 -type f -name 'sis_*.sql.gz' -printf '  %p\n' 2>/dev/null | sort || true
+[[ "$UPLOADS_VOLUME" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]] || {
+  fail "Invalid uploads volume name."
+  exit 1
+}
+
+if [[ $# -ne 1 ]]; then
+  fail "Provide the database archive from one backup set."
+  echo "Usage: ./restore.sh backups/sis_<UTC timestamp>.sql.gz[.gpg]" >&2
   exit 1
 fi
 
-BACKUP_FILE="$1"
-[[ -f "$BACKUP_FILE" ]] || { fail "Backup file not found: $BACKUP_FILE"; exit 1; }
+DB_ARCHIVE="$1"
+[[ -f "$DB_ARCHIVE" ]] || { fail "Database archive not found: $DB_ARCHIVE"; exit 1; }
 [[ -f .env ]] || { fail ".env is missing in ${DEPLOY_DIR}."; exit 1; }
-[[ -f "$COMPOSE_FILE" ]] || { fail "${COMPOSE_FILE} is missing in ${DEPLOY_DIR}."; exit 1; }
+[[ -f "$COMPOSE_FILE" ]] || { fail "${COMPOSE_FILE} is missing."; exit 1; }
 
-# docker compose validates the whole file even for "exec", so provide the
-# image variables that docker-compose.prod.yml requires.
+# Compose validates image variables even for exec/stop/start.
 IMAGE_TAG_IN="${IMAGE_TAG:-}"
 if [[ -z "$IMAGE_TAG_IN" && -f .current_tag ]]; then
   IMAGE_TAG_IN="$(tr -d '\r\n' < .current_tag)"
@@ -45,6 +40,27 @@ if [[ -f .images.env ]]; then
 fi
 export IMAGE_TAG="${IMAGE_TAG_IN:-${IMAGE_TAG:-latest}}"
 
+case "$DB_ARCHIVE" in
+  *.sql.gz.gpg) stem="${DB_ARCHIVE%.sql.gz.gpg}"; encrypted=1 ;;
+  *.sql.gz) stem="${DB_ARCHIVE%.sql.gz}"; encrypted=0 ;;
+  *) fail "Database archive must end with .sql.gz or .sql.gz.gpg."; exit 1 ;;
+esac
+UPLOADS_ARCHIVE="${stem}.uploads.tar.gz"
+[[ "$encrypted" == "1" ]] && UPLOADS_ARCHIVE="${UPLOADS_ARCHIVE}.gpg"
+MANIFEST="${stem}.sha256"
+[[ -f "$UPLOADS_ARCHIVE" ]] || { fail "Matching uploads archive not found: $UPLOADS_ARCHIVE"; exit 1; }
+[[ -f "$MANIFEST" ]] || { fail "Backup checksum manifest not found: $MANIFEST"; exit 1; }
+
+stream_archive() {
+  case "$1" in
+    *.gpg) gpg --batch --decrypt "$1" ;;
+    *) cat -- "$1" ;;
+  esac
+}
+
+log "Verifying checksums and both archives"
+bash ./verify-backup.sh "$DB_ARCHIVE"
+
 read_env_value() {
   local key="$1"
   local value
@@ -56,64 +72,58 @@ read_env_value() {
 DB_NAME="${DB_NAME:-$(read_env_value DB_NAME)}"
 DB_NAME="${DB_NAME:-sis_db}"
 
-log "Checking backup integrity: $BACKUP_FILE"
-gzip -t "$BACKUP_FILE" || { fail "Invalid gzip backup file: $BACKUP_FILE"; exit 1; }
-if ! gzip -dc "$BACKUP_FILE" | tail -n 5 | grep -q '^-- Dump completed'; then
-  fail "Backup is incomplete (missing 'Dump completed' marker): $BACKUP_FILE"
+if ! docker compose -f "$COMPOSE_FILE" --env-file .env ps --status running --services 2>/dev/null | grep -qx 'mysql'; then
+  fail "MySQL container is not running. Restore aborted."
   exit 1
 fi
-
-if ! docker compose -f "$COMPOSE_FILE" ps --status running --services 2>/dev/null | grep -qx 'mysql'; then
-  fail "MySQL container is not running. Start it before restoring."
+if ! docker volume inspect "$UPLOADS_VOLUME" >/dev/null 2>&1; then
+  fail "Uploads volume '${UPLOADS_VOLUME}' does not exist. Restore aborted."
   exit 1
 fi
-
-# Make sure the database named in .env is the one the container actually
-# exposes; restoring into a different database would silently lose data.
-ACTUAL_DB="$(docker compose -f "$COMPOSE_FILE" --env-file .env exec -T mysql printenv MYSQL_DATABASE | tr -d '\r\n' || true)"
-if [[ -n "$ACTUAL_DB" && "$ACTUAL_DB" != "$DB_NAME" ]]; then
-  fail "DB_NAME ('${DB_NAME}') does not match the container database ('${ACTUAL_DB}'). Restore aborted."
+ACTUAL_DB="$(docker compose -f "$COMPOSE_FILE" --env-file .env exec -T mysql printenv MYSQL_DATABASE | tr -d '\r\n')"
+if [[ "$ACTUAL_DB" != "$DB_NAME" ]]; then
+  fail "DB_NAME does not match the running MySQL container. Restore aborted."
   exit 1
 fi
 
 cat >&2 <<EOF
 
-WARNING: this will overwrite the contents of database '${DB_NAME}'.
-         Current data will be replaced by ${BACKUP_FILE}.
-         The application containers will be stopped during the restore.
-         The MySQL volume itself is not deleted.
+WARNING: this will replace database '${DB_NAME}' and all files in volume '${UPLOADS_VOLUME}'.
+         Both archives and checksums were validated before any data is changed.
+         A pre-restore backup set will be created before stopping the application.
 
 EOF
-
 if [[ "${FORCE:-0}" != "1" ]]; then
   read -r -p "Type the database name (${DB_NAME}) to continue: " answer
   [[ "$answer" == "$DB_NAME" ]] || { fail "Confirmation did not match. Restore aborted."; exit 1; }
 fi
 
-# Snapshot the current data before overwriting it. Skipping is only for the
-# case where the current database is already unusable.
-if [[ "${SKIP_PRE_RESTORE_BACKUP:-0}" != "1" ]]; then
-  log "Creating a safety backup of the current database"
-  COMPOSE_FILE="$COMPOSE_FILE" bash ./backup.sh || {
-    fail "Pre-restore backup failed. Set SKIP_PRE_RESTORE_BACKUP=1 only if the current database is unusable."
-    exit 1
-  }
-else
-  log "SKIP_PRE_RESTORE_BACKUP=1; not creating a safety backup."
-fi
+log "Creating a pre-restore backup of database and uploads"
+COMPOSE_FILE="$COMPOSE_FILE" UPLOADS_VOLUME="$UPLOADS_VOLUME" bash ./backup.sh || {
+  fail "Pre-restore backup failed; nothing has been changed."
+  exit 1
+}
 
-log "Stopping backend and frontend"
+log "Stopping frontend and backend"
 docker compose -f "$COMPOSE_FILE" --env-file .env stop frontend backend
 
-log "Restoring into database ${DB_NAME}"
-if ! gunzip -c "$BACKUP_FILE" | docker compose -f "$COMPOSE_FILE" --env-file .env exec -T mysql sh -c \
+log "Restoring database"
+if ! stream_archive "$DB_ARCHIVE" | gzip -dc | docker compose -f "$COMPOSE_FILE" --env-file .env exec -T mysql sh -c \
   'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot --default-character-set=utf8mb4 "$MYSQL_DATABASE"'; then
-  fail "Restore failed. The MySQL container is still running; inspect it before restarting the app."
+  fail "Database restore failed. Application containers remain stopped; inspect the database and pre-restore backup."
+  exit 1
+fi
+
+log "Replacing uploaded files from the matched archive"
+if ! stream_archive "$UPLOADS_ARCHIVE" | docker run --rm -i --network none \
+  --mount "type=volume,source=${UPLOADS_VOLUME},target=/data" \
+  alpine:3.20 sh -c \
+  'set -eu; find /data -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +; tar -xzf - -C /data'; then
+  fail "Uploads restore failed. Application containers remain stopped; recover from the pre-restore backup set."
   exit 1
 fi
 
 log "Starting backend and frontend"
 docker compose -f "$COMPOSE_FILE" --env-file .env start backend frontend
 docker compose -f "$COMPOSE_FILE" --env-file .env ps
-
-log "Restore completed. Verify the application and data before continuing."
+log "Database and uploads restored from the same backup set."

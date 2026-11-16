@@ -315,7 +315,7 @@ const LecturerGrades = () => {
                               {gl.label}
                             </span>
                             {gl.reason && (
-                              <div className="cell-muted" style={{ fontSize: 11, color: '#dc2626', marginTop: 2, fontWeight: 500 }}>
+                              <div className="cell-muted" style={{ fontSize: 11, color: 'var(--danger)', marginTop: 2, fontWeight: 500 }}>
                                 {gl.reason}
                               </div>
                             )}
