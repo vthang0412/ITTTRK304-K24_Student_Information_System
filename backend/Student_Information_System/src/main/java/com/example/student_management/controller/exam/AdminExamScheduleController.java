@@ -6,6 +6,7 @@ import com.example.student_management.dto.exam.ExamStudentDto;
 import com.example.student_management.entity.exam.ExamScheduleStatus;
 import com.example.student_management.entity.exam.ExamType;
 import com.example.student_management.service.exam.ExamScheduleService;
+import com.example.student_management.service.exam.ExamExcelExportService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -13,6 +14,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -30,6 +33,9 @@ public class AdminExamScheduleController {
     @Autowired
     private ExamScheduleService examScheduleService;
 
+    @Autowired
+    private ExamExcelExportService examExcelExportService;
+
     /**
      * 1. Danh sách lịch thi có phân trang, tìm kiếm và lọc
      */
@@ -37,6 +43,7 @@ public class AdminExamScheduleController {
     public ResponseEntity<Page<ExamScheduleDto>> searchSchedules(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Long semesterId,
+            @RequestParam(required = false) Long courseId,
             @RequestParam(required = false) ExamScheduleStatus status,
             @RequestParam(required = false) ExamType examType,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
@@ -51,7 +58,30 @@ public class AdminExamScheduleController {
                 ? Sort.Direction.DESC : Sort.Direction.ASC;
 
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by(direction, sortField));
-        return ResponseEntity.ok(examScheduleService.searchSchedules(keyword, semesterId, status, examType, fromDate, toDate, pageRequest));
+        return ResponseEntity.ok(examScheduleService.searchSchedules(keyword, semesterId, courseId, status, examType, fromDate, toDate, pageRequest));
+    }
+
+    @GetMapping("/course-sections/{sectionId}/eligible-student-count")
+    public ResponseEntity<Map<String, Long>> getEligibleStudentCount(@PathVariable Long sectionId) {
+        return ResponseEntity.ok(Map.of("count", examScheduleService.getEligibleStudentCount(sectionId)));
+    }
+
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportSchedules(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long semesterId,
+            @RequestParam(required = false) Long courseId,
+            @RequestParam(required = false) ExamScheduleStatus status,
+            @RequestParam(required = false) ExamType examType,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate
+    ) {
+        byte[] file = examExcelExportService.exportSchedules(
+                examScheduleService.getSchedulesForExport(keyword, semesterId, courseId, status, examType, fromDate, toDate));
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"Exam_Schedules.xlsx\"")
+                .body(file);
     }
 
     /**
@@ -107,6 +137,19 @@ public class AdminExamScheduleController {
     @GetMapping("/{id}/students")
     public ResponseEntity<List<ExamStudentDto>> getStudentsByScheduleId(@PathVariable Long id) {
         return ResponseEntity.ok(examScheduleService.getStudentsByScheduleId(id));
+    }
+
+    @GetMapping("/{id}/students/export")
+    public ResponseEntity<byte[]> exportStudentsByScheduleId(@PathVariable Long id) {
+        ExamScheduleDto schedule = examScheduleService.getScheduleById(id);
+        String context = "Môn học: " + schedule.getCourseName() + " (" + schedule.getCourseCode() + ")"
+                + " | Lớp: " + schedule.getSectionCode()
+                + " | Học kỳ: " + schedule.getSemesterName();
+        byte[] file = examExcelExportService.exportStudents(examScheduleService.getStudentsByScheduleId(id), context);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"Exam_Students_" + id + ".xlsx\"")
+                .body(file);
     }
 }
 

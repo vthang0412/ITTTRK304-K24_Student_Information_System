@@ -1,0 +1,153 @@
+.student-exam-schedule-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 34fr) repeat(3, minmax(0, 22fr));
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  margin-bottom: 20px;
+}
+
+.student-exam-schedule-filters .search-box,
+.student-exam-schedule-filters .search-box .input,
+.student-exam-schedule-filters .select {
+  width: 100%;
+  min-width: 0;
+  height: 43px;
+  min-height: 43px;
+  box-sizing: border-box;
+}
+
+.student-exam-schedule-filters .search-box {
+  flex: none;
+}
+
+.student-exam-schedules-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: visible;
+}
+
+.student-exam-schedules-table {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--surface);
+}
+
+.student-exam-schedules-table .student-col-course { width: 13%; }
+.student-exam-schedules-table .student-col-code { width: 8%; }
+.student-exam-schedules-table .student-col-section { width: 11%; }
+.student-exam-schedules-table .student-col-semester { width: 12%; }
+.student-exam-schedules-table .student-col-date { width: 9%; }
+.student-exam-schedules-table .student-col-time { width: 6%; }
+.student-exam-schedules-table .student-col-room { width: 10%; }
+.student-exam-schedules-table .student-col-type { width: 7%; }
+.student-exam-schedules-table .student-col-status { width: 10%; }
+.student-exam-schedules-table .student-col-detail { width: 8%; }
+
+.student-exam-schedules-table thead th {
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  line-height: 1.35;
+  text-align: left;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.student-exam-schedules-table tbody td {
+  padding: 12px 8px;
+  border-bottom: 1px solid #eef2f7;
+  color: var(--text-2);
+  font-size: 13.5px;
+  vertical-align: middle;
+}
+
+.student-exam-schedules-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.student-exam-schedules-table tbody tr:hover {
+  background: #f8fbff;
+}
+
+.student-exam-schedules-table th:nth-child(n+5),
+.student-exam-schedules-table td:nth-child(n+5) {
+  text-align: center;
+}
+
+.student-exam-schedules-table th:nth-child(8),
+.student-exam-schedules-table td:nth-child(8) {
+  text-align: left;
+}
+
+.student-exam-schedules-table td:nth-child(1) strong {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.4;
+}
+
+.student-exam-schedules-table td:nth-child(2),
+.student-exam-schedules-table td:nth-child(3),
+.student-exam-schedules-table td:nth-child(5),
+.student-exam-schedules-table td:nth-child(6),
+.student-exam-schedules-table td:nth-child(7),
+.student-exam-schedules-table td:nth-child(9),
+.student-exam-schedules-table td:nth-child(10),
+.student-exam-schedules-table td:nth-child(11) {
+  white-space: nowrap;
+}
+
+.student-exam-schedules-table td:nth-child(4),
+.student-exam-schedules-table td:nth-child(8) {
+  overflow-wrap: anywhere;
+}
+
+.student-exam-schedules-table td:nth-child(4) {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.student-exam-schedules-table .student-exam-detail-btn {
+  width: 56px;
+  min-width: 56px;
+  max-width: 56px;
+  height: 32px;
+  padding: 0 6px;
+}
+
+@media (max-width: 1199px) {
+  .student-exam-schedule-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .student-exam-schedules-table-wrap {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  .student-exam-schedules-table {
+    min-width: 1120px;
+    max-width: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .student-exam-schedule-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

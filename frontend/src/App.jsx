@@ -33,6 +33,9 @@ import StudentNotifications from './pages/student/StudentNotifications';
 import StudentFeedbacks from './pages/student/StudentFeedbacks';
 import LecturerFeedbacks from './pages/lecturer/LecturerFeedbacks';
 import AdminFeedbacks from './pages/admin/AdminFeedbacks';
+import AdminExamSchedules from './pages/admin/AdminExamSchedules';
+import AdminExamRooms from './pages/admin/AdminExamRooms';
+import StudentExamSchedules from './pages/student/StudentExamSchedules';
 
 const withLayout = (element, roles) => (
   <ProtectedRoute allowedRoles={roles}>
@@ -58,6 +61,7 @@ function App() {
             <Route path="/student/courses" element={withLayout(<StudentCourses />, ['STUDENT'])} />
             <Route path="/student/enrollments" element={withLayout(<StudentEnrollments />, ['STUDENT'])} />
             <Route path="/student/timetable" element={withLayout(<StudentTimetable />, ['STUDENT'])} />
+            <Route path="/student/exam-schedules" element={withLayout(<StudentExamSchedules />, ['STUDENT'])} />
             <Route path="/student/grades" element={withLayout(<StudentGrades />, ['STUDENT'])} />
             <Route path="/student/notifications" element={withLayout(<StudentNotifications />, ['STUDENT'])} />
             <Route path="/student/feedbacks" element={withLayout(<StudentFeedbacks />, ['STUDENT'])} />
@@ -75,6 +79,8 @@ function App() {
             <Route path="/admin/semesters" element={withLayout(<AdminSemesters />, ['ADMIN'])} />
             <Route path="/admin/sections" element={withLayout(<AdminSections />, ['ADMIN'])} />
             <Route path="/admin/timetable" element={withLayout(<AdminTimetable />, ['ADMIN'])} />
+            <Route path="/admin/exam-schedules" element={withLayout(<AdminExamSchedules />, ['ADMIN'])} />
+            <Route path="/admin/exam-rooms" element={withLayout(<AdminExamRooms />, ['ADMIN'])} />
             <Route path="/admin/enrollments" element={withLayout(<AdminEnrollments />, ['ADMIN'])} />
             <Route path="/admin/gradebooks" element={withLayout(<AdminGradebooks />, ['ADMIN'])} />
             <Route path="/admin/gradebook-config" element={withLayout(<AdminGradebookConfig />, ['ADMIN'])} />

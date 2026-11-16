@@ -12,11 +12,9 @@ const ChatConversations = ({
   onNew,
   onDelete,
 }) => {
-  const handleDelete = (e, id, title) => {
+  const handleDelete = (e, id) => {
     e.stopPropagation();
-    if (window.confirm(`Bạn có chắc chắn muốn xóa cuộc hội thoại "${title || 'này'}"?`)) {
-      onDelete(id);
-    }
+    onDelete(id);
   };
 
   return (
@@ -85,7 +83,7 @@ const ChatConversations = ({
                   type="button"
                   className="ai-conv-delete-btn"
                   title="Xóa hội thoại"
-                  onClick={(e) => handleDelete(e, item.id, item.title)}
+                  onClick={(e) => handleDelete(e, item.id)}
                   aria-label="Xóa cuộc hội thoại"
                 >
                   <TrashIcon size={14} />

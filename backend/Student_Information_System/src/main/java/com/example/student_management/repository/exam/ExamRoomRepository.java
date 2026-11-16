@@ -23,7 +23,7 @@ public interface ExamRoomRepository extends JpaRepository<ExamRoom, Long>, JpaSp
 
     @Query("SELECT r FROM ExamRoom r WHERE " +
             "(:status IS NULL OR r.status = :status) AND " +
-            "(:building IS NULL OR LOWER(r.building) = LOWER(:building)) AND " +
+            "(:building IS NULL OR LOWER(r.building) LIKE LOWER(CONCAT('%', :building, '%'))) AND " +
             "(:minCapacity IS NULL OR r.capacity >= :minCapacity) AND " +
             "(:keyword IS NULL OR LOWER(r.roomCode) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
             "OR LOWER(r.roomName) LIKE LOWER(CONCAT('%', :keyword, '%')) " +

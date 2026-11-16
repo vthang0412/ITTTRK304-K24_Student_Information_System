@@ -1,0 +1,209 @@
+.exam-print-area .admin-exam-schedule-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 11px;
+  align-items: stretch;
+}
+
+.admin-exam-schedule-filters .exam-schedule-filter-row {
+  display: grid;
+  grid-auto-rows: 43px;
+  gap: 12px;
+  min-width: 0;
+}
+
+.admin-exam-schedule-filters .exam-schedule-filter-row-main {
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+}
+
+.admin-exam-schedule-filters .exam-schedule-filter-row-dates {
+  grid-template-columns: 1.5fr 1.5fr 2fr;
+}
+
+.admin-exam-schedule-filters .exam-schedule-filter-field {
+  min-width: 0;
+}
+
+.admin-exam-schedule-filters .search-box,
+.admin-exam-schedule-filters .input,
+.admin-exam-schedule-filters .select {
+  width: 100%;
+  min-width: 0;
+  height: 43px;
+  min-height: 43px;
+  box-sizing: border-box;
+}
+
+.admin-exam-schedule-filters .search-box {
+  flex: none;
+}
+
+@media (max-width: 1199px) {
+  .admin-exam-schedule-filters .exam-schedule-filter-row-main,
+  .admin-exam-schedule-filters .exam-schedule-filter-row-dates {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .admin-exam-schedule-filters .exam-schedule-filter-row-main,
+  .admin-exam-schedule-filters .exam-schedule-filter-row-dates {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.exam-print-area .table-wrap.admin-exam-schedule-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: visible;
+}
+
+.admin-exam-schedule-table {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.admin-exam-schedule-table .exam-col-number { width: 3%; }
+.admin-exam-schedule-table .exam-col-course { width: 16%; }
+.admin-exam-schedule-table .exam-col-section { width: 10%; }
+.admin-exam-schedule-table .exam-col-semester { width: 11%; }
+.admin-exam-schedule-table .exam-col-date { width: 8%; }
+.admin-exam-schedule-table .exam-col-time { width: 9%; }
+.admin-exam-schedule-table .exam-col-room { width: 9%; }
+.admin-exam-schedule-table .exam-col-type { width: 6%; }
+.admin-exam-schedule-table .exam-col-status { width: 10%; }
+.admin-exam-schedule-table .exam-col-actions { width: 18%; }
+
+.admin-exam-schedule-table thead th {
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-align: left;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.admin-exam-schedule-table tbody td {
+  padding: 12px 8px;
+  border-bottom: 1px solid #eef2f7;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+
+.admin-exam-schedule-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.admin-exam-schedule-table tbody tr:hover {
+  background: #f8fbff;
+}
+
+.admin-exam-schedule-table .exam-header-number,
+.admin-exam-schedule-table .exam-header-date,
+.admin-exam-schedule-table .exam-header-time,
+.admin-exam-schedule-table .exam-header-type,
+.admin-exam-schedule-table .exam-header-status,
+.admin-exam-schedule-table .exam-header-actions,
+.admin-exam-schedule-table .exam-cell-number,
+.admin-exam-schedule-table .exam-cell-date,
+.admin-exam-schedule-table .exam-cell-time,
+.admin-exam-schedule-table .exam-cell-type,
+.admin-exam-schedule-table .exam-cell-status,
+.admin-exam-schedule-table .exam-cell-actions {
+  text-align: center;
+}
+
+.admin-exam-schedule-table .exam-header-number {
+  padding-right: 8px;
+  padding-left: 8px;
+  font-size: 9px;
+  letter-spacing: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.admin-exam-schedule-table .exam-cell-number,
+.admin-exam-schedule-table .exam-cell-date,
+.admin-exam-schedule-table .exam-cell-time,
+.admin-exam-schedule-table .exam-cell-section,
+.admin-exam-schedule-table .exam-cell-room,
+.admin-exam-schedule-table .exam-cell-type {
+  white-space: nowrap;
+}
+
+.admin-exam-schedule-table .exam-cell-course,
+.admin-exam-schedule-table .exam-cell-semester {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.admin-exam-schedule-table .exam-cell-course strong {
+  display: block;
+}
+
+.admin-exam-schedule-table .exam-cell-semester {
+  text-align: left;
+}
+
+.admin-exam-schedule-table .exam-cell-status .badge {
+  padding: 4px 5px;
+  gap: 4px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.admin-exam-schedule-table .exam-cell-actions {
+  white-space: nowrap;
+}
+
+.admin-exam-schedule-table .exam-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.admin-exam-schedule-table .exam-row-actions .btn {
+  flex: 0 0 36px;
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  height: 32px;
+  padding: 0 4px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.admin-exam-schedule-table .exam-action-placeholder {
+  display: inline-block;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 32px;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@media (max-width: 1199px) {
+  .exam-print-area .table-wrap.admin-exam-schedule-table-wrap {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-exam-schedule-table {
+    min-width: 1120px;
+    max-width: none;
+  }
+}

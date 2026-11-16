@@ -16,6 +16,7 @@ public interface ExamScheduleService {
     Page<ExamScheduleDto> searchSchedules(
             String keyword,
             Long semesterId,
+            Long courseId,
             ExamScheduleStatus status,
             ExamType examType,
             LocalDate fromDate,
@@ -24,6 +25,18 @@ public interface ExamScheduleService {
     );
 
     ExamScheduleDto getScheduleById(Long id);
+
+    long getEligibleStudentCount(Long courseSectionId);
+
+    List<ExamScheduleDto> getSchedulesForExport(
+            String keyword,
+            Long semesterId,
+            Long courseId,
+            ExamScheduleStatus status,
+            ExamType examType,
+            LocalDate fromDate,
+            LocalDate toDate
+    );
 
     ExamScheduleDto createSchedule(ExamScheduleRequest request);
 

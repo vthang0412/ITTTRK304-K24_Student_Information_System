@@ -58,6 +58,7 @@ public class ExamScheduleServiceImpl implements ExamScheduleService {
     public Page<ExamScheduleDto> searchSchedules(
             String keyword,
             Long semesterId,
+            Long courseId,
             ExamScheduleStatus status,
             ExamType examType,
             LocalDate fromDate,
@@ -65,8 +66,39 @@ public class ExamScheduleServiceImpl implements ExamScheduleService {
             Pageable pageable
     ) {
         String kw = (keyword != null && !keyword.trim().isEmpty()) ? keyword.trim() : null;
-        return examScheduleRepository.searchSchedules(kw, semesterId, status, examType, fromDate, toDate, pageable)
+        return examScheduleRepository.searchSchedules(kw, semesterId, courseId, status, examType, fromDate, toDate, pageable)
                 .map(this::mapToDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long getEligibleStudentCount(Long courseSectionId) {
+        if (!courseSectionRepository.existsById(courseSectionId)) {
+            throw new NotFoundException("Lớp học phần ID " + courseSectionId + " không tồn tại");
+        }
+        return enrollmentRepository.countByCourseSectionIdAndStatus(courseSectionId, EnrollmentStatus.ENROLLED);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ExamScheduleDto> getSchedulesForExport(
+            String keyword,
+            Long semesterId,
+            Long courseId,
+            ExamScheduleStatus status,
+            ExamType examType,
+            LocalDate fromDate,
+            LocalDate toDate
+    ) {
+        List<ExamScheduleDto> schedules = new ArrayList<>();
+        int page = 0;
+        Page<ExamScheduleDto> result;
+        do {
+            result = searchSchedules(keyword, semesterId, courseId, status, examType, fromDate, toDate,
+                    org.springframework.data.domain.PageRequest.of(page++, 500, org.springframework.data.domain.Sort.by("examDate").ascending()));
+            schedules.addAll(result.getContent());
+        } while (result.hasNext());
+        return schedules;
     }
 
     @Override

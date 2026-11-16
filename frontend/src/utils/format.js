@@ -84,6 +84,17 @@ export const toDateInput = (value) => {
   return date.toISOString().slice(0, 10);
 };
 
+export const downloadBlob = (data, filename) => {
+  const url = URL.createObjectURL(data instanceof Blob ? data : new Blob([data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
 export const toDateTimeInput = (value) => {
   if (!value) return '';
   const date = new Date(value);
