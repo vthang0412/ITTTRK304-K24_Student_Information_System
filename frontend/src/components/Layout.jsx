@@ -4,6 +4,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { notificationApi } from '../api';
+import StudentAIChat from './chat/StudentAIChat';
 import {
   AwardIcon, BellIcon, BookIcon, CalendarIcon, ChevronRightIcon,
   ClipboardIcon, DashboardIcon, LayersIcon, LogoutIcon, MenuIcon, PanelIcon,
@@ -360,6 +361,8 @@ const Layout = ({ children }) => {
 
         <main className="page-content">{children}</main>
       </div>
+
+      {user?.role === 'STUDENT' && <StudentAIChat />}
     </div>
   );
 };
