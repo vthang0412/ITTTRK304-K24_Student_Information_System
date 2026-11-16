@@ -2,6 +2,7 @@ package com.example.student_management.controller.ai;
 
 import com.example.student_management.dto.ai.*;
 import com.example.student_management.service.ai.AIStudyPlanService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,7 +28,7 @@ public class AIStudyPlanController {
     @PostMapping
     public ResponseEntity<Map<String, Object>> createStudyPlan(
             Authentication authentication,
-            @RequestBody(required = false) CreateStudyPlanRequestDto request) {
+            @Valid @RequestBody(required = false) CreateStudyPlanRequestDto request) {
         StudyPlanDto plan = aiStudyPlanService.createStudyPlan(
                 authentication.getName(),
                 request != null ? request : new CreateStudyPlanRequestDto()
@@ -71,7 +72,7 @@ public class AIStudyPlanController {
     public ResponseEntity<Map<String, Object>> updateStudyPlan(
             Authentication authentication,
             @PathVariable Long id,
-            @RequestBody UpdateStudyPlanRequestDto request) {
+            @Valid @RequestBody UpdateStudyPlanRequestDto request) {
         StudyPlanDto updated = aiStudyPlanService.updateStudyPlan(authentication.getName(), id, request);
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
@@ -101,7 +102,7 @@ public class AIStudyPlanController {
             Authentication authentication,
             @PathVariable Long id,
             @PathVariable Long itemId,
-            @RequestBody UpdateStudyPlanItemRequestDto request) {
+            @Valid @RequestBody UpdateStudyPlanItemRequestDto request) {
         StudyPlanItemDto updatedItem = aiStudyPlanService.updatePlanItem(authentication.getName(), id, itemId, request);
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);

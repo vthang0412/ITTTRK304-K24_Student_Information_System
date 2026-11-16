@@ -7,10 +7,13 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface NotificationReadRepository extends JpaRepository<NotificationRead, Long> {
     boolean existsByNotificationIdAndUserId(Long notificationId, Long userId);
+
+    Optional<NotificationRead> findByNotificationIdAndUserId(Long notificationId, Long userId);
 
     @Query("SELECT r.notification.id FROM NotificationRead r WHERE r.user.id = :userId AND r.notification.id IN :notificationIds")
     List<Long> findReadNotificationIdsByUserIdAndNotificationIds(@Param("userId") Long userId,

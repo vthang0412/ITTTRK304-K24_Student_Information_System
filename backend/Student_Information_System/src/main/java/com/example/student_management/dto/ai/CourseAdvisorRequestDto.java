@@ -1,5 +1,8 @@
 package com.example.student_management.dto.ai;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,8 +13,14 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CourseAdvisorRequestDto {
-    private String careerOrientation; // ví dụ: "Trí tuệ nhân tạo", "Phát triển Web", "An toàn thông tin", "Kỹ thuật phần mềm"
-    private Integer targetCredits;    // Số tín chỉ mong muốn đăng ký (mặc định: 15 - 18)
-    private String customNote;        // Ghi chú hoặc câu hỏi định hướng của sinh viên
+    @Size(max = 255)
+    private String careerOrientation;
+
+    @Min(1)
+    @Max(30)
+    private Integer targetCredits;
+
+    @Size(max = 2000)
+    private String customNote;
 }
 

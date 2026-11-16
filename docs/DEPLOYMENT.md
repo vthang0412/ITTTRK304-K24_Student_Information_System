@@ -40,54 +40,64 @@ sis-mysql (MySQL 8.0)                    <- volume sis_mysql_data, không publis
 | `.github/workflows/deploy.yml` | Workflow CD: chờ CI xong, build/push GHCR, SSH deploy, kiểm tra health. |
 | `deploy/docker-compose.prod.yml` | Stack production dùng image GHCR, volume bền vững, healthcheck, restart policy. |
 | `deploy/deploy.sh` | Backup DB, pull image, `up -d` không xoá volume, chờ health, smoke test, ghi tag. |
-| `deploy/backup.sh` | Dump MySQL nén `.sql.gz`, giữ N bản gần nhất. |
-| `deploy/rollback.sh` | Quay lại tag trước hoặc tag chỉ định. |
-| `deploy/restore.sh` | Khôi phục database từ file backup (có xác nhận, không tự chạy khi deploy). |
+| `deploy/backup.sh` | Tạo bộ backup database + uploads, checksum, tùy chọn GPG/offsite. |
+| `deploy/rollback.sh` | Rollback image về tag trước nếu schema còn tương thích; không downgrade database. |
+| `deploy/restore.sh` | Khôi phục database + uploads đồng bộ (có xác nhận, không tự chạy khi deploy). |
+| `deploy/verify-backup.sh` | Kiểm tra backup mà không sửa DB/volume. |
 | `deploy/env.production.example` | Mẫu `.env` production (chỉ placeholder, không chứa secret thật). |
 | `backend/.../application-dev.properties` | Profile development: Flyway + Hibernate validate, demo seed, Swagger, CORS localhost. |
 | `backend/.../application-prod.properties` | Profile production: Hibernate validate, không seed demo, Swagger tắt, Flyway. |
 | `backend/.../db/migration/V1__baseline_schema.sql` | Baseline schema cho database production mới. |
 | `deploy/nginx/sis.conf` | Mẫu reverse proxy Nginx trên host + hướng dẫn HTTPS. |
+| `deploy/nginx/sis-http.conf` | Cấu hình HTTP bootstrap trước khi có chứng chỉ TLS thật. |
 | `docs/DEPLOYMENT.md` | Tài liệu này. |
 | `.gitattributes` | Ép LF cho script/YAML để chạy đúng trên Ubuntu. |
 
-Không sửa nghiệp vụ, không đổi MySQL, không viết lại backend/frontend, không sửa CI hiện tại.
+CI kiểm thử backend/frontend, migrations và startup với MySQL riêng; CI/CD không kết nối Database Production.
 
 ---
 
 ## 3. Cách CI/CD hoạt động
 
 1. Push/merge vào `main`.
-2. Workflow `CI` hiện có chạy:
-   - Backend: Java 21 + `./gradlew build`.
+2. Workflow `CI` chạy:
+   - Backend: Java 21 + `./gradlew build` với MySQL service chỉ tồn tại trong job.
+   - Hai MySQL integration tests: database mới từ V1 đến V15 và fixture legacy baseline 6 lên V15;
+     cả hai phải khởi động Spring/Hibernate validate và fixture phải giữ nguyên dữ liệu.
    - Frontend: Node 22 + `npm ci`, `npm run lint`, `npm run build`.
+   - Compose và shell-script syntax validation.
 3. Khi `CI` kết thúc **thành công** trên `main`, workflow `Deploy to VPS` được kích hoạt bằng `workflow_run`.
 4. Job **Build and push**:
    - Checkout đúng commit SHA của lần CI.
    - Build backend và frontend.
-   - Gắn tag `<commit-sha>` và `latest`.
+   - Gắn tag bất biến `<commit-sha>` (có thể có alias `latest`, nhưng deploy không dùng alias này).
    - Push lên GHCR, dùng cache của GitHub Actions.
 5. Job **Deploy to Ubuntu VPS** (chỉ chạy khi CI thành công trên `main`, và cần approval nếu
    GitHub Environment `production` có required reviewers):
-   - Upload `docker-compose.prod.yml`, `deploy.sh`, `backup.sh`, `rollback.sh`, `restore.sh` lên `/opt/sis`.
+   - Upload Compose và các script deploy/backup/restore/verify lên `/opt/sis`.
    - SSH vào VPS (private key trong GitHub Secrets).
    - Nếu có `GHCR_PULL_TOKEN`, đăng nhập GHCR trên VPS trước khi pull.
    - Chạy `deploy.sh`.
 6. `deploy.sh`:
-   - Backup MySQL (khi stack đang chạy).
+   - Backup MySQL + uploads, rồi đọc Flyway version/failure state trước khi đổi image.
    - `docker compose pull backend frontend`.
-   - `docker compose up -d --remove-orphans` (không `down`, không `-v`).
-   - Chờ healthcheck `mysql`, `backend`, `frontend`.
+   - Chỉ recreate backend/frontend (`up -d --no-deps`); không restart MySQL, `down` hay `-v`.
+   - Chờ MySQL tối đa 240s, backend 540s, frontend 180s; GitHub deploy job có timeout 40 phút.
    - Smoke test frontend và proxy `/actuator/health` từ trong container.
-   - Chỉ ghi `.current_tag` sau khi tất cả thành công.
-7. Nếu container mới không healthy, `deploy.sh` tự động rollback về tag đang chạy trước đó
-   (khi `AUTO_ROLLBACK=1`), giữ nguyên volume database, kiểm tra health lại và báo lỗi rõ ràng.
-   Nếu rollback cũng thất bại, job fail và cần can thiệp thủ công.
+   - Chỉ ghi `.current_tag` và `.current_schema_version` sau khi health/smoke test thành công; ghi
+     `.previous_tag` cùng `.previous_schema_version` để kiểm tra khả năng tương thích rollback.
+7. Tự động rollback image chỉ được thử khi backend đã healthy và Flyway state không đổi, không có
+   migration lỗi. Nếu backend không healthy, schema tiến lên hoặc có migration lỗi, script **không**
+   tự rollback image vì phiên bản cũ có thể không tương thích. Database không bao giờ tự downgrade.
 8. Merge vào `develop`: CI chạy, sau đó workflow `Deploy` chỉ **build/push image tag dev** lên GHCR
    (tag commit SHA và `dev`). Không có bước deploy production từ `develop`.
 
+Các workflow pin GitHub Actions bằng commit SHA. Quyền `packages: write` chỉ cấp cho hai job build/push;
+job SSH deploy chỉ có `contents: read`. Manual workflow dispatch chạy từ `main` và chỉ chấp nhận
+rollback về tag SHA trước đó đã ghi nhận, không deploy một SHA tùy ý.
+
 > `workflow_run` chỉ chạy khi file `deploy.yml` đã có trên nhánh mặc định (`main`).
-> Lần đầu cần merge workflow này vào `main` (hoặc chạy `workflow_dispatch`).
+> Manual `workflow_dispatch` chỉ dùng để rollback về `.previous_tag` đã ghi nhận.
 
 ---
 
@@ -102,11 +112,13 @@ Vào **Repository → Settings → Secrets and variables → Actions**:
 | `VPS_SSH_PRIVATE_KEY` | Có | Nội dung **private key** (cả dòng `BEGIN`/`END`). |
 | `VPS_PORT` | Không | Mặc định `22`. **Không tự đổi SSH port đang dùng.** |
 | `VPS_DEPLOY_PATH` | Không | Mặc định `/opt/sis`. |
-| `VPS_KNOWN_HOSTS` | Nên có | Output của `ssh-keyscan`; nếu không có, workflow dùng `ssh-keyscan` và sẽ cảnh báo. |
+| `VPS_KNOWN_HOSTS` | Có | Host key đã xác minh cho VPS (dạng `known_hosts`; với SSH port khác 22 phải đúng `[host]:port`). Không có fallback `ssh-keyscan` trong workflow. |
 | `GHCR_PULL_TOKEN` | Không | PAT có quyền `read:packages`, dùng khi package GHCR để private. |
 | `GHCR_USER` | Không | Tài khoản sở hữu `GHCR_PULL_TOKEN`. Mặc định dùng `github.repository_owner`. |
 
 Không đưa `.env` production lên GitHub. `.env` chỉ nằm trên VPS.
+`GITHUB_TOKEN` do Actions cấp tự động; chỉ job build/push có `packages: write`. Job triển khai
+không nhận quyền ghi package.
 
 > `GHCR_USER` và `GHCR_PULL_TOKEN` phải thuộc **cùng một tài khoản**. Nếu dùng máy/tài khoản
 > riêng để pull, đặt `GHCR_USER` đúng username của token đó. Workflow không in token ra log;
@@ -195,7 +207,9 @@ sudo -u deploy chmod 600 /home/deploy/.ssh/authorized_keys
 ssh-keyscan -p 22 -H YOUR_VPS_HOST
 ```
 
-Dán output vào secret `VPS_KNOWN_HOSTS`.
+Dùng `ssh-keyscan -p <port> -H <host>` chỉ để thu thập candidate key, rồi đối chiếu fingerprint qua
+một kênh tin cậy (ví dụ VPS console/provider) trước khi lưu output vào secret `VPS_KNOWN_HOSTS`.
+Workflow từ chối thiếu secret hoặc file host key không hợp lệ và luôn bật `StrictHostKeyChecking=yes`.
 
 ### 5.4. Tạo production `.env` trên VPS
 
@@ -217,8 +231,13 @@ sudo chmod 600 /opt/sis/.env
 ```
 
 Lưu ý:
-- `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `JWT_SECRET` phải là giá trị thật, không dùng placeholder.
-- `SPRING_PROFILES_ACTIVE=prod` và `SPRING_SQL_INIT_MODE=never` là mặc định của production.
+- `DB_USERNAME`, `DB_PASSWORD`, `DB_ROOT_PASSWORD`, `JWT_SECRET` phải được cung cấp; không dùng placeholder.
+- `JWT_SECRET` phải có ít nhất 32 byte UTF-8. Ứng dụng từ chối giá trị placeholder và fail-fast
+  nếu thiếu secret hoặc secret quá ngắn.
+- Production Compose cố định `SPRING_PROFILES_ACTIVE=prod`, `SPRING_SQL_INIT_MODE=never` và
+  `SWAGGER_ENABLED=false`; các giá trị này không thể bị bật lại từ `.env`.
+- Production CORS chỉ đọc `PROD_CORS_ALLOWED_ORIGINS`; cấu hình Dev
+  `APP_CORS_ALLOWED_ORIGINS` không được truyền vào backend Production.
   Tài khoản demo `admin/123456` **không bao giờ** được seed vào production.
 - Flyway (`SPRING_FLYWAY_ENABLED=true`) tạo schema trên database mới từ `V1` đến `V9`.
   Với database đã có schema nhưng chưa có `flyway_schema_history`, Flyway baseline ở **version 6**
@@ -227,9 +246,11 @@ Lưu ý:
   thông báo, `V9` để lưu lịch sử lịch học có ngày hiệu lực. **Không hạ
   `spring.flyway.baseline-version` về 1.** Luôn backup và kiểm tra trước khi nâng cấp database cũ;
   Hibernate `validate` sẽ báo lỗi nếu schema vẫn lệch sau migration.
-- Production mặc định tắt Swagger (`SWAGGER_ENABLED=false`).
-- `SPRING_SQL_INIT_MODE` chỉ nên đổi khỏi `never` khi thật sự cần chạy seed có kiểm soát.
+- Production luôn tắt Swagger (`SWAGGER_ENABLED=false`); Compose và profile `prod` cố định trạng thái này.
+- `SPRING_SQL_INIT_MODE` được Compose và profile `prod` cố định là `never`; không bật seed demo ở Production.
 - Không commit file `.env` này.
+- Chỉ các file mẫu `.env.example` được theo dõi trong Git; file môi trường thật phải ở ngoài Git
+  và bị loại khỏi Docker build context.
 - **Không đổi `DB_PASSWORD`/`DB_ROOT_PASSWORD` sau khi volume MySQL đã được khởi tạo**: MySQL chỉ
   áp dụng các biến này ở lần init đầu tiên. Nếu muốn đổi, phải đổi trong MySQL trước.
 - Đổi `JWT_SECRET` sẽ làm các token cũ mất hiệu lực (người dùng phải đăng nhập lại).
@@ -269,27 +290,48 @@ Chờ DNS propagate trước khi chạy certbot.
 sudo apt install -y nginx certbot python3-certbot-nginx
 ```
 
-Copy `deploy/nginx/sis.conf` lên VPS (hoặc tạo file trực tiếp):
+Trước khi có chứng chỉ, dùng cấu hình bootstrap HTTP-only (không tạo chứng chỉ tự ký):
 
 ```bash
 # Từ máy local
-scp deploy/nginx/sis.conf deploy@YOUR_VPS_HOST:/tmp/sis.conf
+scp deploy/nginx/sis-http.conf deploy@YOUR_VPS_HOST:/tmp/sis-http.conf
 ```
 
 Trên VPS:
 
 ```bash
-sudo cp /tmp/sis.conf /etc/nginx/sites-available/sis
+sudo cp /tmp/sis-http.conf /etc/nginx/sites-available/sis
 sudo sed -i 's/sis.example.com/your-real-domain/g' /etc/nginx/sites-available/sis
 sudo ln -sf /etc/nginx/sites-available/sis /etc/nginx/sites-enabled/sis
-sudo rm -f /etc/nginx/sites-enabled/default
+sudo mkdir -p /var/www/html/.well-known/acme-challenge
 sudo nginx -t
 sudo systemctl reload nginx
-sudo certbot --nginx -d your-real-domain --redirect
+sudo certbot certonly --webroot -w /var/www/html -d your-real-domain
+```
+
+Chỉ sau khi Certbot xác nhận chứng chỉ hợp lệ, cài cấu hình HTTPS cuối cùng:
+
+```bash
+scp deploy/nginx/sis.conf deploy@YOUR_VPS_HOST:/tmp/sis-https.conf
+# Run on the VPS:
+sudo cp /tmp/sis-https.conf /etc/nginx/sites-available/sis
+sudo sed -i 's/sis.example.com/your-real-domain/g' /etc/nginx/sites-available/sis
+sudo nginx -t
+sudo systemctl reload nginx
 sudo certbot renew --dry-run
 ```
 
-Certbot sẽ tự thêm block `listen 443 ssl` và redirect HTTP → HTTPS.
+`sis.conf` yêu cầu file chứng chỉ thực tại `/etc/letsencrypt/live/<domain>/`; không cài/reload
+cấu hình này trước khi chứng chỉ đã được cấp. Cấu hình cuối giữ ACME challenge trên HTTP và redirect
+mọi request còn lại sang HTTPS. HSTS bật `includeSubDomains`; chỉ dùng khi tất cả subdomain đều luôn
+có HTTPS. CSP cho phép Google Fonts mà frontend hiện import, dùng hash cho script khởi tạo theme, và
+cho phép inline styles React hiện tại. Nếu thay nội dung script khởi tạo theme trong `frontend/index.html`,
+cần cập nhật hash CSP trong hai Nginx config và kiểm tra trên browser. Trang login/forgot/reset password
+bị rate-limit theo IP; monitor 429 sau khi bật.
+Firewall VPS chỉ mở 80/443 và SSH; cổng frontend vẫn bind loopback, MySQL không publish port.
+
+Giới hạn upload đồng bộ: avatar tối đa 5 MB; Spring multipart request và cả hai Nginx layer cho phép
+6 MB để dành chỗ cho multipart overhead.
 
 ### 6.3. Khi chưa có domain
 
@@ -314,16 +356,20 @@ sau đó đổi lại `127.0.0.1`.
 3. Theo dõi **Actions → CI → Deploy to VPS**.
 4. Job deploy chạy `deploy.sh` trên VPS.
 
-### 7.2. Deploy thủ công một tag có sẵn
+### 7.2. Rollback thủ công về bản ngay trước đó
 
-**Actions → Deploy to VPS → Run workflow**, nhập `image_tag` là commit SHA đã có image trên GHCR.
-Workflow này chỉ deploy, không build lại.
+**Actions → Deploy to VPS → Run workflow**, chọn nhánh `main` và nhập `image_tag` là commit SHA
+được ghi trong `.previous_tag`. Workflow này không build image; remote script xác nhận schema đang
+ở đúng version mà tag đích từng chạy cùng và tạo backup hợp lệ trước khi đổi image.
+
+Để triển khai phiên bản mới, không dùng workflow_dispatch; merge/push lên `main` để CI/CD build image
+và tự deploy SHA của commit vừa kiểm thử.
 
 Hoặc trực tiếp trên VPS:
 
 ```bash
 cd /opt/sis
-chmod +x deploy.sh backup.sh rollback.sh
+chmod +x deploy.sh backup.sh restore.sh verify-backup.sh rollback.sh
 IMAGE_TAG=<commit-sha> \
 BACKEND_IMAGE=ghcr.io/<owner>/<repo>-backend \
 FRONTEND_IMAGE=ghcr.io/<owner>/<repo>-frontend \
@@ -340,26 +386,31 @@ docker compose -f docker-compose.prod.yml --env-file .env ps
 docker inspect -f '{{.State.Health.Status}}' sis-mysql sis-backend sis-frontend
 curl -I http://127.0.0.1:8080/
 docker volume ls | grep sis_
-cat .current_tag .previous_tag 2>/dev/null
+cat .current_tag .previous_tag .current_schema_version .previous_schema_version 2>/dev/null
 ```
 
-Compose project được tách riêng: development mới là `sis-dev-local` (container `sis-dev-local-*`),
-production là `sis-prod` (container `sis-*`). Project `sis-dev-local` dùng volume riêng; stack
-development cũ `sis-dev` và volume của nó được giữ nguyên, không cần gỡ để chạy project mới.
-Không dùng `docker compose down -v`.
-MySQL development mặc định publish tại `127.0.0.1:3308` để không đụng cổng `3307` của stack khác;
-không đổi `.env.local` sang một container khác nếu chưa xác minh profile và Database đích.
-Để chạy stack dev mới mà không đọc/ghi root `.env`, tạo `.env.isolated` từ `.env.example`, đặt credential
-local riêng và chạy `docker compose --env-file .env.isolated up --build -d`. Stack dùng volume
-`sis-dev-local_mysql_data`; không thêm `-v` khi dừng stack.
+Compose project Dev là `sis-dev` (container `sis-dev-*`), Production là `sis-prod`
+(container `sis-*`). Development dùng volume riêng `sis-dev-isolated-mysql-data`;
+Production tiếp tục dùng volume hiện hữu `sis_mysql_data`. Không dùng
+`docker compose down -v` và không đổi tên/xóa volume Production.
+MySQL development mặc định publish tại `127.0.0.1:3307`, chỉ bind loopback.
+Để chạy stack Dev, tạo `.env.isolated` từ `.env.example`, đặt credential local riêng,
+sau đó chạy `docker compose --env-file .env.isolated up --build -d`. Lệnh này chỉ được
+chạy sau khi xác nhận container Dev không còn dùng volume Production.
 
 ---
 
 ## 8. Rollback
 
-Rollback chỉ đổi image tag, **không xoá volume**, và luôn backup DB trước khi đổi.
-`deploy.sh` tự rollback một lần khi tag mới không healthy (`AUTO_ROLLBACK=1`). `.previous_tag`
-không bao giờ trỏ về tag vừa thất bại, nên lần rollback kế tiếp không quay nhầm vào bản lỗi.
+Rollback chỉ đổi image tag, **không xoá volume và không downgrade database**. Trước khi deploy, script
+ghi version Flyway hiện tại; sau thành công, lưu version schema tương thích với từng tag hiện tại/trước.
+Rollback chỉ được phép đến `.previous_tag` khi `.previous_schema_version` khớp trạng thái Flyway hiện
+tại và tạo được backup DB/uploads hợp lệ. Nếu version khác hoặc có migration lỗi, cần đánh giá thủ công;
+không chạy image cũ trên schema mới chỉ vì container health thất bại.
+
+Automatic rollback chỉ thử khi backend đã healthy và trạng thái Flyway không thay đổi trong lần deploy.
+Backend không healthy, migration thất bại/đã tiến version, hoặc không đọc được history đều dẫn đến
+rollback bị chặn để tránh lệch schema-app. Không có lệnh Flyway downgrade tự động.
 
 ```bash
 cd /opt/sis
@@ -367,14 +418,14 @@ cd /opt/sis
 # Quay lại tag ngay trước đó (được ghi tự động sau mỗi deploy thành công)
 ./rollback.sh
 
-# Hoặc chỉ định tag cụ thể
+# Chỉ tag ngay trước đó mới có metadata schema để rollback an toàn
 ./rollback.sh <commit-sha>
-
-# Trường hợp khẩn cấp: MySQL không dump được nhưng vẫn cần quay lại image cũ
-SKIP_BACKUP=1 ./rollback.sh <commit-sha>
 ```
 
-Hoặc dùng **Actions → Deploy to VPS → Run workflow** với `image_tag` của phiên bản cũ.
+Nếu thiếu metadata `.previous_schema_version`, version database không khớp, hoặc backup thất bại,
+rollback bị từ chối. Không chạy downgrade Flyway tự động. Với schema đã tiến lên, giữ backend hiện tại
+hoặc triển khai bản sửa tương thích; chỉ khôi phục DB từ bộ backup đã xác minh theo quy trình mục 9
+sau khi có kế hoạch khôi phục và chấp thuận downtime.
 
 Sau rollback, kiểm tra lại health và dữ liệu:
 
@@ -400,39 +451,53 @@ cd /opt/sis
 ls -lh backups/
 ```
 
-File được lưu tại `/opt/sis/backups/sis_<UTC timestamp>.sql.gz`; mặc định giữ 10 bản gần nhất
-(`BACKUP_RETENTION` có thể đổi). Script kiểm tra gzip, file không rỗng và marker
-`-- Dump completed` để phát hiện dump bị cắt giữa chừng.
+Mỗi lần tạo một bộ cùng timestamp UTC `sis_<timestamp>` gồm:
+
+- `sis_<timestamp>.sql.gz`: dump MySQL với `--single-transaction`, `--quick`, `--hex-blob`,
+  routines, triggers và **events**. `--single-transaction` nhất quán cho InnoDB; tables MyISAM
+  (nếu có) vẫn có thể thay đổi trong lúc dump.
+- `sis_<timestamp>.uploads.tar.gz`: snapshot toàn volume `sis_backend_uploads`, gồm ảnh đại diện
+  và các uploads đang lưu tại `/app/uploads`.
+- `sis_<timestamp>.sha256`: checksum hai archive.
+
+Script từ chối nếu MySQL/volume không tồn tại; kiểm tra archive không rỗng, `gzip -t`, marker
+`-- Dump completed`, danh sách tar và checksum trước khi công bố manifest cuối. Không tự xóa backup
+cũ. Khi khai báo `BACKUP_GPG_RECIPIENT` (GPG public-key recipient), archive được mã hóa thành
+`.gpg` trước khi lưu; private key chỉ cần trên máy dùng để giải mã/restore. Có thể đặt
+`RCLONE_DEST=remote:bucket/sis` để upload và `rclone check --download` kiểm tra bộ backup; nên dùng
+remote `rclone crypt` hoặc GPG để mã hóa dữ liệu offsite. Có thể đặt hai biến trong file
+`/opt/sis/.backup.env` (shell-compatible, quyền `600`, không commit); backup script tự đọc file này.
+Lỗi upload/verify offsite làm lệnh backup thoát lỗi (bản local đã xác thực vẫn được giữ). Bảo vệ
+`/opt/sis/backups` quyền `700`, files `600`.
+
+Kiểm tra một bộ mà không sửa DB/volume:
+
+```bash
+./verify-backup.sh backups/sis_YYYYMMDDTHHMMSSZ.sql.gz
+# Với bộ mã hóa GPG, cần private key khả dụng:
+./verify-backup.sh backups/sis_YYYYMMDDTHHMMSSZ.sql.gz.gpg
+```
+
+Giữ bản offsite và thực hiện restore drill định kỳ trên một VPS/database/volume thử nghiệm riêng;
+không kiểm tra bằng cách restore lên Production.
 
 ### 9.2. Khôi phục
 
-Dừng ứng dụng để tránh ghi dữ liệu trong lúc restore:
-
-```bash
-cd /opt/sis
-docker compose -f docker-compose.prod.yml --env-file .env stop frontend backend
-
-gunzip -c backups/sis_YYYYMMDDTHHMMSSZ.sql.gz \
-  | docker compose -f docker-compose.prod.yml --env-file .env exec -T mysql sh -c \
-      'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot --default-character-set=utf8mb4 "$MYSQL_DATABASE"'
-
-docker compose -f docker-compose.prod.yml --env-file .env start backend frontend
-```
-
-Cách an toàn hơn là dùng script có kiểm tra và xác nhận:
+Khôi phục phải dùng đúng cặp DB/uploads từ cùng timestamp; script xác thực manifest, gzip, marker dump
+và tar trước khi ghi dữ liệu. Nó yêu cầu MySQL cùng uploads volume đang tồn tại, đối chiếu DB name,
+tạo backup an toàn cả DB + uploads trước, rồi mới hỏi xác nhận, dừng frontend/backend và phục hồi.
+Restore ghi đè database và thay toàn bộ nội dung volume uploads. Chạy trong maintenance window:
 
 ```bash
 cd /opt/sis
 ./restore.sh backups/sis_YYYYMMDDTHHMMSSZ.sql.gz
-# Chỉ dùng FORCE=1 trong tình huống khẩn cấp/CI:
-# FORCE=1 ./restore.sh backups/sis_YYYYMMDDTHHMMSSZ.sql.gz
+# Bộ đã mã hóa: private key GPG phải khả dụng.
+./restore.sh backups/sis_YYYYMMDDTHHMMSSZ.sql.gz.gpg
 ```
 
-`restore.sh` kiểm tra file tồn tại, kiểm tra `gzip -t` + marker `Dump completed`, đối chiếu tên
-database với container, tự tạo một backup an toàn trước khi ghi đè (bỏ qua bằng
-`SKIP_PRE_RESTORE_BACKUP=1` khi database hiện tại đã hỏng), hỏi xác nhận đúng tên database, dừng
-backend/frontend trong lúc restore và không bao giờ xoá volume. Script này **không** được gọi tự động
-từ `deploy.sh` hay workflow CD.
+Không dùng `FORCE=1` khi thao tác thủ công. Nếu restore DB hoặc uploads thất bại, ứng dụng được để dừng
+để tránh ghi lệch; khôi phục từ bộ pre-restore mà script vừa tạo sau khi điều tra. Script này **không**
+được gọi tự động bởi deploy/rollback/workflow. Không có lệnh xóa volume.
 
 `data.sql` (chỉ dùng ở development) bổ sung seed bằng `INSERT IGNORE` và **không có
 `TRUNCATE`/`DELETE`**, nên không xoá dữ liệu. Bản ghi demo ADMIN được tự sửa trạng thái/mật khẩu
@@ -451,15 +516,17 @@ Flyway validate checksum khi khởi động. Không sửa migration V1–V11 đ�
 hãy thêm migration tiến về phía trước và kiểm tra lịch sử database. Flyway chạy trước SQL
 initialization; chỉ profile DEV chạy `data.sql`, còn Production giữ `spring.sql.init.mode=never`.
 
-### 9.3. Backup tự động (cron hoặc systemd timer)
+### 9.3. Lịch backup tự động
 
-Ví dụ cron chạy hằng ngày lúc 02:00 (giữ tối đa `BACKUP_RETENTION` bản):
+Có thể lên lịch sau khi kiểm thử thủ công, cấu hình quyền thư mục, khóa GPG/offsite và cảnh báo khi job
+fail. Cron chạy hằng ngày lúc 02:00:
 
 ```cron
 0 2 * * * cd /opt/sis && ./backup.sh >> /var/log/sis-backup.log 2>&1
 ```
 
-Hoặc systemd timer:
+Khuyến nghị systemd timer/service để có logging và trạng thái dễ giám sát. Bảo đảm systemd truyền
+`BACKUP_GPG_RECIPIENT`/`RCLONE_DEST` nếu dùng; không đặt private key hoặc remote credentials trong Git.
 
 ```ini
 # /etc/systemd/system/sis-backup.service
@@ -471,6 +538,8 @@ WorkingDirectory=/opt/sis
 ExecStart=/opt/sis/backup.sh
 User=deploy
 Group=deploy
+# Optional, mode 600 and owned by deploy:
+EnvironmentFile=-/opt/sis/.backup.env
 ```
 
 ```ini
@@ -489,19 +558,26 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now sis-backup.timer
 ```
 
+Không có retention tự động trong script để tránh xóa bản cũ khi bộ mới chưa được xác minh. Thiết lập
+retention riêng sau khi xác nhận bản local và offsite; luôn giữ ít nhất một bản đã restore-drill.
+
 ### 9.4. Backup offsite
 
 Sao chép backup ra ngoài VPS sau mỗi lần chạy, ví dụ:
 
 ```bash
-# rclone (S3, Backblaze, Google Drive...)
-rclone copy /opt/sis/backups remote:sis-backups --include 'sis_*.sql.gz'
-
-# hoặc scp sang máy khác
-scp /opt/sis/backups/sis_*.sql.gz backup-host:/backups/sis/
+RCLONE_DEST=remote-crypt:sis-backups ./backup.sh
 ```
 
-Giữ file backup ở chế độ `600`, thư mục `700` (script đã đặt sẵn) và mã hoá offsite nếu có thể.
+`remote-crypt` phải là remote `rclone crypt` đã cấu hình khóa ngoài repository. Hoặc đặt
+`BACKUP_GPG_RECIPIENT` để script mã hóa local trước khi upload. Kiểm tra định kỳ file trên remote bằng
+`rclone check --download` (được script chạy khi `RCLONE_DEST` đặt) và thử restore từ bản offsite.
+Không lưu rclone credentials hoặc GPG private key trong repository; private key restore cần được bảo
+quản riêng và chỉ cài vào máy restore khi cần.
+
+Các bản `.sql.gz` cũ không có cặp uploads và manifest nên `restore.sh` mới sẽ từ chối chúng. Giữ
+nguyên các bản cũ; nếu cần phục hồi chúng, phải theo quy trình DB-only đã xác minh riêng và chấp nhận
+rằng avatars/uploads không được phục hồi từ các file đó.
 
 ---
 
@@ -511,15 +587,15 @@ Checklist bắt buộc trước khi coi là deploy thành công:
 
 | # | Kiểm tra | Lệnh / cách kiểm tra | Kết quả mong đợi |
 | --- | --- | --- | --- |
-| 1 | CI xanh | GitHub Actions → CI | Cả backend và frontend success |
-| 2 | Build và push GHCR | GitHub Actions → Deploy → Build and push | Có tag `<sha>` và `latest` |
+| 1 | CI xanh | GitHub Actions → CI | Backend/unit + MySQL migration integration + frontend lint/build success |
+| 2 | Build và push GHCR | GitHub Actions → Deploy → Build and push | Có image tag commit SHA; deploy không phụ thuộc `latest` |
 | 3 | SSH connection | Workflow bước Configure SSH / Upload | Không lỗi |
 | 4 | Pull image trên VPS | `docker compose ... pull` trong log deploy | Pull thành công |
 | 5 | Compose deployment | `docker compose ... ps` | 3 container `Up (healthy)` |
 | 6 | MySQL persistence | `docker volume ls \| grep sis_mysql_data` | Volume tồn tại |
 | 7 | Backend healthcheck | `docker inspect -f '{{.State.Health.Status}}' sis-backend` | `healthy` |
 | 8 | Frontend truy cập | `curl -I http://127.0.0.1:8080/` | HTTP 200 |
-| 9 | Swagger tắt mặc định | `curl -I https://domain/swagger-ui.html` | `404` (chỉ bật khi `SWAGGER_ENABLED=true`) |
+| 9 | Swagger bị tắt ở Production | `curl -I https://domain/swagger-ui.html` | `404` |
 | 10 | Health endpoint | `curl https://domain/actuator/health` | `{"status":"UP"}`, không lộ chi tiết DB |
 | 11 | Demo account không tồn tại | Đăng nhập `admin/123456` | Thất bại |
 | 12 | API login tài khoản thật | `POST https://domain/api/auth/login` | Trả token / 200 |
@@ -540,9 +616,11 @@ curl -i -X POST https://your-real-domain/api/auth/login \
 | Kiểm tra | Lệnh | Kết quả |
 | --- | --- | --- |
 | YAML workflow + compose | `python -c "import yaml; yaml.safe_load(...)"` | OK |
-| Shell syntax | `bash -n deploy/deploy.sh deploy/backup.sh deploy/rollback.sh` | OK |
+| Shell syntax | `bash -n deploy/deploy.sh deploy/backup.sh deploy/rollback.sh deploy/restore.sh deploy/verify-backup.sh` | OK |
 | Compose production | `IMAGE_TAG=test-sha docker compose -f deploy/docker-compose.prod.yml --env-file deploy/env.production.example config --quiet` | OK |
-| Port/volume resolve | `docker compose ... config` | MySQL không publish port; frontend chỉ `127.0.0.1:8080`; volume `sis_mysql_data`, `sis_backend_uploads` |
+| Port/volume resolve | `docker compose ... config` | Prod giữ volume `sis_mysql_data`; Dev dùng volume riêng `sis-dev-isolated-mysql-data` |
+| Flyway MySQL integration | `./gradlew build` với MySQL tạm riêng | Fresh V1–V15 + baseline-6 legacy V7–V15; backend/Hibernate validate khởi động, dữ liệu fixture được giữ |
+| Deploy/rollback guard | Docker mock + Flyway state tổng hợp | Deploy SHA lưu metadata; tự rollback bị chặn khi schema tiến; rollback thủ công bị chặn khi schema version khác |
 
 - **Chưa chạy trên VPS thật**, do chưa có thông tin VPS và chưa được phép deploy production.
 - Vì vậy **không tuyên bố deploy production thành công**. Cần người dùng thực hiện mục 5–7
@@ -560,19 +638,22 @@ curl -i -X POST https://your-real-domain/api/auth/login \
 4. Tạo GitHub Secrets ở mục 4 (bao gồm `GHCR_PULL_TOKEN` nếu package private).
 5. Tạo GitHub Environment `production` (Settings → Environments) và có thể bật required reviewers.
 6. Cấu hình DNS + host Nginx + certbot ở mục 6.
-7. Merge workflow vào `main` để kích hoạt CD, hoặc chạy `workflow_dispatch` với tag có sẵn.
+7. Merge workflow vào `main` để kích hoạt CD; chỉ dùng `workflow_dispatch` để rollback về SHA ngay trước đó.
 8. Chạy checklist mục 10 trên VPS thật.
-9. Sau lần deploy đầu, cân nhắc đặt `SPRING_SQL_INIT_MODE=never`.
+9. Production luôn cố định `SPRING_SQL_INIT_MODE=never`; Compose không cho phép bật seed qua `.env`.
 
 ---
 
 ## 12. Ghi chú an toàn
 
 - Không dùng `docker compose down -v`; `deploy.sh` không bao giờ gọi `down`.
-- Volume có tên cố định: `sis_mysql_data`, `sis_backend_uploads`.
+- Volume Production có tên cố định: `sis_mysql_data`, `sis_backend_uploads`; Dev dùng
+  `sis-dev-isolated-mysql-data`.
 - MySQL không publish port; frontend chỉ bind loopback.
 - Không log secret: workflow không in private key, password hay token.
   Token GHCR được truyền qua stdin của `docker login --password-stdin`.
 - Backup trước deploy; rollback dùng tag SHA, không dùng `latest`.
 - Không xoá image cũ ngay sau deploy để còn rollback.
 - `deploy.sh` chỉ ghi `.current_tag` sau khi health + smoke test thành công.
+- Nếu `.previous_schema_version` không khớp Flyway version hiện tại, không rollback image cũ và không tự
+  restore DB; cần đánh giá tương thích hoặc thực hiện quy trình restore đã được duyệt.

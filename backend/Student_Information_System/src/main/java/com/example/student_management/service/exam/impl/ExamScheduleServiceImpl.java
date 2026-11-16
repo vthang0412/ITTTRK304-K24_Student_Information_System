@@ -5,7 +5,10 @@ import com.example.student_management.dto.exam.ExamScheduleRequest;
 import com.example.student_management.dto.exam.ExamStudentDto;
 import com.example.student_management.entity.academic.CourseSection;
 import com.example.student_management.entity.academic.Enrollment;
+import com.example.student_management.entity.academic.CourseSectionSchedule;
 import com.example.student_management.entity.academic.EnrollmentStatus;
+import com.example.student_management.entity.academic.RecurringCourseSchedule;
+import com.example.student_management.entity.academic.Semester;
 import com.example.student_management.entity.auth.Role;
 import com.example.student_management.entity.auth.Student;
 import com.example.student_management.entity.auth.User;
@@ -19,19 +22,24 @@ import com.example.student_management.exception.ConflictException;
 import com.example.student_management.exception.ForbiddenException;
 import com.example.student_management.exception.NotFoundException;
 import com.example.student_management.repository.academic.CourseSectionRepository;
+import com.example.student_management.repository.academic.CourseSectionScheduleRepository;
+import com.example.student_management.repository.academic.RecurringCourseScheduleRepository;
 import com.example.student_management.repository.academic.EnrollmentRepository;
 import com.example.student_management.repository.auth.UserRepository;
 import com.example.student_management.repository.exam.ExamRoomRepository;
 import com.example.student_management.repository.exam.ExamScheduleRepository;
 import com.example.student_management.service.exam.ExamScheduleService;
+import com.example.student_management.service.timetable.ScheduleParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -49,6 +57,12 @@ public class ExamScheduleServiceImpl implements ExamScheduleService {
 
     @Autowired
     private EnrollmentRepository enrollmentRepository;
+
+    @Autowired
+    private CourseSectionScheduleRepository courseSectionScheduleRepository;
+
+    @Autowired
+    private RecurringCourseScheduleRepository recurringCourseScheduleRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -136,7 +150,10 @@ public class ExamScheduleServiceImpl implements ExamScheduleService {
         }
 
         // Kiểm tra xung đột lịch thi của sinh viên
+        validateLecturerExamConflict(section, request.getExamDate(), request.getStartTime(), request.getEndTime(), null);
+        validateLecturerClassConflict(section, request.getExamDate(), request.getStartTime(), request.getEndTime(), null);
         validateStudentConflict(section.getId(), request.getExamDate(), request.getStartTime(), request.getEndTime(), null);
+        validateStudentClassConflict(section.getId(), request.getExamDate(), request.getStartTime(), request.getEndTime());
 
         ExamSchedule schedule = ExamSchedule.builder()
                 .courseSection(section)
@@ -198,7 +215,10 @@ public class ExamScheduleServiceImpl implements ExamScheduleService {
         }
 
         // Kiểm tra xung đột lịch thi của sinh viên (bỏ qua chính lịch thi đang cập nhật)
+        validateLecturerExamConflict(section, request.getExamDate(), request.getStartTime(), request.getEndTime(), id);
+        validateLecturerClassConflict(section, request.getExamDate(), request.getStartTime(), request.getEndTime(), id);
         validateStudentConflict(section.getId(), request.getExamDate(), request.getStartTime(), request.getEndTime(), id);
+        validateStudentClassConflict(section.getId(), request.getExamDate(), request.getStartTime(), request.getEndTime());
 
         schedule.setCourseSection(section);
         schedule.setExamDate(request.getExamDate());
@@ -368,6 +388,162 @@ public class ExamScheduleServiceImpl implements ExamScheduleService {
     /**
      * Kiểm tra trùng lịch thi của sinh viên
      */
+    /**
+     * Kiểm tra trùng lịch thi của giảng viên phụ trách lớp học phần.
+     */
+    private void validateLecturerExamConflict(
+            CourseSection section,
+            LocalDate date,
+            LocalTime start,
+            LocalTime end,
+            Long excludeScheduleId
+    ) {
+        if (section == null || section.getLecturer() == null) {
+            return;
+        }
+        Long lecturerId = section.getLecturer().getId();
+        for (ExamSchedule other : examScheduleRepository.findByExamDateAndStatusNot(date, ExamScheduleStatus.CANCELLED)) {
+            if (excludeScheduleId != null && other.getId().equals(excludeScheduleId)) {
+                continue;
+            }
+            CourseSection otherSection = other.getCourseSection();
+            if (otherSection == null || otherSection.getLecturer() == null) {
+                continue;
+            }
+            if (!lecturerId.equals(otherSection.getLecturer().getId())) {
+                continue;
+            }
+            if (isTimeOverlapping(start, end, other.getStartTime(), other.getEndTime())) {
+                String courseName = otherSection.getCourse() != null ? otherSection.getCourse().getCourseName() : otherSection.getSectionCode();
+                throw new ConflictException(String.format(
+                        "Giảng viên %s bị trùng lịch thi với môn '%s' - lớp %s (khung giờ %s - %s)",
+                        section.getLecturer().getFullName(),
+                        courseName,
+                        otherSection.getSectionCode(),
+                        other.getStartTime(),
+                        other.getEndTime()
+                ));
+            }
+        }
+    }
+    private void validateLecturerClassConflict(
+            CourseSection section,
+            LocalDate date,
+            LocalTime start,
+            LocalTime end,
+            Long excludeScheduleId
+    ) {
+        if (section == null || section.getLecturer() == null) {
+            return;
+        }
+        for (CourseSection other : courseSectionRepository.findByLecturerId(section.getLecturer().getId())) {
+            if (other.getId() == null || other.getStatus() == com.example.student_management.entity.academic.CourseSectionStatus.CANCELLED) {
+                continue;
+            }
+            if (excludeScheduleId != null && other.getId().equals(section.getId())) {
+                // updating same section is fine; conflicts with its own class time are checked below for students/lecturer generally
+            }
+            for (ScheduleWindow window : effectiveWindows(other, date)) {
+                if (isTimeOverlapping(start, end, window.startTime(), window.endTime())) {
+                    String courseName = other.getCourse() != null ? other.getCourse().getCourseName() : other.getSectionCode();
+                    throw new ConflictException(String.format(
+                            "Giang vien %s bi trung lich day lop '%s' (%s) khung gio %s - %s",
+                            section.getLecturer().getFullName(), courseName, other.getSectionCode(),
+                            window.startTime(), window.endTime()));
+                }
+            }
+        }
+    }
+
+    private void validateStudentClassConflict(Long courseSectionId, LocalDate date, LocalTime start, LocalTime end) {
+        List<Enrollment> currentEnrollments = enrollmentRepository.findByCourseSectionIdAndStatus(
+                courseSectionId, EnrollmentStatus.ENROLLED);
+        if (currentEnrollments.isEmpty()) {
+            return;
+        }
+        Set<Long> studentIds = currentEnrollments.stream().map(Enrollment::getStudent)
+                .filter(Objects::nonNull).map(Student::getId).collect(Collectors.toSet());
+        Set<Long> checkedSections = new HashSet<>();
+        checkedSections.add(courseSectionId);
+        for (Long studentId : studentIds) {
+            for (Enrollment enrollment : enrollmentRepository.findByStudentIdAndStatus(studentId, EnrollmentStatus.ENROLLED)) {
+                CourseSection other = enrollment.getCourseSection();
+                if (other == null || !checkedSections.add(other.getId())
+                        || other.getStatus() == com.example.student_management.entity.academic.CourseSectionStatus.CANCELLED) {
+                    continue;
+                }
+                for (ScheduleWindow window : effectiveWindows(other, date)) {
+                    if (isTimeOverlapping(start, end, window.startTime(), window.endTime())) {
+                        Student student = currentEnrollments.stream().map(Enrollment::getStudent)
+                                .filter(s -> s != null && s.getId().equals(studentId)).findFirst().orElse(null);
+                        String studentName = student != null ? student.getFullName() + " (" + student.getStudentCode() + ")" : ("ID " + studentId);
+                        String courseName = other.getCourse() != null ? other.getCourse().getCourseName() : other.getSectionCode();
+                        throw new ConflictException(String.format(
+                                "Sinh vien %s bi trung lich hoc mon '%s' - Lop %s (khung gio %s - %s)",
+                                studentName, courseName, other.getSectionCode(), window.startTime(), window.endTime()));
+                    }
+                }
+            }
+        }
+    }
+
+    private List<ScheduleWindow> effectiveWindows(CourseSection section, LocalDate date) {
+        if (section == null || section.getSemester() == null) {
+            return List.of();
+        }
+        Semester semester = section.getSemester();
+        if (semester.getStartDate() == null || semester.getEndDate() == null
+                || date.isBefore(semester.getStartDate()) || date.isAfter(semester.getEndDate())) {
+            return List.of();
+        }
+        int dayOfWeek = date.getDayOfWeek().getValue();
+        List<ScheduleWindow> windows = new ArrayList<>();
+        List<RecurringCourseSchedule> recurring = recurringCourseScheduleRepository
+                .findByCourseSectionIdOrderByDayOfWeekAscStartTimeAsc(section.getId());
+        if (!recurring.isEmpty()) {
+            for (RecurringCourseSchedule rule : recurring) {
+                if (rule.getDayOfWeek() == null || rule.getDayOfWeek() != dayOfWeek) continue;
+                if (date.isBefore(rule.getStartDate()) || date.isAfter(rule.getEndDate())) continue;
+                if (rule.getCancelledFrom() != null && !date.isBefore(rule.getCancelledFrom())) continue;
+                if (rule.getStartTime() != null && rule.getEndTime() != null) {
+                    windows.add(new ScheduleWindow(rule.getStartTime(), rule.getEndTime()));
+                }
+            }
+            return windows;
+        }
+
+        List<CourseSectionSchedule> history = courseSectionScheduleRepository
+                .findByCourseSectionIdOrderByEffectiveFromAsc(section.getId());
+        if (history.isEmpty()) {
+            addParsedWindows(windows, section.getSchedule(), date, semester.getStartDate(), semester.getEndDate(), null);
+            return windows;
+        }
+        for (CourseSectionSchedule entry : history) {
+            LocalDate from = entry.getEffectiveFrom() != null ? entry.getEffectiveFrom() : semester.getStartDate();
+            LocalDate to = entry.getEffectiveTo() != null ? entry.getEffectiveTo() : semester.getEndDate();
+            if (date.isBefore(from) || date.isAfter(to)) continue;
+            if (entry.getCancelledFrom() != null && !date.isBefore(entry.getCancelledFrom())) continue;
+            addParsedWindows(windows, entry.getSchedule(), date, from, to, entry.getCancelledFrom());
+        }
+        return windows;
+    }
+
+    private void addParsedWindows(List<ScheduleWindow> windows, String rawSchedule, LocalDate date,
+                                  LocalDate from, LocalDate to, LocalDate cancelledFrom) {
+        if (rawSchedule == null || rawSchedule.isBlank()) return;
+        if (date.isBefore(from) || date.isAfter(to)) return;
+        if (cancelledFrom != null && !date.isBefore(cancelledFrom)) return;
+        int dayOfWeek = date.getDayOfWeek().getValue();
+        for (ScheduleParser.Slot slot : ScheduleParser.parse(rawSchedule)) {
+            if (slot.dayOfWeek() == dayOfWeek) {
+                windows.add(new ScheduleWindow(slot.startTime(), slot.endTime()));
+            }
+        }
+    }
+
+    private record ScheduleWindow(LocalTime startTime, LocalTime endTime) {}
+
+
     private void validateStudentConflict(
             Long courseSectionId,
             LocalDate date,
@@ -377,54 +553,57 @@ public class ExamScheduleServiceImpl implements ExamScheduleService {
     ) {
         List<Enrollment> currentEnrollments = enrollmentRepository.findByCourseSectionIdAndStatus(
                 courseSectionId, EnrollmentStatus.ENROLLED);
-
         if (currentEnrollments.isEmpty()) {
             return;
         }
 
-        Map<Long, Student> studentMap = currentEnrollments.stream()
+        Set<Long> studentIds = currentEnrollments.stream()
                 .map(Enrollment::getStudent)
                 .filter(Objects::nonNull)
-                .collect(Collectors.toMap(Student::getId, s -> s, (a, b) -> a));
+                .map(Student::getId)
+                .collect(Collectors.toSet());
 
-        Set<Long> studentIds = studentMap.keySet();
+        List<ExamSchedule> overlappingSchedules = examScheduleRepository.findByExamDateAndStatusNot(
+                date, ExamScheduleStatus.CANCELLED).stream()
+                .filter(other -> excludeScheduleId == null || !other.getId().equals(excludeScheduleId))
+                .filter(other -> other.getCourseSection() != null
+                        && !other.getCourseSection().getId().equals(courseSectionId))
+                .filter(other -> isTimeOverlapping(start, end, other.getStartTime(), other.getEndTime()))
+                .toList();
+        if (overlappingSchedules.isEmpty()) {
+            return;
+        }
 
-        // Lấy tất cả lịch thi cùng ngày (không CANCELLED)
-        List<ExamSchedule> sameDaySchedules = examScheduleRepository.findByExamDateAndStatusNot(
-                date, ExamScheduleStatus.CANCELLED);
+        Map<Long, ExamSchedule> scheduleBySectionId = overlappingSchedules.stream()
+                .collect(Collectors.toMap(sc -> sc.getCourseSection().getId(), sc -> sc, (a, b) -> a));
+        List<Enrollment> otherEnrollments = enrollmentRepository.findByCourseSectionIdInAndStatus(
+                scheduleBySectionId.keySet(), EnrollmentStatus.ENROLLED);
 
         List<String> conflicts = new ArrayList<>();
-
-        for (ExamSchedule other : sameDaySchedules) {
-            if (excludeScheduleId != null && other.getId().equals(excludeScheduleId)) {
+        for (Enrollment oe : otherEnrollments) {
+            Student os = oe.getStudent();
+            if (os == null || !studentIds.contains(os.getId()) || oe.getCourseSection() == null) {
                 continue;
             }
-            if (other.getCourseSection().getId().equals(courseSectionId)) {
+            ExamSchedule other = scheduleBySectionId.get(oe.getCourseSection().getId());
+            if (other == null) {
                 continue;
             }
-            if (isTimeOverlapping(start, end, other.getStartTime(), other.getEndTime())) {
-                // Kiểm tra xem có sinh viên nào của lớp này cũng tham gia lớp của other không
-                List<Enrollment> otherEnrollments = enrollmentRepository.findByCourseSectionIdAndStatus(
-                        other.getCourseSection().getId(), EnrollmentStatus.ENROLLED);
-
-                for (Enrollment oe : otherEnrollments) {
-                    Student os = oe.getStudent();
-                    if (os != null && studentIds.contains(os.getId())) {
-                        conflicts.add(String.format("Sinh viên %s (%s) bị trùng lịch với môn '%s' - Lớp %s (Khung giờ %s - %s)",
-                                os.getFullName(),
-                                os.getStudentCode(),
-                                other.getCourseSection().getCourse().getCourseName(),
-                                other.getCourseSection().getSectionCode(),
-                                other.getStartTime(),
-                                other.getEndTime()
-                        ));
-                    }
-                }
-            }
+            CourseSection otherSection = other.getCourseSection();
+            String courseName = otherSection.getCourse() != null
+                    ? otherSection.getCourse().getCourseName() : otherSection.getSectionCode();
+            conflicts.add(String.format(
+                    "Sinh vien %s (%s) bi trung lich voi mon '%s' - Lop %s (Khung gio %s - %s)",
+                    os.getFullName(),
+                    os.getStudentCode(),
+                    courseName,
+                    otherSection.getSectionCode(),
+                    other.getStartTime(),
+                    other.getEndTime()));
         }
 
         if (!conflicts.isEmpty()) {
-            throw new ConflictException("Xung đột lịch thi của sinh viên: " + String.join("; ", conflicts));
+            throw new ConflictException("Xung dot lich thi cua sinh vien: " + String.join("; ", conflicts));
         }
     }
 

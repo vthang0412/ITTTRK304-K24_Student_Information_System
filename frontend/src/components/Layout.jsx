@@ -3,12 +3,13 @@ import Swal from 'sweetalert2';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useTheme } from '../context/ThemeContext';
 import { notificationApi } from '../api';
 import StudentAIChat from './chat/StudentAIChat';
 import {
   AwardIcon, BellIcon, BookIcon, CalendarIcon, ChevronRightIcon,
   ClipboardIcon, DashboardIcon, LayersIcon, LogoutIcon, MenuIcon, PanelIcon,
-  StudentsIcon, SupportIcon, UserIcon, UsersIcon,
+  MoonIcon, StudentsIcon, SunIcon, SupportIcon, UserIcon, UsersIcon,
 } from './Icons';
 
 const MENUS = {
@@ -114,6 +115,7 @@ const Layout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
+  const { theme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('sidebar-collapsed') === '1');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [today] = useState(() => new Date());
@@ -193,8 +195,8 @@ const Layout = ({ children }) => {
       buttonsStyling: false,
       allowOutsideClick: false,
       allowEscapeKey: false,
-      background: '#ffffff',
-      color: '#0f172a',
+      background: 'var(--surface)',
+      color: 'var(--text)',
       width: 420,
       didOpen: () => {
         const popup = document.querySelector('.swal2-popup');
@@ -220,8 +222,8 @@ const Layout = ({ children }) => {
         htmlContainer: 'swal-auth-text',
         icon: 'swal-auth-icon',
       },
-      background: '#ffffff',
-      color: '#0f172a',
+      background: 'var(--surface)',
+      color: 'var(--text)',
       width: 420,
       allowOutsideClick: false,
       allowEscapeKey: false,
@@ -266,7 +268,7 @@ const Layout = ({ children }) => {
                         <span style={{
                           position: 'absolute', top: -4, right: -6,
                           minWidth: 14, height: 14,
-                          background: '#ef4444', color: '#fff',
+                          background: 'var(--button-danger)', color: '#fff',
                           borderRadius: 7, fontSize: 9, fontWeight: 700,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           padding: '0 2px', lineHeight: 1,
@@ -278,7 +280,7 @@ const Layout = ({ children }) => {
                     <span>{item.label}</span>
                     {isNotif && unreadCount > 0 && !collapsed && (
                       <span style={{
-                        marginLeft: 'auto', background: '#ef4444', color: '#fff',
+                        marginLeft: 'auto', background: 'var(--button-danger)', color: '#fff',
                         borderRadius: 10, fontSize: 11, fontWeight: 700,
                         padding: '1px 7px',
                       }}>
@@ -330,6 +332,16 @@ const Layout = ({ children }) => {
               {today.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
             </span>
             <button
+              className="icon-btn theme-toggle"
+              type="button"
+              onClick={toggleTheme}
+              aria-label={`Chuyển sang chế độ ${theme === 'light' ? 'tối' : 'sáng'}`}
+              aria-pressed={theme === 'dark'}
+              title={`Chế độ hiện tại: ${theme === 'light' ? 'Sáng' : 'Tối'}`}
+            >
+              {theme === 'light' ? <SunIcon /> : <MoonIcon />}
+            </button>
+            <button
               className="icon-btn"
               aria-label="Thông báo"
               onClick={() => navigate(user?.role === 'ADMIN' ? '/admin/notifications' : user?.role === 'LECTURER' ? '/lecturer/notifications' : '/student/notifications')}
@@ -340,7 +352,7 @@ const Layout = ({ children }) => {
                 <span style={{
                   position: 'absolute', top: 2, right: 2,
                   minWidth: 16, height: 16,
-                  background: '#ef4444', color: '#fff',
+                  background: 'var(--button-danger)', color: '#fff',
                   borderRadius: 8, fontSize: 10, fontWeight: 700,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   padding: '0 3px', lineHeight: 1,

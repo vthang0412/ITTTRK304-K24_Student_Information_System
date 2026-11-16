@@ -49,7 +49,7 @@ public class AIChatController {
      */
     @PostMapping("/chat/conversations")
     public ResponseEntity<Map<String, Object>> createConversation(
-            @RequestBody(required = false) AICreateConversationRequest request,
+            @Valid @RequestBody(required = false) AICreateConversationRequest request,
             Authentication authentication
     ) {
         AIConversationDto created = aiChatService.createConversation(authentication.getName(), request);

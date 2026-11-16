@@ -21,6 +21,10 @@ public interface ExamRoomRepository extends JpaRepository<ExamRoom, Long>, JpaSp
 
     Optional<ExamRoom> findByRoomCode(String roomCode);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from ExamRoom r where r.id = :id")
+    Optional<ExamRoom> findByIdForUpdate(@Param("id") Long id);
+
     @Query("SELECT r FROM ExamRoom r WHERE " +
             "(:status IS NULL OR r.status = :status) AND " +
             "(:building IS NULL OR LOWER(r.building) LIKE LOWER(CONCAT('%', :building, '%'))) AND " +

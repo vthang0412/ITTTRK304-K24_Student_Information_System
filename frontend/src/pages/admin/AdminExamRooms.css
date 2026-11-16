@@ -58,7 +58,7 @@
 
 .admin-exam-rooms-table tbody td {
   padding: 10px;
-  border-bottom: 1px solid #eef2f7;
+  border-bottom: 1px solid var(--border);
   color: var(--text-2);
   font-size: 13px;
   line-height: 1.4;
@@ -70,7 +70,7 @@
 }
 
 .admin-exam-rooms-table tbody tr:hover {
-  background: #f8fbff;
+  background: var(--surface-2);
 }
 
 .admin-exam-rooms-table .exam-room-header-capacity,

@@ -10,22 +10,37 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 
 @Component
 public class JwtUtil {
-    @Value("${app.jwt.secret}")
-    private String secret;
+    private final Key signingKey;
+    private final long jwtExpirationMs;
 
-    @Value("${app.jwt.expiration-ms}")
-    private long jwtExpirationMs;
+    public JwtUtil(
+            @Value("${app.jwt.secret}") String secret,
+            @Value("${app.jwt.expiration-ms}") long jwtExpirationMs) {
+        byte[] secretBytes = secret.getBytes(StandardCharsets.UTF_8);
+        String normalizedSecret = secret.toLowerCase(Locale.ROOT);
+        if (secret.isBlank()
+                || normalizedSecret.startsWith("replace-with-")
+                || normalizedSecret.contains("change-this-secret-key")
+                || normalizedSecret.startsWith("your-")
+                || secretBytes.length < 32) {
+            throw new IllegalArgumentException("JWT_SECRET must be a non-placeholder value of at least 32 UTF-8 bytes");
+        }
+        this.signingKey = Keys.hmacShaKeyFor(secretBytes);
+        this.jwtExpirationMs = jwtExpirationMs;
+    }
 
     private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(secret.getBytes());
+        return signingKey;
     }
 
     public String extractUsername(String token) {

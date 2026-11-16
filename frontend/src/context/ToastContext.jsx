@@ -62,8 +62,8 @@ export const ToastProvider = ({ children }) => {
       confirmButtonText,
       confirmButtonColor: '#2563eb',
       width: 420,
-      background: '#ffffff',
-      color: '#0f172a',
+      background: 'var(--surface)',
+      color: 'var(--text)',
       borderRadius: '18px',
       didOpen: () => {
         const popup = document.querySelector('.swal2-popup');
@@ -111,11 +111,11 @@ export const ToastProvider = ({ children }) => {
         .swal-auth-title {
           font-size: 1.15rem !important;
           font-weight: 800 !important;
-          color: #0f172a !important;
+          color: var(--text) !important;
         }
         .swal-auth-text {
           font-size: 0.96rem !important;
-          color: #475569 !important;
+          color: var(--text-2) !important;
           line-height: 1.6 !important;
         }
         .swal-auth-icon {
@@ -142,12 +142,12 @@ export const ToastProvider = ({ children }) => {
           background: #1d4ed8 !important;
         }
         .swal-auth-cancel {
-          background: #e2e8f0 !important;
-          color: #334155 !important;
-          border: 1px solid #cbd5e1 !important;
+          background: var(--surface-2) !important;
+          color: var(--text-2) !important;
+          border: 1px solid var(--border-strong) !important;
         }
         .swal-auth-cancel:hover {
-          background: #dfe7f0 !important;
+          background: var(--border) !important;
         }
         @media (max-width: 480px) {
           .swal-auth-popup {
