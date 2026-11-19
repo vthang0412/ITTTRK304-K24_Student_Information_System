@@ -180,7 +180,8 @@ const StudentEnrollments = () => {
         open={!!target}
         title="Huỷ đơn đăng ký học phần"
         message={`Bạn có chắc muốn huỷ đơn đăng ký lớp ${target?.courseSection?.sectionCode} — ${target?.courseSection?.course?.courseName}? Thao tác này không thể hoàn tác.`}
-        confirmLabel="Huỷ"
+        cancelLabel="Đóng"
+        confirmLabel="Xác nhận hủy"
         loading={withdrawing}
         onConfirm={handleWithdraw}
         onCancel={() => setTarget(null)}

@@ -320,7 +320,6 @@ const Profile = () => {
                   </div>
                 </div>
                 <div className="info-list">
-                  <InfoRow label="Tên đăng nhập" value={profile?.username || user?.username} />
                   <InfoRow label="Email" value={profile?.email || user?.email} />
                   <InfoRow label={meta.codeLabel} value={profileCode} />
                   <InfoRow label="Khoa / Bộ môn" value={profile?.department || user?.department} />
