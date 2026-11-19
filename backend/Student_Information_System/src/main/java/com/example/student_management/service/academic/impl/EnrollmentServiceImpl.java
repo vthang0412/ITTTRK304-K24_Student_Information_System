@@ -483,6 +483,9 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         if (enrollment.getStatus() == EnrollmentStatus.REJECTED) {
             throw new BadRequestException("Đơn đăng ký đã bị từ chối, không thể hủy");
         }
+        if (enrollment.getStatus() == EnrollmentStatus.ENROLLED) {
+            throw new BadRequestException("Học phần đã được quản trị viên duyệt, không thể hủy đăng ký");
+        }
         LocalDateTime now = LocalDateTime.now();
         enrollment.setStatus(EnrollmentStatus.WITHDRAWN);
         enrollment.setWithdrawnAt(now);
