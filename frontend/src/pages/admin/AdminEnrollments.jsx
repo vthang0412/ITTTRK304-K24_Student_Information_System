@@ -474,7 +474,7 @@ const AdminEnrollments = () => {
         </div>
       </div>
 
-      <div className="toolbar">
+      <div className="toolbar admin-enrollment-main-filters">
         <SearchInput
           value={search}
           onChange={(value) => {
@@ -488,8 +488,6 @@ const AdminEnrollments = () => {
           }}
           placeholder="Mã SV, họ tên, email, môn, lớp, học kỳ..."
         />
-      </div>
-      <div className="toolbar" style={{ flexWrap: 'wrap' }}>
         <select
           className="select"
           value={filters.semesterId}
@@ -533,22 +531,26 @@ const AdminEnrollments = () => {
           <option value="REJECTED">Đã từ chối</option>
           <option value="WITHDRAWN">Đã rút</option>
         </select>
-        <label className="field" style={{ minWidth: 200 }}>
+      </div>
+      <div className="toolbar admin-enrollment-time-filters">
+        <label className="field">
           <span>Đăng ký từ</span>
           <input
             type="datetime-local"
             className="input"
             value={filters.fromTime}
             onChange={(event) => clearSelectionForFilterChange({ ...filters, fromTime: event.target.value })}
+            aria-label="Đăng ký từ"
           />
         </label>
-        <label className="field" style={{ minWidth: 200 }}>
+        <label className="field">
           <span>Đăng ký đến</span>
           <input
             type="datetime-local"
             className="input"
             value={filters.toTime}
             onChange={(event) => clearSelectionForFilterChange({ ...filters, toTime: event.target.value })}
+            aria-label="Đăng ký đến"
           />
         </label>
       </div>
@@ -592,7 +594,6 @@ const AdminEnrollments = () => {
             </button>
           </>
         )}
-        <button className="btn btn-secondary" onClick={load} disabled={bulkProcessing || processingId !== null}>Làm mới</button>
       </div>
 
       <div className="card">
@@ -716,14 +717,6 @@ const AdminEnrollments = () => {
             <h2 style={{ margin: 0 }}>Lịch sử duyệt/từ chối hàng loạt</h2>
             <p className="cell-muted">Nhật ký riêng từng đợt; lịch sử duyệt hoặc từ chối cá nhân vẫn được lưu trong Enrollment.</p>
           </div>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => loadHistory(historyPage)}
-            disabled={historyLoading}
-          >
-            Làm mới lịch sử
-          </button>
         </div>
         <div className="toolbar" style={{ flexWrap: 'wrap', padding: '0 20px 16px' }}>
           <input
