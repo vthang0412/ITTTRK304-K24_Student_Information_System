@@ -77,6 +77,10 @@ public class ExamRoomServiceImpl implements ExamRoomService {
             throw new BadRequestException("Sức chứa phòng thi phải lớn hơn 0");
         }
 
+        if (request.getStatus() == ExamRoomStatus.INACTIVE && examScheduleRepository.existsByRoomId(id)) {
+            throw new ConflictException("Không thể ngừng sử dụng phòng thi [" + room.getRoomCode() + "] đang được sử dụng trong lịch thi. Vui lòng xử lý các lịch thi liên quan trước.");
+        }
+
         room.setRoomCode(code);
         room.setRoomName(request.getRoomName().trim());
         room.setBuilding(request.getBuilding() != null ? request.getBuilding().trim() : null);
@@ -107,6 +111,9 @@ public class ExamRoomServiceImpl implements ExamRoomService {
             throw new BadRequestException("Trạng thái phòng thi không được để trống");
         }
         ExamRoom room = findRoomById(id);
+        if (status == ExamRoomStatus.INACTIVE && examScheduleRepository.existsByRoomId(id)) {
+            throw new ConflictException("Không thể ngừng sử dụng phòng thi [" + room.getRoomCode() + "] đang được sử dụng trong lịch thi. Vui lòng xử lý các lịch thi liên quan trước.");
+        }
         room.setStatus(status);
         ExamRoom updated = examRoomRepository.save(room);
         return mapToDto(updated);

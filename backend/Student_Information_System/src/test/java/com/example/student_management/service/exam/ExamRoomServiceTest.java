@@ -160,12 +160,39 @@ class ExamRoomServiceTest {
     @Test
     void testUpdateRoomStatus_Success() {
         when(examRoomRepository.findById(1L)).thenReturn(Optional.of(room1));
+        when(examScheduleRepository.existsByRoomId(1L)).thenReturn(false);
         when(examRoomRepository.save(any(ExamRoom.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ExamRoomDto result = examRoomService.updateRoomStatus(1L, ExamRoomStatus.INACTIVE);
 
         assertNotNull(result);
         assertEquals(ExamRoomStatus.INACTIVE, result.getStatus());
+    }
+
+    @Test
+    void testUpdateRoomStatus_DeactivateUsedRoom_ThrowsConflict() {
+        when(examRoomRepository.findById(1L)).thenReturn(Optional.of(room1));
+        when(examScheduleRepository.existsByRoomId(1L)).thenReturn(true);
+
+        assertThrows(ConflictException.class, () -> examRoomService.updateRoomStatus(1L, ExamRoomStatus.INACTIVE));
+        verify(examRoomRepository, never()).save(any());
+    }
+
+    @Test
+    void testUpdateRoom_DeactivateUsedRoom_ThrowsConflict() {
+        ExamRoomRequest request = ExamRoomRequest.builder()
+                .roomCode("P101-A2")
+                .roomName("Phòng thi máy 101")
+                .capacity(40)
+                .status(ExamRoomStatus.INACTIVE)
+                .build();
+
+        when(examRoomRepository.findById(1L)).thenReturn(Optional.of(room1));
+        when(examRoomRepository.existsByRoomCodeAndIdNot("P101-A2", 1L)).thenReturn(false);
+        when(examScheduleRepository.existsByRoomId(1L)).thenReturn(true);
+
+        assertThrows(ConflictException.class, () -> examRoomService.updateRoom(1L, request));
+        verify(examRoomRepository, never()).save(any());
     }
 
     @Test

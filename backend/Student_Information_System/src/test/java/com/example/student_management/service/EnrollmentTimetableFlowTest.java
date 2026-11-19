@@ -154,7 +154,7 @@ class EnrollmentTimetableFlowTest {
     }
 
     @Test
-    void approvalMakesEnrollmentVisibleInTimetableUntilStudentWithdraws() {
+    void approvalMakesEnrollmentVisibleInTimetableAndBlocksStudentWithdrawal() {
         Enrollment approved = enrollmentService.approve("admin", 4L);
 
         assertEquals(EnrollmentStatus.ENROLLED, approved.getStatus());
@@ -181,12 +181,19 @@ class EnrollmentTimetableFlowTest {
         assertEquals("Giảng viên A", afterApproval.getItems().get(0).getLecturerName());
         verify(enrollmentRepository).findForTimetableBySemester(10L, EnrollmentStatus.ENROLLED, 3L);
 
-        enrollmentService.withdraw("student1", 4L);
-        TimetableWeekResponse afterWithdrawal = timetableService.getWeek(
-                "student1", 3L, LocalDate.of(2026, 11, 12), 1, 10);
+        BadRequestException exception = assertThrows(
+                BadRequestException.class,
+                () -> enrollmentService.withdraw("student1", 4L));
+        assertEquals("Học phần đã được quản trị viên duyệt, không thể hủy đăng ký", exception.getMessage());
+        assertEquals(EnrollmentStatus.ENROLLED, enrollment.getStatus());
+    }
 
-        assertEquals(0, afterWithdrawal.getTotalElements());
-        assertEquals(List.of(), afterWithdrawal.getItems());
+    @Test
+    void studentCanWithdrawPendingEnrollmentBeforeApproval() {
+        Enrollment withdrawn = enrollmentService.withdraw("student1", 4L);
+
+        assertEquals(EnrollmentStatus.WITHDRAWN, withdrawn.getStatus());
+        assertNotNull(withdrawn.getWithdrawnAt());
     }
 
     @Test
