@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { aiChatApi } from '../../api';
@@ -26,6 +26,7 @@ const StudentAIChat = () => {
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
   const [error, setError] = useState(null);
   const [lastFailedText, setLastFailedText] = useState(null);
   const [deleteConversationId, setDeleteConversationId] = useState(null);
@@ -74,6 +75,17 @@ const StudentAIChat = () => {
     }
   };
 
+  useEffect(() => {
+    const openChat = () => {
+      setIsOpen(true);
+      setIsMinimized(false);
+      setView('chat');
+      if (!activeConversationId) loadConversations(true);
+    };
+    window.addEventListener('sis-ai:open-chat', openChat);
+    return () => window.removeEventListener('sis-ai:open-chat', openChat);
+  }, [activeConversationId, loadConversations]);
+
   // Khi bấm mở chat
   const handleOpenChat = () => {
     setIsOpen(true);
@@ -107,6 +119,48 @@ const StudentAIChat = () => {
     setActiveConversationId(id);
     setView('chat');
     loadMessages(id);
+  };
+
+  const handleRenameConversation = async (id, title) => {
+    try {
+      const res = await aiChatApi.renameConversation(id, { title });
+      const updated = res.data?.data;
+      setConversations((prev) => prev.map((c) => (
+        c.id === id ? { ...c, ...(updated || {}), title: updated?.title || title } : c
+      )));
+      toast.success('Đã đổi tên cuộc trò chuyện');
+    } catch (err) {
+      const message = getErrorMessage(err, 'Không thể đổi tên cuộc trò chuyện.');
+      toast.error('Không thể đổi tên cuộc trò chuyện', message);
+      throw err;
+    }
+  };
+
+  const handleFeedback = async (messageId, feedback) => {
+    if (!messageId || !/^\d+$/.test(String(messageId))) return;
+    const current = messages.find((m) => m.id === messageId);
+    if (current?.feedback === feedback) return;
+
+    setMessages((prev) => prev.map((m) => (
+      m.id === messageId ? { ...m, feedback } : m
+    )));
+
+    try {
+      const res = await aiChatApi.sendFeedback(messageId, { feedback });
+      const updated = res.data?.data;
+      if (updated) {
+        setMessages((prev) => prev.map((m) => (
+          m.id === messageId ? { ...m, feedback: updated.feedback || feedback } : m
+        )));
+      }
+      toast.success('Cảm ơn bạn đã góp ý');
+    } catch (err) {
+      setMessages((prev) => prev.map((m) => (
+        m.id === messageId ? { ...m, feedback: current?.feedback } : m
+      )));
+      const message = getErrorMessage(err, 'Không thể gửi đánh giá.');
+      toast.error('Không thể gửi đánh giá', message);
+    }
   };
 
   const handleConfirmDeleteConversation = async () => {
@@ -143,7 +197,9 @@ const StudentAIChat = () => {
 
   // Gửi tin nhắn đến AI
   const handleSendMessage = async (text) => {
-    if (!text || !text.trim() || sending) return;
+    const trimmedText = typeof text === 'string' ? text.trim() : '';
+    if (!trimmedText || trimmedText.length > 2000 || sendingRef.current) return;
+    sendingRef.current = true;
 
     let targetConvId = activeConversationId;
 
@@ -158,6 +214,7 @@ const StudentAIChat = () => {
         setConversations((prev) => [newConv, ...prev]);
       } catch (err) {
         setError(getErrorMessage(err, 'Không thể khởi tạo hội thoại.'));
+        sendingRef.current = false;
         return;
       }
     }
@@ -166,7 +223,7 @@ const StudentAIChat = () => {
     const userMsg = {
       id: `temp-${Date.now()}`,
       role: 'USER',
-      content: text,
+      content: trimmedText,
       createdAt: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, userMsg]);
@@ -175,7 +232,7 @@ const StudentAIChat = () => {
     setLastFailedText(null);
 
     try {
-      const res = await aiChatApi.sendMessage(targetConvId, { message: text });
+      const res = await aiChatApi.sendMessage(targetConvId, { message: trimmedText });
       const assistantData = res.data?.data;
 
       if (assistantData) {
@@ -197,9 +254,11 @@ const StudentAIChat = () => {
       }
     } catch (err) {
       const errMsg = getErrorMessage(err, 'Gửi câu hỏi thất bại. Vui lòng thử lại sau.');
+      setMessages((prev) => prev.filter((m) => m.id !== userMsg.id));
       setError(errMsg);
-      setLastFailedText(text);
+      setLastFailedText(trimmedText);
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   };
@@ -261,6 +320,7 @@ const StudentAIChat = () => {
                 onSelect={handleSelectConversation}
                 onNew={handleCreateNewConversation}
                 onDelete={setDeleteConversationId}
+                onRename={handleRenameConversation}
               />
             ) : (
               <>
@@ -270,6 +330,7 @@ const StudentAIChat = () => {
                   error={error}
                   onRetry={lastFailedText ? () => handleSendMessage(lastFailedText) : null}
                   onSelectSuggestion={(text) => handleSendMessage(text)}
+                  onFeedback={handleFeedback}
                 />
 
                 <ChatInput

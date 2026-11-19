@@ -17,7 +17,9 @@ import com.example.student_management.repository.academic.EnrollmentRepository;
 import com.example.student_management.repository.ai.AIUsageLogRepository;
 import com.example.student_management.repository.auth.UserRepository;
 import com.example.student_management.service.ai.AICourseAdvisorService;
+import com.example.student_management.service.ai.AIInputSafety;
 import com.example.student_management.service.ai.AIProviderService;
+import com.example.student_management.service.ai.AIRequestQuota;
 import com.example.student_management.service.grade.GradebookService;
 import com.example.student_management.service.timetable.ScheduleParser;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -75,7 +77,7 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
     private final Map<Long, CourseAdvisorResponseDto> advisorCache = new ConcurrentHashMap<>();
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public CourseAdvisorResponseDto getCourseRecommendations(String username) {
         User user = getStudentUser(username);
         Student student = user.getStudent();
@@ -83,7 +85,16 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
         if (cached != null) {
             return cached;
         }
-        return generateCourseAdvice(user, student, null);
+        AIUsageLog reservation = AIRequestQuota.reserve(usageLogRepository, student, rateLimitPerHour, "ADVISOR");
+        boolean[] generated = {false};
+        CourseAdvisorResponseDto result = advisorCache.computeIfAbsent(student.getId(), id -> {
+            generated[0] = true;
+            return generateCourseAdvice(user, student, null, reservation);
+        });
+        if (!generated[0]) {
+            AIRequestQuota.complete(usageLogRepository, reservation, "SIS", "cache", true, 0L);
+        }
+        return result;
     }
 
     @Override
@@ -92,19 +103,16 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
         User user = getStudentUser(username);
         Student student = user.getStudent();
 
-        long recentCalls = usageLogRepository.countByStudentIdAndCreatedAtAfter(
-                student.getId(), LocalDateTime.now().minusHours(1));
-        if (recentCalls >= rateLimitPerHour) {
-            throw new BadRequestException(
-                    "Bạn đã dùng hết " + rateLimitPerHour + " lượt gọi AI trong 1 giờ. Vui lòng chờ ít phút.");
-        }
+        AIUsageLog reservation = AIRequestQuota.reserve(usageLogRepository, student, rateLimitPerHour, "ADVISOR");
 
         advisorCache.remove(student.getId());
-        return generateCourseAdvice(user, student, request);
+        CourseAdvisorResponseDto result = generateCourseAdvice(user, student, request, reservation);
+        advisorCache.put(student.getId(), result);
+        return result;
     }
 
     private CourseAdvisorResponseDto generateCourseAdvice(User user, Student student,
-            CourseAdvisorRequestDto preferences) {
+            CourseAdvisorRequestDto preferences, AIUsageLog reservation) {
         long startTime = System.currentTimeMillis();
 
         // 1. Lấy dữ liệu học tập thực tế từ SIS
@@ -323,7 +331,7 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
 
         // 3. Tạo lời khuyên tổng quan AI (Advisor Summary)
         String advisorSummary = buildAdvisorSummary(student, accumulatedCredits, activeCredits, recommendedList,
-                preferences, startTime);
+                preferences, startTime, reservation);
 
         String disclaimer = "Lưu ý: Các đề xuất môn học trên chỉ mang tính chất tham khảo học thuật từ dữ liệu thực tế hệ thống SIS. "
                 + "Hệ thống AI không tự động đăng ký hoặc hủy học phần; sinh viên vui lòng chủ động sử dụng chức năng Đăng ký học phần để hoàn tất đăng ký.";
@@ -343,7 +351,6 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
                 .generatedAt(LocalDateTime.now())
                 .build();
 
-        advisorCache.put(student.getId(), response);
         return response;
     }
 
@@ -409,7 +416,8 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
             int activeCredits,
             List<CourseRecommendationItemDto> recommended,
             CourseAdvisorRequestDto pref,
-            long startTime) {
+            long startTime,
+            AIUsageLog reservation) {
         StringBuilder prompt = new StringBuilder();
         prompt.append("Sinh viên: ").append(student.getFullName()).append(" (").append(student.getStudentCode())
                 .append(").\n");
@@ -430,21 +438,11 @@ public class AICourseAdvisorServiceImpl implements AICourseAdvisorService {
         AIProviderService.AIProviderResult external = providerService.generateExternalAnalysis(sysInstruction,
                 prompt.toString());
 
-        // Ghi log sử dụng AI
-        try {
-            usageLogRepository.save(AIUsageLog.builder()
-                    .student(student)
-                    .featureType("ADVISOR")
-                    .provider(external.getProviderUsed())
-                    .model(external.getModelUsed())
-                    .status("SUCCESS")
-                    .latencyMs(System.currentTimeMillis() - startTime)
-                    .createdAt(LocalDateTime.now())
-                    .build());
-        } catch (Exception ignored) {
-        }
+        AIRequestQuota.complete(usageLogRepository, reservation, external.getProviderUsed(),
+                external.getModelUsed(), external.isSuccess(), System.currentTimeMillis() - startTime);
 
-        if (external.isSuccess() && external.getContent() != null && !external.getContent().isBlank()) {
+        if (external.isSuccess() && !AIInputSafety.isSensitiveOutput(external.getContent())
+                && external.getContent() != null && !external.getContent().isBlank()) {
             return external.getContent();
         }
 

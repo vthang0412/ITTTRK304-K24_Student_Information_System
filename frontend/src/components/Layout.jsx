@@ -8,8 +8,9 @@ import { notificationApi } from '../api';
 import StudentAIChat from './chat/StudentAIChat';
 import {
   AwardIcon, BellIcon, BookIcon, CalendarIcon, ChevronRightIcon,
-  ClipboardIcon, DashboardIcon, LayersIcon, LogoutIcon, MenuIcon, PanelIcon,
-  MoonIcon, StudentsIcon, SunIcon, SupportIcon, UserIcon, UsersIcon,
+  ClipboardIcon, DashboardIcon, FileTextIcon, LayersIcon, LogoutIcon, MenuIcon,
+  MoonIcon, PanelIcon, SparklesIcon, StudentsIcon, SunIcon, SupportIcon,
+  TrendingIcon, UserIcon, UsersIcon,
 } from './Icons';
 
 const MENUS = {
@@ -21,7 +22,12 @@ const MENUS = {
     { label: 'Thời khóa biểu', to: '/student/timetable', icon: CalendarIcon },
     { label: 'Lịch thi', to: '/student/exam-schedules', icon: CalendarIcon },
     { label: 'Kết quả học tập', to: '/student/grades', icon: AwardIcon },
-    { label: 'Phản ánh & Ticket', to: '/student/feedbacks', icon: SupportIcon },
+    { label: 'Tổng quan AI', to: '/student/ai-dashboard', icon: SparklesIcon, section: 'Không gian AI' },
+    { label: 'Nhận xét học tập AI', to: '/student/ai-insights', icon: TrendingIcon },
+    { label: 'Tư vấn học phần AI', to: '/student/ai-course-advisor', icon: BookIcon },
+    { label: 'Kế hoạch học tập AI', to: '/student/ai-study-planner', icon: CalendarIcon },
+    { label: 'Báo cáo học tập AI', to: '/student/ai-reports', icon: FileTextIcon },
+    { label: 'Phản ánh & Ticket', to: '/student/feedbacks', icon: SupportIcon, section: 'Hỗ trợ' },
     { label: 'Thông báo', to: '/student/notifications', icon: BellIcon },
   ],
   LECTURER: [
@@ -57,6 +63,11 @@ const TITLES = {
   '/student/timetable': 'Thời khóa biểu',
   '/student/exam-schedules': 'Lịch thi cá nhân',
   '/student/grades': 'Kết quả học tập',
+  '/student/ai-dashboard': 'Tổng quan AI',
+  '/student/ai-insights': 'Nhận xét học tập AI',
+  '/student/ai-course-advisor': 'Tư vấn học phần AI',
+  '/student/ai-study-planner': 'Kế hoạch học tập AI',
+  '/student/ai-reports': 'Báo cáo học tập AI',
   '/student/feedbacks': 'Phản ánh & Ticket',
   '/student/notifications': 'Thông báo',
   '/lecturer/profile': 'Hồ sơ cá nhân',

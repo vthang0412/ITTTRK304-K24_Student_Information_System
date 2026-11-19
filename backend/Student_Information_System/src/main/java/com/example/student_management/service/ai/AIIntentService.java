@@ -17,10 +17,54 @@ public class AIIntentService {
         INCOMPLETE_COURSE_QUERY,
         GENERAL_ACADEMIC_QUESTION,
         FOLLOW_UP_QUESTION,
+        COMBINED_SIS_TUTOR,
+        TUTOR_EXPLANATION,
+        TUTOR_EXERCISE,
+        TUTOR_CODE_REVIEW,
+        TUTOR_QUIZ,
+        TUTOR_ANSWER_EVALUATION,
+        TUTOR_STUDY_MATERIAL,
+        TUTOR_FOLLOW_UP,
         OUT_OF_SCOPE
     }
 
+    public static class IntentAnalysis {
+        private final Intent intent;
+        private final AITutorService.TutorPlan tutorPlan;
+
+        public IntentAnalysis(Intent intent, AITutorService.TutorPlan tutorPlan) {
+            this.intent = intent;
+            this.tutorPlan = tutorPlan;
+        }
+
+        public Intent getIntent() { return intent; }
+        public AITutorService.TutorPlan getTutorPlan() { return tutorPlan; }
+    }
+
+    private final AITutorService tutorService = new AITutorService();
+
+    public IntentAnalysis analyze(String question, boolean hasConversationContext) {
+        Intent intent = detectIntent(question, hasConversationContext);
+        AITutorService.TutorPlan plan = isTutorIntent(intent) ? tutorService.plan(question, null) : null;
+        return new IntentAnalysis(intent, plan);
+    }
+
     public Intent detectIntent(String question, boolean hasConversationContext) {
+        if (question == null || question.trim().isEmpty()) return Intent.GENERAL_ACADEMIC_QUESTION;
+        String q = normalize(question);
+
+        if (isOutOfScope(q)) return Intent.OUT_OF_SCOPE;
+
+        boolean tutor = tutorService.isTutorQuestion(question);
+        boolean sis = tutorService.mentionsSisData(question);
+        if (tutor && sis) return Intent.COMBINED_SIS_TUTOR;
+        if (tutor) return mapTutorIntent(tutorService.plan(question, null).getTask());
+
+        if (hasConversationContext && isFollowUp(q)) return Intent.FOLLOW_UP_QUESTION;
+        return detectSisIntent(question, hasConversationContext);
+    }
+
+    public Intent detectSisIntent(String question, boolean hasConversationContext) {
         if (question == null || question.trim().isEmpty()) return Intent.GENERAL_ACADEMIC_QUESTION;
         String q = normalize(question);
 
@@ -57,8 +101,31 @@ public class AIIntentService {
         return Intent.GENERAL_ACADEMIC_QUESTION;
     }
 
+    public boolean isTutorIntent(Intent intent) {
+        return intent == Intent.COMBINED_SIS_TUTOR
+                || intent == Intent.TUTOR_EXPLANATION
+                || intent == Intent.TUTOR_EXERCISE
+                || intent == Intent.TUTOR_CODE_REVIEW
+                || intent == Intent.TUTOR_QUIZ
+                || intent == Intent.TUTOR_ANSWER_EVALUATION
+                || intent == Intent.TUTOR_STUDY_MATERIAL
+                || intent == Intent.TUTOR_FOLLOW_UP;
+    }
+
+    private Intent mapTutorIntent(AITutorService.TutorTask task) {
+        if (task == null) return Intent.TUTOR_EXPLANATION;
+        return switch (task) {
+            case EXERCISE -> Intent.TUTOR_EXERCISE;
+            case CODE_REVIEW -> Intent.TUTOR_CODE_REVIEW;
+            case QUIZ -> Intent.TUTOR_QUIZ;
+            case ANSWER_EVALUATION -> Intent.TUTOR_ANSWER_EVALUATION;
+            case STUDY_MATERIAL -> Intent.TUTOR_STUDY_MATERIAL;
+            case FOLLOW_UP -> Intent.TUTOR_FOLLOW_UP;
+            default -> Intent.TUTOR_EXPLANATION;
+        };
+    }
+
     private boolean isFollowUp(String q) {
-        // short or referential questions
         if (q.length() <= 40 && (containsAny(q, "mon do", "mon nao", "tai sao", "vi sao", "nhu the nao", "cu the hon", "phan tich ky hon", "giai thich them", "con", "tiep", "the thi", "neu vay", "no", "y tren", "ket qua tren", "o tren", "vua roi", "luc nay"))) {
             return true;
         }

@@ -43,7 +43,7 @@ const ChatInput = ({ onSend, sending, disabled }) => {
         <textarea
           ref={textareaRef}
           className="ai-textarea"
-          placeholder={sending ? 'Trợ lý AI đang trả lời...' : 'Hỏi về GPA, môn học, lịch học, đăng ký...'}
+          placeholder={sending ? 'Trợ lý AI đang trả lời...' : 'Hỏi về GPA, môn học hoặc nhờ giải thích/luyện tập/review code...'}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}

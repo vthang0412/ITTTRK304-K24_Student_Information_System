@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import lombok.extern.slf4j.Slf4j;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -13,8 +14,11 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.*;
 
+@Slf4j
 @Service
 public class AIProviderService {
+
+    private static final int MAX_OUTPUT_LENGTH = 8000;
 
     @Value("${app.ai.provider:gemini}")
     private String provider;
@@ -76,7 +80,7 @@ public class AIProviderService {
                 String answer = callGeminiApi(systemContext, conversationHistory, userQuestion);
                 if (answer != null && !answer.isBlank()) {
                     return AIProviderResult.builder()
-                            .content(answer.trim())
+                            .content(limitOutput(answer))
                             .providerUsed("GEMINI")
                             .modelUsed(model)
                             .success(true)
@@ -84,7 +88,9 @@ public class AIProviderService {
                             .sources(safeSources)
                             .build();
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ex) {
+                log.warn("AI provider call failed: type={}", ex.getClass().getSimpleName());
+            }
         }
 
         if ("openai".equalsIgnoreCase(provider) && openaiApiKey != null && !openaiApiKey.isBlank()) {
@@ -92,7 +98,7 @@ public class AIProviderService {
                 String answer = callOpenAiApi(systemContext, conversationHistory, userQuestion);
                 if (answer != null && !answer.isBlank()) {
                     return AIProviderResult.builder()
-                            .content(answer.trim())
+                            .content(limitOutput(answer))
                             .providerUsed("OPENAI")
                             .modelUsed(model)
                             .success(true)
@@ -100,7 +106,9 @@ public class AIProviderService {
                             .sources(safeSources)
                             .build();
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ex) {
+                log.warn("AI provider call failed: type={}", ex.getClass().getSimpleName());
+            }
         }
 
         String content = (fallbackContent == null || fallbackContent.isBlank())
@@ -110,7 +118,7 @@ public class AIProviderService {
                 .content(content)
                 .providerUsed("SIS-ASSISTANT-ENGINE")
                 .modelUsed("sis-local-v1")
-                .success(true)
+                .success(false)
                 .latencyMs(System.currentTimeMillis() - start)
                 .sources(safeSources)
                 .build();
@@ -123,28 +131,32 @@ public class AIProviderService {
                 String answer = callGeminiApi(systemPrompt, List.of(), userPrompt);
                 if (answer != null && !answer.isBlank()) {
                     return AIProviderResult.builder()
-                            .content(answer)
+                            .content(limitOutput(answer))
                             .providerUsed("GEMINI")
                             .modelUsed(model)
                             .success(true)
                             .latencyMs(System.currentTimeMillis() - start)
                             .build();
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ex) {
+                log.warn("AI provider call failed: type={}", ex.getClass().getSimpleName());
+            }
         }
         if ("openai".equalsIgnoreCase(provider) && openaiApiKey != null && !openaiApiKey.isBlank()) {
             try {
                 String answer = callOpenAiApi(systemPrompt, List.of(), userPrompt);
                 if (answer != null && !answer.isBlank()) {
                     return AIProviderResult.builder()
-                            .content(answer)
+                            .content(limitOutput(answer))
                             .providerUsed("OPENAI")
                             .modelUsed(model)
                             .success(true)
                             .latencyMs(System.currentTimeMillis() - start)
                             .build();
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ex) {
+                log.warn("AI provider call failed: type={}", ex.getClass().getSimpleName());
+            }
         }
         return AIProviderResult.builder()
                 .content(null)
@@ -156,7 +168,7 @@ public class AIProviderService {
     }
 
     private String callGeminiApi(String systemContext, List<Map<String, String>> history, String userQuestion) throws Exception {
-        String url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + geminiApiKey.trim();
+        String url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("systemInstruction", Map.of("parts", List.of(Map.of("text", systemContext == null ? "" : systemContext))));
 
@@ -180,6 +192,7 @@ public class AIProviderService {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .header("Content-Type", "application/json")
+                .header("x-goog-api-key", geminiApiKey == null ? "" : geminiApiKey.trim())
                 .timeout(Duration.ofSeconds(25))
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
                 .build();
@@ -237,6 +250,12 @@ public class AIProviderService {
             }
         }
         throw new RuntimeException("OpenAI API returned status " + response.statusCode());
+    }
+
+    private String limitOutput(String answer) {
+        if (answer == null) return null;
+        String trimmed = answer.trim();
+        return trimmed.length() > MAX_OUTPUT_LENGTH ? trimmed.substring(0, MAX_OUTPUT_LENGTH) : trimmed;
     }
 
     @SuppressWarnings("unchecked")

@@ -201,4 +201,27 @@ export const aiChatApi = {
     { timeout: 35000 },
   ),
   deleteConversation: (conversationId) => httpClient.delete(`/api/student/ai/chat/conversations/${conversationId}`),
+  renameConversation: (conversationId, data) => httpClient.put(`/api/student/ai/chat/conversations/${conversationId}/title`, data),
+  sendFeedback: (messageId, data) => httpClient.put(`/api/student/ai/chat/messages/${messageId}/feedback`, data),
+  getReport: () => httpClient.get('/api/student/ai/report'),
+  downloadReportExcel: () => httpClient.get('/api/student/ai/report/excel', { responseType: 'blob' }),
+};
+
+export const aiInsightsApi = {
+  getInsights: () => httpClient.get('/api/student/ai/insights'),
+  refreshInsights: () => httpClient.post('/api/student/ai/insights/refresh'),
+};
+
+export const aiCourseAdvisorApi = {
+  getRecommendations: () => httpClient.get('/api/student/ai/course-advisor'),
+  recommend: (data) => httpClient.post('/api/student/ai/course-advisor/recommend', data || {}),
+};
+
+export const aiStudyPlanApi = {
+  getAll: () => httpClient.get('/api/student/ai/study-plans'),
+  getDetail: (id) => httpClient.get(`/api/student/ai/study-plans/${id}`),
+  create: (data) => httpClient.post('/api/student/ai/study-plans', data || {}),
+  update: (id, data) => httpClient.put(`/api/student/ai/study-plans/${id}`, data),
+  remove: (id) => httpClient.delete(`/api/student/ai/study-plans/${id}`),
+  updateItem: (id, itemId, data) => httpClient.patch(`/api/student/ai/study-plans/${id}/items/${itemId}`, data),
 };

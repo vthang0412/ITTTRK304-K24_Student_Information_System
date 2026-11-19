@@ -31,7 +31,7 @@ class FlywayMySqlIntegrationTest {
         TestDatabase database = createTestDatabase("fresh");
         try {
             try (ConfigurableApplicationContext ignored = startBackend(database.url())) {
-                assertEquals("16", currentFlywayVersion(database.url()));
+                assertEquals("17", currentFlywayVersion(database.url()));
                 assertEquals(0, countRows(database.url(), "users"));
             }
         } finally {
@@ -63,7 +63,7 @@ class FlywayMySqlIntegrationTest {
             }
 
             try (ConfigurableApplicationContext ignored = startBackend(database.url())) {
-                assertEquals("16", currentFlywayVersion(database.url()));
+                assertEquals("17", currentFlywayVersion(database.url()));
                 assertEquals(1, countRows(database.url(),
                         "users WHERE username = 'legacy-fixture'"));
                 assertEquals("int", recurringScheduleDayColumnType(database.url()));
