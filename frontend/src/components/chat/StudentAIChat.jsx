@@ -11,12 +11,13 @@ import ChatInput from './ChatInput';
 import ChatConversations from './ChatConversations';
 import './chat.css';
 
-const StudentAIChat = () => {
+const StudentAIChat = ({ sidebarCollapsed = false }) => {
   const { user } = useAuth();
   const toast = useToast();
 
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [view, setView] = useState('chat'); // 'chat' | 'history'
 
   const [conversations, setConversations] = useState([]);
@@ -27,6 +28,8 @@ const StudentAIChat = () => {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const sendingRef = useRef(false);
+  const [continuingMessageId, setContinuingMessageId] = useState(null);
+  const continuingRef = useRef(false);
   const [error, setError] = useState(null);
   const [lastFailedText, setLastFailedText] = useState(null);
   const [deleteConversationId, setDeleteConversationId] = useState(null);
@@ -79,6 +82,7 @@ const StudentAIChat = () => {
     const openChat = () => {
       setIsOpen(true);
       setIsMinimized(false);
+      setIsExpanded(false);
       setView('chat');
       if (!activeConversationId) loadConversations(true);
     };
@@ -90,6 +94,7 @@ const StudentAIChat = () => {
   const handleOpenChat = () => {
     setIsOpen(true);
     setIsMinimized(false);
+    setIsExpanded(false);
     setView('chat');
 
     if (!activeConversationId) {
@@ -133,33 +138,6 @@ const StudentAIChat = () => {
       const message = getErrorMessage(err, 'Không thể đổi tên cuộc trò chuyện.');
       toast.error('Không thể đổi tên cuộc trò chuyện', message);
       throw err;
-    }
-  };
-
-  const handleFeedback = async (messageId, feedback) => {
-    if (!messageId || !/^\d+$/.test(String(messageId))) return;
-    const current = messages.find((m) => m.id === messageId);
-    if (current?.feedback === feedback) return;
-
-    setMessages((prev) => prev.map((m) => (
-      m.id === messageId ? { ...m, feedback } : m
-    )));
-
-    try {
-      const res = await aiChatApi.sendFeedback(messageId, { feedback });
-      const updated = res.data?.data;
-      if (updated) {
-        setMessages((prev) => prev.map((m) => (
-          m.id === messageId ? { ...m, feedback: updated.feedback || feedback } : m
-        )));
-      }
-      toast.success('Cảm ơn bạn đã góp ý');
-    } catch (err) {
-      setMessages((prev) => prev.map((m) => (
-        m.id === messageId ? { ...m, feedback: current?.feedback } : m
-      )));
-      const message = getErrorMessage(err, 'Không thể gửi đánh giá.');
-      toast.error('Không thể gửi đánh giá', message);
     }
   };
 
@@ -242,6 +220,12 @@ const StudentAIChat = () => {
           content: assistantData.content,
           sources: assistantData.sources || [],
           createdAt: assistantData.createdAt || new Date().toISOString(),
+          finishReason: assistantData.finishReason,
+          truncated: Boolean(assistantData.truncated),
+          canContinue: Boolean(assistantData.canContinue),
+          providerUsed: assistantData.providerUsed,
+          modelUsed: assistantData.modelUsed,
+          continuationCount: assistantData.continuationCount || 0,
         };
         setMessages((prev) => [...prev, assistantMsg]);
 
@@ -260,6 +244,40 @@ const StudentAIChat = () => {
     } finally {
       sendingRef.current = false;
       setSending(false);
+    }
+  };
+
+  const handleContinueMessage = async (message) => {
+    if (!message?.id || !activeConversationId || continuingRef.current) return;
+    continuingRef.current = true;
+    setContinuingMessageId(message.id);
+    setError(null);
+    try {
+      const res = await aiChatApi.sendMessage(activeConversationId, {
+        message: 'Tiếp tục câu trả lời',
+        continueResponse: true,
+        continueFromMessageId: message.id,
+        continuationCount: (message.continuationCount || 0) + 1,
+      });
+      const data = res.data?.data;
+      if (data) {
+        setMessages((prev) => prev.map((m) => (m.id === message.id ? {
+          ...m,
+          content: data.content,
+          sources: data.sources || m.sources,
+          finishReason: data.finishReason,
+          truncated: Boolean(data.truncated),
+          canContinue: Boolean(data.canContinue),
+          providerUsed: data.providerUsed,
+          modelUsed: data.modelUsed,
+          continuationCount: data.continuationCount,
+        } : m)));
+      }
+    } catch (err) {
+      setError(getErrorMessage(err, 'Không thể tiếp tục câu trả lời. Vui lòng thử lại.'));
+    } finally {
+      continuingRef.current = false;
+      setContinuingMessageId(null);
     }
   };
 
@@ -301,13 +319,25 @@ const StudentAIChat = () => {
 
       {/* 2. Cửa sổ chat nhỏ khi mở */}
       {isOpen && !isMinimized && (
-        <div className="ai-chat-window" role="dialog" aria-label="Cửa sổ Trợ lý AI">
+        <div
+          className={`ai-chat-window${isExpanded ? ' is-expanded' : ''}${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}
+          role="dialog"
+          aria-label="Cửa sổ Trợ lý AI"
+        >
           <ChatHeader
             view={view}
             onToggleView={() => setView((v) => (v === 'chat' ? 'history' : 'chat'))}
             onNewConversation={handleCreateNewConversation}
-            onMinimize={() => setIsMinimized(true)}
-            onClose={() => setIsOpen(false)}
+            isExpanded={isExpanded}
+            onToggleExpanded={() => setIsExpanded((expanded) => !expanded)}
+            onMinimize={() => {
+              setIsMinimized(true);
+              setIsExpanded(false);
+            }}
+            onClose={() => {
+              setIsOpen(false);
+              setIsExpanded(false);
+            }}
             conversationTitle={activeConv?.title}
           />
 
@@ -330,7 +360,8 @@ const StudentAIChat = () => {
                   error={error}
                   onRetry={lastFailedText ? () => handleSendMessage(lastFailedText) : null}
                   onSelectSuggestion={(text) => handleSendMessage(text)}
-                  onFeedback={handleFeedback}
+                  onContinue={handleContinueMessage}
+                  continuingMessageId={continuingMessageId}
                 />
 
                 <ChatInput

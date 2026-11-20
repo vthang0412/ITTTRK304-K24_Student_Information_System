@@ -21,6 +21,9 @@ public class CourseRecommendationItemDto {
     private List<String> missingPrerequisites;
     private String status; // RECOMMENDED, MUST_RETAKE, SCHEDULE_CONFLICT, SECTIONS_FULL, PREREQUISITE_NOT_MET, ALREADY_COMPLETED, CURRENTLY_ENROLLED
     private String priority; // HIGH, MEDIUM, LOW, NONE
+    private String orientationMatch; // HIGH, MEDIUM, LOW, NOT_SPECIFIED
+    private String matchReason;
+    private boolean selectedForCurrentPlan;
     private String reason;
     private List<CourseSectionOptionDto> availableSections;
 }

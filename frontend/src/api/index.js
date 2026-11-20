@@ -190,6 +190,8 @@ export const notificationApi = {
   delete: (id) => httpClient.delete(`/api/notifications/${id}`),
 };
 
+const AI_CHAT_TIMEOUT_MS = Number(import.meta.env.VITE_AI_CHAT_TIMEOUT_MS || 35000);
+
 export const aiChatApi = {
   getOverview: () => httpClient.get('/api/student/ai/overview'),
   getConversations: () => httpClient.get('/api/student/ai/chat/conversations'),
@@ -198,7 +200,7 @@ export const aiChatApi = {
   sendMessage: (conversationId, data) => httpClient.post(
     `/api/student/ai/chat/conversations/${conversationId}/messages`,
     data,
-    { timeout: 35000 },
+    { timeout: AI_CHAT_TIMEOUT_MS },
   ),
   deleteConversation: (conversationId) => httpClient.delete(`/api/student/ai/chat/conversations/${conversationId}`),
   renameConversation: (conversationId, data) => httpClient.put(`/api/student/ai/chat/conversations/${conversationId}/title`, data),

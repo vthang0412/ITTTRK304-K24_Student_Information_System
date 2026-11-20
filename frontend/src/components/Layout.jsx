@@ -391,7 +391,7 @@ const Layout = ({ children }) => {
         <main className="page-content">{children}</main>
       </div>
 
-      {user?.role === 'STUDENT' && <StudentAIChat />}
+      {user?.role === 'STUDENT' && <StudentAIChat sidebarCollapsed={collapsed} />}
     </div>
   );
 };

@@ -346,10 +346,63 @@
   line-height: 1.6;
 }
 
+.ai-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ai-inline-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ai-kv-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 18px;
+}
+
+.ai-kv {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 12px;
+}
+
+.ai-kv span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.ai-kv strong {
+  color: var(--text);
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.ai-condition-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+
 @media (max-width: 900px) {
   .ai-grid-2,
   .ai-grid-3,
-  .ai-course-grid {
+  .ai-course-grid,
+  .ai-kv-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }

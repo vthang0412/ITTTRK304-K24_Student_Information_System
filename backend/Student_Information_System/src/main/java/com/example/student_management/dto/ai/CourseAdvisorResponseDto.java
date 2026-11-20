@@ -22,7 +22,13 @@ public class CourseAdvisorResponseDto {
     private int maxCreditsPerSemester;
 
     private List<CourseRecommendationItemDto> recommendedCourses;
+    private List<CourseRecommendationItemDto> deferredCourses;
     private List<CourseRecommendationItemDto> notRecommendedCourses;
+
+    private CourseAdvisorRequestAnalysisDto requestAnalysis;
+    private CourseAdvisorCreditSummaryDto creditSummary;
+    private CourseAdvisorSuitabilityDto suitabilityAnalysis;
+    private CourseAdvisorPlanDto alternativePlan;
 
     private String advisorSummary;
     private String disclaimer;

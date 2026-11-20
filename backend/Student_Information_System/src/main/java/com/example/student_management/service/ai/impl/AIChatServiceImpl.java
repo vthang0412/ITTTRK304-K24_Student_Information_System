@@ -20,15 +20,25 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
 public class AIChatServiceImpl implements AIChatService {
+
+    private static final Pattern ANSWER_LIKE = Pattern.compile(
+            "\\d{1,2}\\s*[:.)-]?\\s*[abcd]\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern AI_ORIENTATION = Pattern.compile("\\bai\\b");
+    private static final Pattern TARGET_CREDITS = Pattern.compile("(\\d{1,2})\\s*tin\\s*chi");
+    private static final int MIN_CLEAR_OVERLAP_LENGTH = 80;
+    private static final int MAX_CONTINUATION_OVERLAP_LENGTH = 1500;
 
     @Autowired private UserRepository userRepository;
     @Autowired private AIConversationRepository conversationRepository;
@@ -36,12 +46,22 @@ public class AIChatServiceImpl implements AIChatService {
     @Autowired private AIUsageLogRepository usageLogRepository;
     @Autowired private AIProviderService providerService;
     @Autowired private AIChatToolsService toolsService;
+    @Autowired private AICourseAdvisorService courseAdvisorService;
+    @Autowired private AIInsightsService insightsService;
+    @Autowired private AIResponseContinuationService continuationService;
 
     private final AIIntentService intentService = new AIIntentService();
     private final AITutorService tutorService = new AITutorService();
+    private final AIQuizService quizService = new AIQuizService();
+    private final AIGpaWhatIfService gpaWhatIfService = new AIGpaWhatIfService();
+    private final AITimetableAssistantService timetableService = new AITimetableAssistantService();
+    private final AIStudyPlanChatService studyPlanChatService = new AIStudyPlanChatService();
 
     @Value("${app.ai.rate-limit-per-hour:60}")
     private int rateLimitPerHour;
+
+    @Value("${app.ai.continuation.max-count:3}")
+    private int maxContinuations;
 
     @Override
     @Transactional(readOnly = true)
@@ -89,6 +109,10 @@ public class AIChatServiceImpl implements AIChatService {
         }
         AIConversation conversation = getOwnedConversation(conversationId, student.getId());
 
+        if (Boolean.TRUE.equals(request.getContinueResponse())) {
+            return continueAnswer(username, student, conversation, request);
+        }
+
         AIUsageLog reservation = AIRequestQuota.reserve(usageLogRepository, student, rateLimitPerHour, "CHAT");
 
         // Save user message
@@ -100,50 +124,84 @@ public class AIChatServiceImpl implements AIChatService {
                 .build());
 
         List<AIMessage> previousMessages = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversation.getId());
-        boolean hasContext = previousMessages.stream().filter(m -> m.getId() != null && !m.getId().equals(userMessage.getId())).anyMatch(m -> "ASSISTANT".equalsIgnoreCase(m.getRole()));
-        AIIntentService.IntentAnalysis analysis = intentService.analyze(question, hasContext);
+        List<AIMessage> historyExcludingCurrent = previousMessages.stream()
+                .filter(m -> m.getId() == null || userMessage.getId() == null || !m.getId().equals(userMessage.getId()))
+                .toList();
+        boolean hasContext = historyExcludingCurrent.stream()
+                .anyMatch(m -> "ASSISTANT".equalsIgnoreCase(m.getRole()));
+        AIConversationContextService.Context context =
+                new AIConversationContextService().resolve(historyExcludingCurrent, question);
+        AIIntentService.IntentAnalysis analysis =
+                intentService.analyze(question, hasContext, context.getPrior());
         AIIntentService.Intent intent = analysis.getIntent();
+        String studentKey = student.getStudentCode() != null ? student.getStudentCode() : username;
+        if (quizService.hasActiveQuiz(studentKey, conversation.getId()) && isAnswerLike(question)
+                && shouldTreatAsQuizAnswer(intent, context)) {
+            analysis = new AIIntentService.IntentAnalysis(AIIntentService.Intent.QUIZ_ANSWER_SUBMISSION,
+                    null, 0.95, false);
+            intent = AIIntentService.Intent.QUIZ_ANSWER_SUBMISSION;
+        }
 
-        String conversationSummary = buildConversationSummary(previousMessages, question);
+        String conversationSummary = buildConversationSummary(historyExcludingCurrent, question);
         List<Map<String, String>> providerHistory = new ArrayList<>();
         if (!conversationSummary.isBlank()) {
             providerHistory.add(Map.of("role", "user", "content",
                     "<untrusted_conversation_summary>" + AIInputSafety.sanitizeData(conversationSummary)
                             + "</untrusted_conversation_summary>"));
         }
-        List<AIMessage> recentMessages = previousMessages.stream()
-                .filter(m -> m.getId() == null || userMessage.getId() == null || !m.getId().equals(userMessage.getId()))
-                .toList();
-        int historyStart = Math.max(0, recentMessages.size() - 14);
-        for (int i = historyStart; i < recentMessages.size(); i++) {
-            AIMessage m = recentMessages.get(i);
+        int historyStart = Math.max(0, historyExcludingCurrent.size() - 14);
+        for (int i = historyStart; i < historyExcludingCurrent.size(); i++) {
+            AIMessage m = historyExcludingCurrent.get(i);
             String role = "ASSISTANT".equalsIgnoreCase(m.getRole()) ? "assistant" : "user";
             providerHistory.add(Map.of("role", role, "content", safe(m.getContent())));
         }
 
-        // Authorized SIS data fetching based on intent/context
-        DataBundle data = fetchDataForIntent(user, student, analysis, question, previousMessages);
-        String systemContext = buildSystemContext(student, intent, data);
-        String fallback = buildFallbackAnswer(intent, data, question, conversationSummary);
-
-        AIProviderService.AIProviderResult result = providerService.generateChatResponse(
-                systemContext,
-                providerHistory,
-                question,
-                fallback,
-                data.sources
-        );
-        String answer = AIInputSafety.safeAnswer(result.getContent(), fallback);
-        AIRequestQuota.complete(usageLogRepository, reservation, result.getProviderUsed(),
-                result.getModelUsed(), result.isSuccess(), result.getLatencyMs());
+        BusinessAnswer business = buildBusinessAnswer(username, user, student, conversation.getId(),
+                question, analysis, context, studentKey);
+        String answer;
+        List<String> sources;
+        String finishReason;
+        Boolean truncated;
+        Boolean canContinue;
+        String providerUsed;
+        String modelUsed;
+        if (business != null) {
+            answer = AIInputSafety.safeAnswer(business.answer(), business.answer());
+            sources = business.sources();
+            finishReason = "SIS_RULE_ENGINE";
+            truncated = false;
+            canContinue = false;
+            providerUsed = "SIS_RULE_ENGINE";
+            modelUsed = "phase7-business";
+            AIRequestQuota.complete(usageLogRepository, reservation, "SIS_RULE_ENGINE", "phase7-business", true, 0L);
+        } else {
+            DataBundle data = fetchDataForIntent(user, student, analysis, question, historyExcludingCurrent);
+            String systemContext = buildSystemContext(student, intent, data);
+            String fallback = buildFallbackAnswer(intent, data, question, conversationSummary);
+            AIProviderService.AIProviderResult result = providerService.generateChatResponse(
+                    systemContext, providerHistory, question, fallback, data.sources);
+            answer = AIInputSafety.safeAnswer(result.getContent(), fallback);
+            sources = result.getSources() != null ? result.getSources() : data.sources;
+            finishReason = result.getFinishReason() == null ? "UNKNOWN" : result.getFinishReason();
+            truncated = Boolean.TRUE.equals(result.getTruncated());
+            canContinue = truncated && Boolean.TRUE.equals(result.getCanContinue());
+            providerUsed = result.getProviderUsed();
+            modelUsed = result.getModelUsed();
+            AIRequestQuota.complete(usageLogRepository, reservation, result.getProviderUsed(),
+                    result.getModelUsed(), result.isSuccess(), result.getLatencyMs());
+        }
 
         AIMessage savedAssistant = messageRepository.save(AIMessage.builder()
                 .conversation(conversation)
                 .role("ASSISTANT")
                 .content(answer)
-                .sources(String.join(", ", result.getSources() != null ? result.getSources() : data.sources))
+                .sources(String.join(", ", sources))
                 .createdAt(LocalDateTime.now())
                 .build());
+
+        if (canContinue) {
+            continuationService.register(studentKey, conversation.getId(), savedAssistant.getId(), question, answer);
+        }
 
         if ("Hội thoại học tập mới".equals(conversation.getTitle())) {
             conversation.setTitle(question.length() > 40 ? question.substring(0, 37) + "..." : question);
@@ -156,9 +214,206 @@ public class AIChatServiceImpl implements AIChatService {
                 .conversationId(conversation.getId())
                 .role("ASSISTANT")
                 .content(answer)
-                .sources(result.getSources() != null ? result.getSources() : data.sources)
+                .sources(sources)
+                .intent(intent.name())
+                .confidence(analysis.getConfidence())
+                .needsClarification(analysis.isNeedsClarification())
+                .contextUsed(hasContext || context.isFollowUp())
                 .createdAt(savedAssistant.getCreatedAt())
+                .finishReason(finishReason)
+                .truncated(truncated)
+                .canContinue(canContinue)
+                .providerUsed(providerUsed)
+                .modelUsed(modelUsed)
+                .continuationCount(0)
                 .build();
+    }
+
+    private AIChatResponse continueAnswer(String username, Student student,
+                                          AIConversation conversation, AIChatRequest request) {
+        if (request.getContinueFromMessageId() == null) {
+            throw new BadRequestException("Thiếu câu trả lời cần tiếp tục. Vui lòng thử lại từ tin nhắn bị ngắt.");
+        }
+        String studentKey = student.getStudentCode() != null ? student.getStudentCode() : username;
+        int maxCount = maxContinuations >= 1 && maxContinuations <= 5 ? maxContinuations : 3;
+        Long messageId = request.getContinueFromMessageId();
+        AIResponseContinuationService.ContinuationState state = continuationService.begin(
+                messageId, studentKey, conversation.getId(), maxCount);
+        boolean stateCompletionPending = false;
+        try {
+            AIUsageLog reservation = AIRequestQuota.reserve(
+                    usageLogRepository, student, rateLimitPerHour, "CHAT");
+            AIMessage partial = messageRepository
+                    .findByIdAndConversationId(messageId, conversation.getId())
+                    .orElseThrow(() -> new BadRequestException(
+                            "Không tìm thấy câu trả lời cần tiếp tục trong hội thoại này."));
+            if (!"ASSISTANT".equalsIgnoreCase(partial.getRole())) {
+                throw new BadRequestException("Chỉ có thể tiếp tục câu trả lời của trợ lý AI.");
+            }
+
+            String partialContent = partial.getContent() == null ? "" : partial.getContent();
+            String tail = partialContent.length() > MAX_CONTINUATION_OVERLAP_LENGTH
+                    ? partialContent.substring(partialContent.length() - MAX_CONTINUATION_OVERLAP_LENGTH)
+                    : partialContent;
+            String safeQuestion = AIInputSafety.sanitizeData(state.getOriginalQuestion());
+            String systemContext = "Bạn đang viết tiếp một câu trả lời bị ngắt do giới hạn độ dài. "
+                    + "Hãy tiếp tục đúng từ đoạn cuối được cung cấp, KHÔNG lặp lại nội dung cũ, "
+                    + "KHÔNG thêm lời mở đầu, KHÔNG tóm tắt lại. "
+                    + "Giữ cùng ngôn ngữ, cùng định dạng Markdown và cùng phong cách với phần trước.\n"
+                    + "Câu hỏi gốc: " + safeQuestion + "\n"
+                    + "Đoạn cuối của câu trả lời:\n" + AIInputSafety.sanitizeData(tail);
+            List<Map<String, String>> providerHistory = List.of(Map.of(
+                    "role", "user",
+                    "content", "<untrusted_original_question>" + safeQuestion + "</untrusted_original_question>"));
+            AIProviderService.AIProviderResult result = providerService.generateChatResponse(
+                    systemContext,
+                    providerHistory,
+                    "Hãy viết tiếp phần còn lại từ đoạn cuối đã cho.",
+                    "",
+                    List.of("Student SIS Profile"));
+
+            if (result == null || !result.isSuccess()) {
+                if (result != null) {
+                    AIRequestQuota.complete(usageLogRepository, reservation,
+                            result.getProviderUsed(), result.getModelUsed(), false, result.getLatencyMs());
+                }
+                throw new BadRequestException(
+                        "Trợ lý AI chưa thể tiếp tục. Nội dung hiện có được giữ nguyên; vui lòng thử lại.");
+            }
+
+            String extra = AIInputSafety.safeAnswer(result.getContent(), "");
+            if (extra == null || extra.isBlank()) {
+                AIRequestQuota.complete(usageLogRepository, reservation,
+                        result.getProviderUsed(), result.getModelUsed(), false, result.getLatencyMs());
+                throw new BadRequestException(
+                        "Trợ lý AI chưa trả về nội dung tiếp nối. Nội dung hiện có được giữ nguyên; vui lòng thử lại.");
+            }
+
+            String merged = mergeContinuation(partialContent, extra, tail);
+            partial.setContent(merged);
+            messageRepository.saveAndFlush(partial);
+
+            boolean stillTruncated = Boolean.TRUE.equals(result.getTruncated());
+            int continuationCount = state.getCount() + 1;
+            boolean canContinue = stillTruncated && continuationCount < maxCount;
+            conversation.setUpdatedAt(LocalDateTime.now());
+            conversationRepository.save(conversation);
+            AIRequestQuota.complete(usageLogRepository, reservation,
+                    result.getProviderUsed(), result.getModelUsed(), true, result.getLatencyMs());
+            completeContinuationAfterCommit(messageId, merged, stillTruncated);
+            stateCompletionPending = true;
+
+            String finishReason = result.getFinishReason() == null ? "UNKNOWN" : result.getFinishReason();
+            List<String> sources = partial.getSources() == null || partial.getSources().isBlank()
+                    ? List.of("Student SIS Profile")
+                    : Arrays.stream(partial.getSources().split(","))
+                            .map(String::trim)
+                            .filter(s -> !s.isEmpty())
+                            .toList();
+
+            return AIChatResponse.builder()
+                    .messageId(partial.getId())
+                    .conversationId(conversation.getId())
+                    .role("ASSISTANT")
+                    .content(merged)
+                    .sources(sources)
+                    .intent("CONTINUATION")
+                    .confidence(null)
+                    .needsClarification(false)
+                    .contextUsed(true)
+                    .createdAt(partial.getCreatedAt())
+                    .finishReason(finishReason)
+                    .truncated(stillTruncated)
+                    .canContinue(canContinue)
+                    .providerUsed(result.getProviderUsed())
+                    .modelUsed(result.getModelUsed())
+                    .continuationCount(continuationCount)
+                    .build();
+        } finally {
+            if (!stateCompletionPending) {
+                continuationService.cancel(messageId);
+            }
+        }
+    }
+
+    private String mergeContinuation(String partial, String extra, String contextTail) {
+        if (extra == null || extra.isEmpty()) {
+            return partial == null ? "" : partial;
+        }
+        if (partial == null || partial.isBlank()) {
+            return extra;
+        }
+        int overlap = findClearContinuationOverlap(partial, extra, contextTail);
+        if (overlap > 0) {
+            extra = extra.substring(overlap);
+            if (extra.isEmpty()) {
+                return partial;
+            }
+        }
+        char last = partial.charAt(partial.length() - 1);
+        boolean joinDirectly = Character.isLetterOrDigit(last)
+                || last == '}' || last == '`' || last == ')' || last == ']'
+                || last == ':' || last == ',' || last == ';';
+        return joinDirectly ? partial + extra : partial + "\n" + extra;
+    }
+
+    private int findClearContinuationOverlap(String partial, String extra, String contextTail) {
+        if (contextTail == null || contextTail.length() < MIN_CLEAR_OVERLAP_LENGTH
+                || contextTail.length() > MAX_CONTINUATION_OVERLAP_LENGTH
+                || extra.length() < contextTail.length()) {
+            return 0;
+        }
+        String leadingContent = extra.stripLeading();
+        if (leadingContent.startsWith(">") || leadingContent.startsWith("```")
+                || leadingContent.startsWith("\"") || leadingContent.startsWith("'")
+                || leadingContent.startsWith("“") || leadingContent.startsWith("‘")) {
+            return 0;
+        }
+
+        int partialStart = partial.length() - contextTail.length();
+        if (partialStart < 0
+                || !partial.regionMatches(partialStart, contextTail, 0, contextTail.length())
+                || !extra.startsWith(contextTail)) {
+            return 0;
+        }
+        return isSentenceBoundary(partial, partialStart)
+                && isSentenceBoundary(extra, contextTail.length())
+                ? contextTail.length()
+                : 0;
+    }
+
+    private boolean isSentenceBoundary(String text, int offset) {
+        if (offset == 0) {
+            return true;
+        }
+        int index = offset - 1;
+        if (text.charAt(index) == '\n' || text.charAt(index) == '\r') {
+            return true;
+        }
+        while (index >= 0 && Character.isWhitespace(text.charAt(index))) {
+            index--;
+        }
+        return index >= 0 && ".!?".indexOf(text.charAt(index)) >= 0;
+    }
+
+    private void completeContinuationAfterCommit(Long messageId, String content, boolean retainState) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    continuationService.complete(messageId, content, retainState);
+                }
+
+                @Override
+                public void afterCompletion(int status) {
+                    if (status != STATUS_COMMITTED) {
+                        continuationService.cancel(messageId);
+                    }
+                }
+            });
+        } else {
+            continuationService.complete(messageId, content, retainState);
+        }
     }
 
     @Override
@@ -253,6 +508,107 @@ public class AIChatServiceImpl implements AIChatService {
                 : "Báo cáo được tạo từ điểm đã công bố và dữ liệu đăng ký học phần trong hệ thống.");
         report.put("sources", List.of("Academic Records", "Enrollments"));
         return report;
+    }
+
+    // ===== phase 7 business routing =====
+    private record BusinessAnswer(String answer, List<String> sources) { }
+
+    private BusinessAnswer buildBusinessAnswer(String username, User user, Student student,
+                                                Long conversationId, String question,
+                                                AIIntentService.IntentAnalysis analysis,
+                                                AIConversationContextService.Context context,
+                                                String studentKey) {
+        AIIntentService.Intent intent = analysis.getIntent();
+        if (intent == AIIntentService.Intent.UNKNOWN && analysis.isNeedsClarification()) {
+            return new BusinessAnswer(
+                    "Mình chưa xác định được bạn muốn hỏi dữ liệu học vụ, kiến thức cần ôn hay tạo quiz. "
+                            + "Bạn có thể hỏi rõ ví dụ: \"GPA của tôi là bao nhiêu?\", "
+                            + "\"Mô phỏng GPA nếu học 18 tín chỉ với GPA 3.5?\", "
+                            + "\"Tư vấn môn nên đăng ký kỳ tới\" hoặc \"Tạo 5 câu trắc nghiệm Java\".",
+                    List.of("Chat Context"));
+        }
+        if (intent == AIIntentService.Intent.GPA_WHAT_IF) {
+            Map<String, String> slots = context.getPrior() == null
+                    ? new HashMap<>() : new HashMap<>(context.getPrior().getSlots());
+            AIGpaWhatIfService.WhatIfResult result =
+                    gpaWhatIfService.simulate(user, question, slots, toolsService);
+            return new BusinessAnswer(result.getAnswer(),
+                    result.isComplete()
+                            ? List.of("Published Grades & Academic Records", "GPA Simulation (Backend)")
+                            : List.of("Chat Context"));
+        }
+        if (intent == AIIntentService.Intent.COURSE_ADVISOR) {
+            CourseAdvisorRequestDto preferences = buildAdvisorPreferences(question);
+            CourseAdvisorResponseDto advice = preferences == null
+                    ? courseAdvisorService.getCourseRecommendations(username)
+                    : courseAdvisorService.recommendCoursesWithPreferences(username, preferences);
+            return new BusinessAnswer(AIBusinessChatFormatter.formatAdvisor(advice),
+                    List.of("Course Catalog", "Published Grades & Academic Records", "Enrollment Records"));
+        }
+        if (intent == AIIntentService.Intent.STUDY_PLANNER) {
+            return new BusinessAnswer(studyPlanChatService.build(user, question, toolsService),
+                    List.of("Published Grades & Academic Records", "Enrollment Records", "Exam Schedule"));
+        }
+        if (intent == AIIntentService.Intent.QUIZ_GENERATION) {
+            String topic = (context.getTopic() == null ? "" : context.getTopic()) + " " + question;
+            return new BusinessAnswer(quizService.start(studentKey, conversationId, topic, question,
+                            quizService.parseRequestedCount(question)),
+                    List.of("AI Quiz Bank (Backend)"));
+        }
+        if (intent == AIIntentService.Intent.QUIZ_ANSWER_SUBMISSION) {
+            return new BusinessAnswer(quizService.grade(studentKey, conversationId, question),
+                    List.of("AI Quiz Bank (Backend)"));
+        }
+        if (intent == AIIntentService.Intent.TIMETABLE_ASSISTANT || intent == AIIntentService.Intent.EXAM_SCHEDULE) {
+            boolean includeClasses = intent == AIIntentService.Intent.TIMETABLE_ASSISTANT;
+            return new BusinessAnswer(timetableService.build(studentKey, student, toolsService, includeClasses),
+                    includeClasses
+                            ? List.of("Enrollment Records", "Exam Schedule")
+                            : List.of("Exam Schedule"));
+        }
+        if (intent == AIIntentService.Intent.LEARNING_INSIGHTS) {
+            return new BusinessAnswer(AIBusinessChatFormatter.formatInsights(insightsService.getInsights(username)),
+                    List.of("Published Grades & Academic Records", "Enrollment Records", "Learning Insights"));
+        }
+        return null;
+    }
+
+    private CourseAdvisorRequestDto buildAdvisorPreferences(String question) {
+        String q = norm(question);
+        String orientation = null;
+        if (AI_ORIENTATION.matcher(q).find() || containsAnyNorm(q, "tri tue nhan tao")) orientation = "AI";
+        else if (containsAnyNorm(q, "web", "frontend", "backend")) orientation = "Web";
+        else if (containsAnyNorm(q, "mobile", "android", "ung dung di dong")) orientation = "Mobile";
+        else if (containsAnyNorm(q, "an toan", "security", "bao mat")) orientation = "Security";
+        else if (containsAnyNorm(q, "phan mem", "software")) orientation = "Software";
+        Integer targetCredits = null;
+        java.util.regex.Matcher matcher = TARGET_CREDITS.matcher(q);
+        if (matcher.find()) {
+            int value = Integer.parseInt(matcher.group(1));
+            if (value >= 1 && value <= 30) targetCredits = value;
+        }
+        if (orientation == null && targetCredits == null) return null;
+        return CourseAdvisorRequestDto.builder()
+                .careerOrientation(orientation)
+                .targetCredits(targetCredits)
+                .build();
+    }
+
+    private boolean isAnswerLike(String question) {
+        String q = norm(question);
+        return ANSWER_LIKE.matcher(q).find()
+                || containsAnyNorm(q, "dap an cua toi", "day la dap an", "cham diem");
+    }
+
+    private boolean shouldTreatAsQuizAnswer(AIIntentService.Intent intent,
+                                            AIConversationContextService.Context context) {
+        return intent == AIIntentService.Intent.QUIZ_ANSWER_SUBMISSION
+                || intent == AIIntentService.Intent.FOLLOW_UP_QUESTION
+                || intent == AIIntentService.Intent.UNKNOWN
+                || intent == AIIntentService.Intent.GENERAL_ACADEMIC_QUESTION
+                || intent == AIIntentService.Intent.TUTOR_ANSWER_EVALUATION
+                || (context.getPrior() != null
+                    && context.getPrior().getIntent() == AIIntentService.Intent.QUIZ_GENERATION);
     }
 
     // ===== context/data helpers =====
@@ -532,7 +888,9 @@ public class AIChatServiceImpl implements AIChatService {
                 || intent == AIIntentService.Intent.TUTOR_QUIZ
                 || intent == AIIntentService.Intent.TUTOR_ANSWER_EVALUATION
                 || intent == AIIntentService.Intent.TUTOR_STUDY_MATERIAL
-                || intent == AIIntentService.Intent.TUTOR_FOLLOW_UP;
+                || intent == AIIntentService.Intent.TUTOR_FOLLOW_UP
+                || intent == AIIntentService.Intent.GENERAL_KNOWLEDGE
+                || intent == AIIntentService.Intent.COURSE_INFORMATION;
     }
 
     private boolean isTutorIntent(AIIntentService.Intent intent) {

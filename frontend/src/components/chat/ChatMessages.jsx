@@ -69,18 +69,20 @@ const renderTable = (lines, keyPrefix) => {
   if (rows.length === 0) return null;
   const [header, ...body] = rows;
   return (
-    <table key={keyPrefix} className="ai-md-table">
-      <thead>
-        <tr>{header.map((cell, idx) => <th key={idx}>{renderInline(cell, `${keyPrefix}-h-${idx}`)}</th>)}</tr>
-      </thead>
-      <tbody>
-        {body.map((row, rIdx) => (
-          <tr key={rIdx}>
-            {row.map((cell, cIdx) => <td key={cIdx}>{renderInline(cell, `${keyPrefix}-b-${rIdx}-${cIdx}`)}</td>)}
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div key={keyPrefix} className="ai-md-table-wrap">
+      <table className="ai-md-table">
+        <thead>
+          <tr>{header.map((cell, idx) => <th key={idx}>{renderInline(cell, `${keyPrefix}-h-${idx}`)}</th>)}</tr>
+        </thead>
+        <tbody>
+          {body.map((row, rIdx) => (
+            <tr key={rIdx}>
+              {row.map((cell, cIdx) => <td key={cIdx}>{renderInline(cell, `${keyPrefix}-b-${rIdx}-${cIdx}`)}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 };
 
@@ -204,7 +206,8 @@ const ChatMessages = ({
   error,
   onRetry,
   onSelectSuggestion,
-  onFeedback,
+  onContinue,
+  continuingMessageId,
 }) => {
   const scrollRef = useRef(null);
   const bottomRef = useRef(null);
@@ -291,45 +294,29 @@ const ChatMessages = ({
                       {isUser ? msg.content : renderFormattedText(msg.content, `${msg.id || index}`, handleCopy)}
                     </div>
 
-                    {!isUser && Array.isArray(msg.sources) && msg.sources.length > 0 && (
-                      <div className="ai-sources-wrap">
-                        {msg.sources.map((src, sIdx) => (
-                          <span key={sIdx} className="ai-source-chip" title="Nguồn dữ liệu">
-                            📚 {src}
-                          </span>
-                        ))}
+                    {!isUser && (msg.truncated || msg.canContinue) && (
+                      <div className="ai-truncated-notice">
+                        <span>
+                          {msg.finishReason === 'LENGTH'
+                            ? 'Câu trả lời đã dừng do giới hạn độ dài của mô hình.'
+                            : msg.finishReason === 'BACKEND_LIMIT'
+                              ? 'Câu trả lời đã đạt giới hạn độ dài an toàn của hệ thống.'
+                              : 'Câu trả lời có thể chưa hoàn tất.'}
+                        </span>
+                        {msg.canContinue && (
+                          <button
+                            type="button"
+                            className="ai-continue-btn"
+                            disabled={continuingMessageId != null}
+                            onClick={() => onContinue?.(msg)}
+                            title="Viết tiếp phần còn lại"
+                          >
+                            {continuingMessageId === msg.id ? 'Đang tiếp tục...' : 'Tiếp tục câu trả lời'}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
-
-                  {!isUser && (
-                    <div className="ai-message-actions">
-                      <button
-                        type="button"
-                        className="ai-message-action-btn"
-                        onClick={() => handleCopy(msg.content || '', `answer-${msg.id || index}`)}
-                        title="Sao chép câu trả lời"
-                      >
-                        {copiedKey === `answer-${msg.id || index}` ? 'Đã copy' : 'Sao chép'}
-                      </button>
-                      <button
-                        type="button"
-                        className={`ai-message-action-btn ${msg.feedback === 'HELPFUL' ? 'active' : ''}`}
-                        onClick={() => onFeedback?.(msg.id, 'HELPFUL')}
-                        title="Câu trả lời hữu ích"
-                      >
-                        Hữu ích
-                      </button>
-                      <button
-                        type="button"
-                        className={`ai-message-action-btn ${msg.feedback === 'UNHELPFUL' ? 'active' : ''}`}
-                        onClick={() => onFeedback?.(msg.id, 'UNHELPFUL')}
-                        title="Câu trả lời chưa hữu ích"
-                      >
-                        Chưa hữu ích
-                      </button>
-                    </div>
-                  )}
 
                   {time && (
                     <div
