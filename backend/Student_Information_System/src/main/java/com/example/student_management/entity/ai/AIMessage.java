@@ -34,6 +34,9 @@ public class AIMessage {
     @Column(columnDefinition = "TEXT")
     private String sources; // e.g. "Academic Records, Enrollments"
 
+    @Column(length = 20)
+    private String feedback;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

@@ -37,6 +37,11 @@ import AdminFeedbacks from './pages/admin/AdminFeedbacks';
 import AdminExamSchedules from './pages/admin/AdminExamSchedules';
 import AdminExamRooms from './pages/admin/AdminExamRooms';
 import StudentExamSchedules from './pages/student/StudentExamSchedules';
+import AIDashboard from './pages/student/AIDashboard';
+import AIInsights from './pages/student/AIInsights';
+import AICourseAdvisor from './pages/student/AICourseAdvisor';
+import AIStudyPlanner from './pages/student/AIStudyPlanner';
+import AIReports from './pages/student/AIReports';
 
 const withLayout = (element, roles) => (
   <ProtectedRoute allowedRoles={roles}>
@@ -67,6 +72,11 @@ function App() {
               <Route path="/student/grades" element={withLayout(<StudentGrades />, ['STUDENT'])} />
               <Route path="/student/notifications" element={withLayout(<StudentNotifications />, ['STUDENT'])} />
               <Route path="/student/feedbacks" element={withLayout(<StudentFeedbacks />, ['STUDENT'])} />
+              <Route path="/student/ai-dashboard" element={withLayout(<AIDashboard />, ['STUDENT'])} />
+              <Route path="/student/ai-insights" element={withLayout(<AIInsights />, ['STUDENT'])} />
+              <Route path="/student/ai-course-advisor" element={withLayout(<AICourseAdvisor />, ['STUDENT'])} />
+              <Route path="/student/ai-study-planner" element={withLayout(<AIStudyPlanner />, ['STUDENT'])} />
+              <Route path="/student/ai-reports" element={withLayout(<AIReports />, ['STUDENT'])} />
 
               <Route path="/lecturer/profile" element={withLayout(<Profile />, ['LECTURER'])} />
               <Route path="/lecturer/sections" element={withLayout(<LecturerSections />, ['LECTURER'])} />

@@ -2,6 +2,11 @@ export const getErrorMessage = (err, fallback = 'Đã có lỗi xảy ra. Vui l�
   if (!err) return fallback;
   const data = err.response?.data;
   if (typeof data === 'string' && data.trim()) return data;
+  const status = err.response?.status;
+  if (status === 429) return 'Bạn đã gửi quá nhiều yêu cầu AI. Vui lòng thử lại sau ít phút.';
+  if (status === 403) return 'Bạn không có quyền thực hiện thao tác này.';
+  if (status === 401) return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+  if (status >= 500) return 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau.';
   const message = data?.message;
   if (!message) return fallback;
   // Map message tiếng Anh cũ → tiếng Việt

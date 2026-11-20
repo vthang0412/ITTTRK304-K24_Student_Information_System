@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  MessageSquareIcon, PlusIcon, TrashIcon,
+  MessageSquareIcon, PencilIcon, PlusIcon, TrashIcon,
 } from '../Icons';
 import { formatDate } from '../../utils/format';
 
@@ -11,10 +11,42 @@ const ChatConversations = ({
   onSelect,
   onNew,
   onDelete,
+  onRename,
 }) => {
+  const [editingId, setEditingId] = useState(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [saving, setSaving] = useState(false);
+
   const handleDelete = (e, id) => {
     e.stopPropagation();
     onDelete(id);
+  };
+
+  const handleStartRename = (e, item) => {
+    e.stopPropagation();
+    setEditingId(item.id);
+    setEditingTitle(item.title || '');
+  };
+
+  const handleCancelRename = (e) => {
+    e?.stopPropagation();
+    setEditingId(null);
+    setEditingTitle('');
+  };
+
+  const handleSubmitRename = async (e, id) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const title = editingTitle.trim();
+    if (!title || title.length > 120 || saving) return;
+    setSaving(true);
+    try {
+      await onRename(id, title);
+      setEditingId(null);
+      setEditingTitle('');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -56,38 +88,91 @@ const ChatConversations = ({
         ) : (
           conversations.map((item) => {
             const isActive = item.id === activeId;
+            const isEditing = editingId === item.id;
             return (
               <div
                 key={item.id}
                 className={`ai-conv-item ${isActive ? 'active' : ''}`}
-                onClick={() => onSelect(item.id)}
+                onClick={() => !isEditing && onSelect(item.id)}
               >
                 <div className="ai-conv-meta">
-                  <div className="ai-conv-title" title={item.title}>
-                    {item.title || 'Hội thoại học tập'}
-                  </div>
-                  {item.lastMessage && (
-                    <div className="ai-conv-last-msg" title={item.lastMessage}>
-                      {item.lastMessage}
-                    </div>
+                  {isEditing ? (
+                    <form
+                      className="ai-conv-edit-form"
+                      onSubmit={(e) => handleSubmitRename(e, item.id)}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        autoFocus
+                        className="ai-conv-edit-input"
+                        value={editingTitle}
+                        maxLength={120}
+                        onChange={(e) => setEditingTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') handleCancelRename(e);
+                        }}
+                        aria-label="Tên cuộc hội thoại"
+                      />
+                      <div className="ai-conv-edit-actions">
+                        <button
+                          type="button"
+                          className="ai-conv-edit-btn"
+                          onClick={handleCancelRename}
+                          disabled={saving}
+                        >
+                          Hủy
+                        </button>
+                        <button
+                          type="submit"
+                          className="ai-conv-edit-btn primary"
+                          disabled={saving || !editingTitle.trim()}
+                        >
+                          {saving ? '...' : 'Lưu'}
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <div className="ai-conv-title" title={item.title}>
+                        {item.title || 'Hội thoại học tập'}
+                      </div>
+                      {item.lastMessage && (
+                        <div className="ai-conv-last-msg" title={item.lastMessage}>
+                          {item.lastMessage}
+                        </div>
+                      )}
+                      <div className="ai-conv-sub">
+                        <span>{formatDate(item.updatedAt || item.createdAt)}</span>
+                        {item.messageCount > 0 && (
+                          <span>· {item.messageCount} tin nhắn</span>
+                        )}
+                      </div>
+                    </>
                   )}
-                  <div className="ai-conv-sub">
-                    <span>{formatDate(item.updatedAt || item.createdAt)}</span>
-                    {item.messageCount > 0 && (
-                      <span>· {item.messageCount} tin nhắn</span>
-                    )}
-                  </div>
                 </div>
 
-                <button
-                  type="button"
-                  className="ai-conv-delete-btn"
-                  title="Xóa hội thoại"
-                  onClick={(e) => handleDelete(e, item.id)}
-                  aria-label="Xóa cuộc hội thoại"
-                >
-                  <TrashIcon size={14} />
-                </button>
+                {!isEditing && (
+                  <div className="ai-conv-actions" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      className="ai-conv-rename-btn"
+                      title="Đổi tên hội thoại"
+                      onClick={(e) => handleStartRename(e, item)}
+                      aria-label="Đổi tên cuộc hội thoại"
+                    >
+                      <PencilIcon size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className="ai-conv-delete-btn"
+                      title="Xóa hội thoại"
+                      onClick={(e) => handleDelete(e, item.id)}
+                      aria-label="Xóa cuộc hội thoại"
+                    >
+                      <TrashIcon size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })

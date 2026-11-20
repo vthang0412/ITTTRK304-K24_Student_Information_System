@@ -16,6 +16,12 @@ public interface AIChatService {
 
     void deleteConversation(String username, Long conversationId);
 
+    AIConversationDto renameConversation(String username, Long conversationId, AIRenameConversationRequest request);
+
+    AIMessageDto setMessageFeedback(String username, Long messageId, String feedback);
+
     Map<String, Object> getAcademicOverview(String username);
+
+    Map<String, Object> getAcademicReport(String username);
 }
 

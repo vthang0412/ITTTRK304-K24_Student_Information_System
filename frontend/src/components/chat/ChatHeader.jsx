@@ -1,12 +1,14 @@
 import React from 'react';
 import {
-  BotIcon, MessageSquareIcon, MinusIcon, PlusIcon, XIcon,
+  BotIcon, Maximize2Icon, MessageSquareIcon, Minimize2Icon, MinusIcon, PlusIcon, XIcon,
 } from '../Icons';
 
 const ChatHeader = ({
   view,
   onToggleView,
   onNewConversation,
+  isExpanded,
+  onToggleExpanded,
   onMinimize,
   onClose,
   conversationTitle,
@@ -43,6 +45,17 @@ const ChatHeader = ({
         aria-label="Lịch sử hội thoại"
       >
         <MessageSquareIcon size={15} />
+      </button>
+
+      <button
+        type="button"
+        className="ai-action-btn"
+        title={isExpanded ? 'Thu nhỏ' : 'Phóng to'}
+        onClick={onToggleExpanded}
+        aria-label={isExpanded ? 'Thu nhỏ khung chat' : 'Phóng to khung chat'}
+        aria-pressed={isExpanded}
+      >
+        {isExpanded ? <Minimize2Icon size={15} /> : <Maximize2Icon size={15} />}
       </button>
 
       <button
