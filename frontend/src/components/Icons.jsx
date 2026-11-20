@@ -171,3 +171,9 @@ export const MessageSquareIcon = (p) => (
 export const MinusIcon = (p) => (
   <Svg {...p}><path d="M5 12h14" /></Svg>
 );
+export const Maximize2Icon = (p) => (
+  <Svg {...p}><path d="M15 3h6v6M14 10l7-7M9 21H3v-6M10 14l-7 7" /></Svg>
+);
+export const Minimize2Icon = (p) => (
+  <Svg {...p}><path d="M4 14h6v6M14 10l6-6M20 14h-6v6M10 10 4 4" /></Svg>
+);

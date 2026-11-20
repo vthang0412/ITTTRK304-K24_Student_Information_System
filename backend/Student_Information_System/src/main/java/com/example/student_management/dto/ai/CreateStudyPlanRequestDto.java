@@ -3,6 +3,7 @@ package com.example.student_management.dto.ai;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -36,6 +37,8 @@ public class CreateStudyPlanRequestDto {
     @Size(max = 2000)
     private String customNote;
 
+    @Valid
+    @Size(max = 100, message = "Mỗi kế hoạch tối đa 100 nhiệm vụ")
     private List<StudyPlanItemDto> manualItems;
 }
 

@@ -21,5 +21,6 @@ public class CourseSectionOptionDto {
     private boolean isOpen;
     private boolean hasScheduleConflict;
     private String conflictWith;
+    private Double weeklyHours;
 }
 

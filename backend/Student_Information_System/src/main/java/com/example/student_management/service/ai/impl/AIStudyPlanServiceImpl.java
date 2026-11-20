@@ -20,7 +20,9 @@ import com.example.student_management.repository.ai.AIStudyPlanItemRepository;
 import com.example.student_management.repository.ai.AIStudyPlanRepository;
 import com.example.student_management.repository.ai.AIUsageLogRepository;
 import com.example.student_management.repository.auth.UserRepository;
+import com.example.student_management.service.ai.AIInputSafety;
 import com.example.student_management.service.ai.AIProviderService;
+import com.example.student_management.service.ai.AIRequestQuota;
 import com.example.student_management.service.ai.AIStudyPlanService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,6 +38,9 @@ import java.util.stream.Collectors;
 
 @Service
 public class AIStudyPlanServiceImpl implements AIStudyPlanService {
+
+    private static final int MAX_PLAN_DAYS = 90;
+    private static final int MAX_MANUAL_ITEMS = 100;
 
     @Autowired
     private UserRepository userRepository;
@@ -68,19 +73,20 @@ public class AIStudyPlanServiceImpl implements AIStudyPlanService {
         User user = getStudentUser(username);
         Student student = user.getStudent();
 
-        // 1. Kiểm tra giới hạn tần suất (Rate limit)
-        long recentCalls = usageLogRepository.countByStudentIdAndCreatedAtAfter(
-                student.getId(), LocalDateTime.now().minusHours(1));
-        if (recentCalls >= rateLimitPerHour) {
-            throw new BadRequestException("Bạn đã dùng hết " + rateLimitPerHour + " lượt gọi AI trong 1 giờ. Vui lòng chờ ít phút.");
-        }
-
-        // 2. Chuẩn hóa ngày bắt đầu và kết thúc
+        // 1. Chuẩn hóa ngày bắt đầu và kết thúc
         LocalDate startDate = request.getStartDate() != null ? request.getStartDate() : LocalDate.now();
         LocalDate endDate = request.getEndDate() != null ? request.getEndDate() : startDate.plusDays(6);
         if (endDate.isBefore(startDate)) {
             throw new BadRequestException("Ngày kết thúc (" + endDate + ") không thể trước ngày bắt đầu (" + startDate + ")");
         }
+        if (ChronoUnit.DAYS.between(startDate, endDate) + 1 > MAX_PLAN_DAYS) {
+            throw new BadRequestException("Kế hoạch học tập tối đa " + MAX_PLAN_DAYS + " ngày. Vui lòng chia thành các kế hoạch ngắn hơn.");
+        }
+        if (request.getManualItems() != null && request.getManualItems().size() > MAX_MANUAL_ITEMS) {
+            throw new BadRequestException("Mỗi kế hoạch tối đa " + MAX_MANUAL_ITEMS + " nhiệm vụ.");
+        }
+
+        AIUsageLog reservation = AIRequestQuota.reserve(usageLogRepository, student, rateLimitPerHour, "PLANNER");
 
         String title = (request.getTitle() != null && !request.getTitle().isBlank())
                 ? request.getTitle().trim()
@@ -110,11 +116,21 @@ public class AIStudyPlanServiceImpl implements AIStudyPlanService {
         List<AIStudyPlanItem> items = new ArrayList<>();
         if (request.getManualItems() != null && !request.getManualItems().isEmpty()) {
             for (StudyPlanItemDto m : request.getManualItems()) {
+                if (m == null) continue;
+                if (m.getTitle() != null && m.getTitle().length() > 255) {
+                    throw new BadRequestException("Tên nhiệm vụ tối đa 255 ký tự");
+                }
+                if (m.getDurationMinutes() != null && (m.getDurationMinutes() < 1 || m.getDurationMinutes() > 1440)) {
+                    throw new BadRequestException("Thời lượng nhiệm vụ phải từ 1 đến 1440 phút");
+                }
                 Course course = null;
                 if (m.getCourseId() != null) {
                     course = courseRepository.findById(m.getCourseId()).orElse(null);
                 }
                 LocalDate taskDate = m.getStudyDate() != null ? m.getStudyDate() : startDate;
+                if (taskDate.isBefore(startDate) || taskDate.isAfter(endDate)) {
+                    throw new BadRequestException("Ngày học của nhiệm vụ phải nằm trong khoảng của kế hoạch");
+                }
                 items.add(AIStudyPlanItem.builder()
                         .studyPlan(savedPlan)
                         .course(course)
@@ -134,7 +150,7 @@ public class AIStudyPlanServiceImpl implements AIStudyPlanService {
         studyPlanItemRepository.saveAll(items);
 
         // 6. Gọi AI để sinh lời khuyên học tập cá nhân hóa
-        String aiAdvice = generateStudyAdvice(student, savedPlan, focusCourses, request.getCustomNote(), startTime);
+        String aiAdvice = generateStudyAdvice(student, savedPlan, focusCourses, request.getCustomNote(), startTime, reservation);
 
         return mapToDto(savedPlan, aiAdvice);
     }
@@ -317,7 +333,7 @@ public class AIStudyPlanServiceImpl implements AIStudyPlanService {
     /**
      * Gọi AI Provider để tạo lời khuyên phân bổ thời gian học thông minh
      */
-    private String generateStudyAdvice(Student student, AIStudyPlan plan, List<Course> focusCourses, String customNote, long startTime) {
+    private String generateStudyAdvice(Student student, AIStudyPlan plan, List<Course> focusCourses, String customNote, long startTime, AIUsageLog reservation) {
         StringBuilder prompt = new StringBuilder();
         prompt.append("Sinh viên: ").append(student.getFullName()).append(" (").append(student.getStudentCode()).append(").\n");
         prompt.append("Kế hoạch: ").append(plan.getTitle()).append(", Mục tiêu: ").append(plan.getGoal()).append(".\n");
@@ -337,20 +353,11 @@ public class AIStudyPlanServiceImpl implements AIStudyPlanService {
 
         AIProviderService.AIProviderResult external = providerService.generateExternalAnalysis(sysInstruction, prompt.toString());
 
-        // Ghi log sử dụng AI
-        try {
-            usageLogRepository.save(AIUsageLog.builder()
-                    .student(student)
-                    .featureType("PLANNER")
-                    .provider(external.getProviderUsed())
-                    .model(external.getModelUsed())
-                    .status("SUCCESS")
-                    .latencyMs(System.currentTimeMillis() - startTime)
-                    .createdAt(LocalDateTime.now())
-                    .build());
-        } catch (Exception ignored) {}
+        AIRequestQuota.complete(usageLogRepository, reservation, external.getProviderUsed(),
+                external.getModelUsed(), external.isSuccess(), System.currentTimeMillis() - startTime);
 
-        if (external.isSuccess() && external.getContent() != null && !external.getContent().isBlank()) {
+        if (external.isSuccess() && !AIInputSafety.isSensitiveOutput(external.getContent())
+                && external.getContent() != null && !external.getContent().isBlank()) {
             return external.getContent();
         }
 

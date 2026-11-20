@@ -317,10 +317,121 @@ img { max-width: 100%; display: block; }
   gap: 10px;
   flex-wrap: wrap;
 }
-.admin-timetable-filters {
+.toolbar.admin-timetable-filters {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: minmax(0, 20fr) minmax(0, 28fr) minmax(0, 26fr) minmax(0, 26fr);
+  grid-auto-flow: row;
+  align-items: center;
+  flex-wrap: initial;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
   margin: 18px 0 0;
+}
+
+.toolbar.admin-timetable-filters > .select,
+.toolbar.admin-timetable-filters > .input {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  height: 46px;
+  min-height: 46px;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.toolbar.admin-enrollment-main-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 32fr) repeat(4, minmax(0, 17fr));
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 10px;
+  flex-wrap: initial;
+}
+
+.toolbar.admin-enrollment-main-filters > * {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.toolbar.admin-enrollment-main-filters .search-box {
+  flex: none;
+}
+
+.toolbar.admin-enrollment-main-filters .search-box,
+.toolbar.admin-enrollment-main-filters .search-box .input,
+.toolbar.admin-enrollment-main-filters > .select {
+  height: 46px;
+  min-height: 46px;
+}
+
+.toolbar.admin-enrollment-time-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+  width: 100%;
+  max-width: 720px;
+  min-width: 0;
+  margin: 0 0 16px;
+  flex-wrap: initial;
+}
+
+.toolbar.admin-enrollment-time-filters > .field {
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  margin: 0;
+  gap: 6px;
+}
+
+.toolbar.admin-enrollment-time-filters > .field > span {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.toolbar.admin-enrollment-time-filters > .field .input {
+  width: 100%;
+  min-width: 0;
+  height: 46px;
+  min-height: 46px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1199px) {
+  .toolbar.admin-enrollment-main-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .toolbar.admin-enrollment-time-filters {
+    max-width: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .toolbar.admin-enrollment-main-filters,
+  .toolbar.admin-enrollment-time-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1199px) {
+  .toolbar.admin-timetable-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .toolbar.admin-timetable-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .admin-timetable-week {
   display: grid;

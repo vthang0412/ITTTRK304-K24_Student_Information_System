@@ -19,7 +19,9 @@ import com.example.student_management.repository.ai.AIUsageLogRepository;
 import com.example.student_management.repository.auth.UserRepository;
 import com.example.student_management.service.ai.AIContextService;
 import com.example.student_management.service.ai.AIInsightsService;
+import com.example.student_management.service.ai.AIInputSafety;
 import com.example.student_management.service.ai.AIProviderService;
+import com.example.student_management.service.ai.AIRequestQuota;
 import com.example.student_management.service.grade.GradebookService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -64,7 +66,7 @@ public class AIInsightsServiceImpl implements AIInsightsService {
     private final Map<Long, AIInsightsDto> insightsCache = new ConcurrentHashMap<>();
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public AIInsightsDto getInsights(String username) {
         User user = getStudentUser(username);
         Student student = user.getStudent();
@@ -72,7 +74,16 @@ public class AIInsightsServiceImpl implements AIInsightsService {
         if (cached != null) {
             return cached;
         }
-        return generateAndLogInsights(user, student);
+        AIUsageLog reservation = AIRequestQuota.reserve(usageLogRepository, student, rateLimitPerHour, "INSIGHTS");
+        boolean[] generated = {false};
+        AIInsightsDto result = insightsCache.computeIfAbsent(student.getId(), id -> {
+            generated[0] = true;
+            return generateAndLogInsights(user, student, reservation);
+        });
+        if (!generated[0]) {
+            AIRequestQuota.complete(usageLogRepository, reservation, "SIS", "cache", true, 0L);
+        }
+        return result;
     }
 
     @Override
@@ -81,17 +92,15 @@ public class AIInsightsServiceImpl implements AIInsightsService {
         User user = getStudentUser(username);
         Student student = user.getStudent();
 
-        long recentCalls = usageLogRepository.countByStudentIdAndCreatedAtAfter(
-                student.getId(), LocalDateTime.now().minusHours(1));
-        if (recentCalls >= rateLimitPerHour) {
-            throw new BadRequestException("Bạn đã vượt quá giới hạn " + rateLimitPerHour + " lượt phân tích AI trong 1 giờ. Vui lòng thử lại sau.");
-        }
+        AIUsageLog reservation = AIRequestQuota.reserve(usageLogRepository, student, rateLimitPerHour, "INSIGHTS");
 
         insightsCache.remove(student.getId());
-        return generateAndLogInsights(user, student);
+        AIInsightsDto result = generateAndLogInsights(user, student, reservation);
+        insightsCache.put(student.getId(), result);
+        return result;
     }
 
-    private AIInsightsDto generateAndLogInsights(User user, Student student) {
+    private AIInsightsDto generateAndLogInsights(User user, Student student, AIUsageLog reservation) {
         long start = System.currentTimeMillis();
         List<StudentGradeDto> publishedGrades = gradebookService.getStudentPublishedGrades(user.getUsername());
         List<Enrollment> enrollments = enrollmentRepository.findByStudentId(student.getId());
@@ -168,7 +177,7 @@ public class AIInsightsServiceImpl implements AIInsightsService {
 
         // 5. Tạo nhận xét AI (External LLM nếu có API key, fallback nội bộ nếu chưa cấu hình)
         String aiSummary = buildAiSummary(student, user, gpa10, gpa4, completedCredits,
-                totalCompletedCourses, totalFailedCourses, semesterInsights, lowScoreCourses, highScoreCourses, start);
+                totalCompletedCourses, totalFailedCourses, semesterInsights, lowScoreCourses, highScoreCourses, start, reservation);
 
         AIInsightsDto dto = AIInsightsDto.builder()
                 .studentCode(student.getStudentCode())
@@ -190,7 +199,6 @@ public class AIInsightsServiceImpl implements AIInsightsService {
                 .generatedAt(LocalDateTime.now())
                 .build();
 
-        insightsCache.put(student.getId(), dto);
         return dto;
     }
 
@@ -359,7 +367,8 @@ public class AIInsightsServiceImpl implements AIInsightsService {
             List<AISemesterInsightDto> semesterInsights,
             List<Map<String, Object>> lowScoreCourses,
             List<StudentGradeDto> highScoreCourses,
-            long startMs
+            long startMs,
+            AIUsageLog reservation
     ) {
         String systemContext = contextService.buildSystemContextPrompt(student, user);
         String prompt = "Hãy viết một đoạn nhận xét tổng quan ngắn gọn (3-5 câu bằng tiếng Việt, dùng Markdown) phân tích tình hình học tập thực tế của sinh viên dựa trên dữ liệu SIS: GPA 10 = "
@@ -370,20 +379,11 @@ public class AIInsightsServiceImpl implements AIInsightsService {
 
         AIProviderService.AIProviderResult external = providerService.generateExternalAnalysis(systemContext, prompt);
 
-        // Ghi log sử dụng AI
-        try {
-            usageLogRepository.save(AIUsageLog.builder()
-                    .student(student)
-                    .featureType("INSIGHTS")
-                    .provider(external.getProviderUsed())
-                    .model(external.getModelUsed())
-                    .status("SUCCESS")
-                    .latencyMs(System.currentTimeMillis() - startMs)
-                    .createdAt(LocalDateTime.now())
-                    .build());
-        } catch (Exception ignored) {}
+        AIRequestQuota.complete(usageLogRepository, reservation, external.getProviderUsed(),
+                external.getModelUsed(), external.isSuccess(), System.currentTimeMillis() - startMs);
 
-        if (external.isSuccess() && external.getContent() != null && !external.getContent().isBlank()) {
+        if (external.isSuccess() && !AIInputSafety.isSensitiveOutput(external.getContent())
+                && external.getContent() != null && !external.getContent().isBlank()) {
             return external.getContent();
         }
 

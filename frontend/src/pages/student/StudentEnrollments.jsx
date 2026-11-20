@@ -157,9 +157,9 @@ const StudentEnrollments = () => {
                       </td>
                       <td>
                         <div className="row-actions">
-                          {e.status === 'ENROLLED' || e.status === 'PENDING' ? (
+                          {e.status === 'PENDING' ? (
                             <button className="btn btn-secondary btn-sm" onClick={() => setTarget(e)}>
-                              {e.status === 'PENDING' ? 'Huỷ đơn' : 'Huỷ đăng ký'}
+                              Huỷ đơn
                             </button>
                           ) : (
                             <span className="cell-muted">—</span>
@@ -178,9 +178,10 @@ const StudentEnrollments = () => {
 
       <ConfirmDialog
         open={!!target}
-        title={target?.status === 'PENDING' ? 'Huỷ đơn đăng ký học phần' : 'Huỷ đăng ký học phần'}
-        message={`Bạn có chắc muốn huỷ ${target?.status === 'PENDING' ? 'đơn đăng ký' : 'đăng ký'} lớp ${target?.courseSection?.sectionCode} — ${target?.courseSection?.course?.courseName}? Thao tác này không thể hoàn tác.`}
-        confirmLabel="Huỷ"
+        title="Huỷ đơn đăng ký học phần"
+        message={`Bạn có chắc muốn huỷ đơn đăng ký lớp ${target?.courseSection?.sectionCode} — ${target?.courseSection?.course?.courseName}? Thao tác này không thể hoàn tác.`}
+        cancelLabel="Đóng"
+        confirmLabel="Xác nhận hủy"
         loading={withdrawing}
         onConfirm={handleWithdraw}
         onCancel={() => setTarget(null)}

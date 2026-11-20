@@ -18,6 +18,7 @@ public class AIMessageDto {
     private String role;
     private String content;
     private List<String> sources;
+    private String feedback;
     private LocalDateTime createdAt;
 }
 

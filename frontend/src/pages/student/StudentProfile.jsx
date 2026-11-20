@@ -85,7 +85,6 @@ const StudentProfile = () => {
                   </div>
                 </div>
                 <div className="info-list">
-                  <ProfileRow label="Tên đăng nhập" value={profile?.username || user?.username} />
                   <ProfileRow label="Email" value={profile?.email || user?.email} />
                   <ProfileRow label="Khoa / Ngành" value={profile?.department || '—'} />
                   <ProfileRow label="Mã sinh viên" value={profile?.studentCode} />

@@ -118,6 +118,10 @@ const AdminExamRooms = () => {
   };
   const changeStatus = async (room) => {
     const nextStatus = room.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    if (nextStatus === 'INACTIVE' && room.inUse) {
+      toast.error('Không thể ngừng sử dụng phòng đang được sử dụng', 'Hãy xử lý các lịch thi liên quan trước.');
+      return;
+    }
     const result = await Swal.fire({
       title: nextStatus === 'ACTIVE' ? 'Kích hoạt phòng thi?' : 'Ngừng sử dụng phòng thi?',
       text: `${room.roomCode} - ${room.roomName}`,
@@ -225,7 +229,13 @@ const AdminExamRooms = () => {
                       <td className="exam-room-cell-actions">
                         <div className="exam-row-actions">
                           <button className="btn btn-sm btn-secondary exam-room-action-edit" onClick={() => openEdit(room)}>Sửa</button>
-                          <button className="btn btn-sm btn-secondary exam-room-action-status" onClick={() => changeStatus(room)}>{room.status === 'ACTIVE' ? 'Ngừng dùng' : 'Kích hoạt'}</button>
+                          <button
+                            className="btn btn-sm btn-secondary exam-room-action-status"
+                            disabled={room.status === 'ACTIVE' && room.inUse}
+                            onClick={() => changeStatus(room)}
+                          >
+                            {room.status === 'ACTIVE' ? 'Ngừng dùng' : 'Kích hoạt'}
+                          </button>
                           <button className="btn btn-sm btn-danger exam-room-action-delete" disabled={room.inUse} onClick={() => deleteRoom(room)}>Xóa</button>
                         </div>
                       </td>
@@ -257,7 +267,7 @@ const AdminExamRooms = () => {
           </>
         )}
       >
-        {editing?.inUse && <Alert tone="info">Phòng này đang được sử dụng trong lịch thi. Không thể xóa cho đến khi xử lý các lịch thi liên quan.</Alert>}
+        {editing?.inUse && <Alert tone="info">Phòng này đang được sử dụng trong lịch thi. Không thể ngừng sử dụng hoặc xóa cho đến khi xử lý các lịch thi liên quan.</Alert>}
         <form id="exam-room-form" onSubmit={saveRoom}>
           <div className="form-grid">
             <Field label="Mã phòng" required error={formErrors.roomCode}>
@@ -275,7 +285,7 @@ const AdminExamRooms = () => {
             <Field label="Trạng thái">
               <select className="select" value={form.status} onChange={(event) => setForm((value) => ({ ...value, status: event.target.value }))}>
                 <option value="ACTIVE">Đang sử dụng</option>
-                <option value="INACTIVE">Ngừng sử dụng</option>
+                <option value="INACTIVE" disabled={Boolean(editing?.inUse)}>Ngừng sử dụng</option>
               </select>
             </Field>
             <Field label="Mô tả" className="full">
