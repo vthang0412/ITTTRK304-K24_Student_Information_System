@@ -73,6 +73,7 @@ const AIDashboard = () => {
 
       <div className="stats-grid">
         <StatCard label="GPA hệ 10" value={formatScore(overview?.gpa10)} icon={<TrendingIcon />} tone="blue" />
+        <StatCard label="GPA hệ 4" value={formatScore(overview?.gpa4)} icon={<TrendingIcon />} tone="indigo" />
         <StatCard label="Tín chỉ tích lũy" value={overview?.accumulatedCredits ?? '—'} icon={<AwardIcon />} tone="green" />
         <StatCard label="Tín chỉ đang học" value={overview?.activeCredits ?? '—'} icon={<BookIcon />} tone="amber" />
         <StatCard label="Học phần chưa đạt" value={overview?.failedCount ?? '—'} icon={<ClipboardIcon />} tone="red" />
@@ -88,7 +89,7 @@ const AIDashboard = () => {
             <Link to="/student/ai-insights" className="btn btn-secondary btn-sm">Chi tiết</Link>
           </div>
           {chartData.length === 0 ? (
-            <div className="ai-empty-inline">Chưa có dữ liệu học kỳ để hiển thị biểu đồ.</div>
+            <div className="ai-empty-inline">Chưa có đủ dữ liệu học tập để hiển thị biểu đồ.</div>
           ) : (
             <div className="ai-chart-wrap">
               <ResponsiveContainer width="100%" height="100%">
@@ -200,12 +201,12 @@ const AIDashboard = () => {
           </div>
         </div>
         <div className="ai-quick-actions">
-          <button type="button" className="ai-quick-action" onClick={openChat}>💬 Trợ lý AI Sinh viên</button>
-          <Link to="/student/ai-insights" className="ai-quick-action">📊 Nhận xét học tập</Link>
-          <Link to="/student/ai-course-advisor" className="ai-quick-action">📚 Tư vấn học phần</Link>
-          <Link to="/student/ai-study-planner" className="ai-quick-action">🗓️ Kế hoạch học tập</Link>
-          <Link to="/student/ai-reports" className="ai-quick-action">📄 Báo cáo học tập</Link>
-          <Link to="/student/grades" className="ai-quick-action">✅ Kết quả đã công bố</Link>
+          <button type="button" className="ai-quick-action" onClick={openChat}>Trợ lý AI Sinh viên</button>
+          <Link to="/student/ai-insights" className="ai-quick-action">Nhận xét học tập</Link>
+          <Link to="/student/ai-course-advisor" className="ai-quick-action">Tư vấn học phần</Link>
+          <Link to="/student/ai-study-planner" className="ai-quick-action">Kế hoạch học tập</Link>
+          <Link to="/student/ai-reports" className="ai-quick-action">Báo cáo học tập</Link>
+          <Link to="/student/grades" className="ai-quick-action">Kết quả đã công bố</Link>
         </div>
         {!overview?.gpa10 && (
           <Alert tone="info" style={{ marginTop: 12 }}>

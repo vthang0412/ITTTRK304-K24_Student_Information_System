@@ -1,4 +1,4 @@
-import { courseSectionApi, enrollmentApi, gradebookApi, lecturerApi, reportApi, semesterApi, studentApi } from '../api';
+import { aiChatApi, courseSectionApi, enrollmentApi, gradebookApi, lecturerApi, reportApi, semesterApi, studentApi } from '../api';
 
 const numberOrZero = (value) => {
   const num = Number(value);
@@ -271,75 +271,105 @@ const loadLecturer = async () => {
   };
 };
 
+const publishedAtTime = (value) => {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : 0;
+};
+
+const isPassedGrade = (entry) => {
+  if (typeof entry.passed === 'boolean') return entry.passed;
+  const attendance = Number(entry.attendanceScore);
+  if (Number.isFinite(attendance) && attendance < 4) return false;
+  return entry.finalScore >= 4;
+};
+
 const loadStudent = async () => {
-  const [enrollmentsRes, gradesRes, sectionsRes] = await Promise.all([
+  const [enrollmentsRes, gradesRes, sectionsRes, overviewRes] = await Promise.all([
     enrollmentApi.getMyEnrollments(),
-    studentApi.getMyGrades().catch(() => ({ data: [] })),
+    studentApi.getMyGrades(),
     courseSectionApi.getAll(),
+    aiChatApi.getOverview(),
   ]);
 
-  const enrollments = enrollmentsRes.data || [];
-  const grades = gradesRes.data || [];
-  const sections = sectionsRes.data || [];
-
-  const gradeByEnrollmentId = new Map(
-    grades.map((g) => [g.enrollmentId ?? g.id, g]),
-  );
+  const enrollments = Array.isArray(enrollmentsRes.data) ? enrollmentsRes.data : [];
+  const grades = Array.isArray(gradesRes.data) ? gradesRes.data : [];
+  const sections = Array.isArray(sectionsRes.data) ? sectionsRes.data : [];
+  const overview = overviewRes.data?.data ?? overviewRes.data ?? {};
 
   const active = enrollments.filter((e) => e.status === 'ENROLLED');
-  const totalCredits = active.reduce(
+  const activeCredits = active.reduce(
     (sum, e) => sum + numberOrZero(e.courseSection?.course?.credits),
     0,
   );
 
-  const graded = active
-    .map((e) => {
-      const published = gradeByEnrollmentId.get(e.id);
-      if (!published || published.finalScore === null || published.finalScore === undefined || published.finalScore === '') {
+  const graded = grades
+    .map((g) => {
+      const score = Number(g.finalScore);
+      if (g.finalScore === null || g.finalScore === undefined || g.finalScore === '' || !Number.isFinite(score)) {
         return null;
       }
+      const attendanceComponent = (g.componentScores || []).find(
+        (c) => c.componentName && c.componentName.toLowerCase().includes('chuyên cần'),
+      );
       return {
-        enrollment: e,
-        finalScore: Number(published.finalScore),
-        credits: numberOrZero(published.credits ?? e.courseSection?.course?.credits),
-        semesterName: published.semesterName || e.courseSection?.semester?.semesterName || 'Chưa xác định',
+        id: g.enrollmentId ?? g.gradebookId,
+        enrollmentId: g.enrollmentId,
+        courseName: g.courseName || 'Chưa rõ tên học phần',
+        courseCode: g.courseCode,
+        sectionCode: g.sectionCode,
+        credits: numberOrZero(g.credits),
+        semesterName: g.semesterName || 'Chưa xác định',
+        finalScore: score,
+        classification: g.classification,
+        passed: g.passed,
+        attendanceScore: attendanceComponent?.score ?? null,
+        publishedAt: g.publishedAt,
       };
     })
     .filter(Boolean)
-    .filter((e) => Number.isFinite(e.finalScore));
+    .sort((a, b) => (
+      publishedAtTime(b.publishedAt) - publishedAtTime(a.publishedAt)
+      || Number(b.id ?? 0) - Number(a.id ?? 0)
+    ));
 
   const validScores = graded.map((e) => e.finalScore);
-  const currentGpa = validScores.length
-    ? (validScores.reduce((sum, value) => sum + value, 0) / validScores.length).toFixed(2)
-    : null;
-  const passed = graded.filter((e) => e.finalScore >= 4);
-  const failed = graded.filter((e) => e.finalScore < 4);
-  const completedCredits = passed.reduce((sum, e) => sum + e.credits, 0);
+  const passed = graded.filter(isPassedGrade);
+  const failed = graded.filter((entry) => !isPassedGrade(entry));
+  const passedCredits = passed.reduce((sum, e) => sum + e.credits, 0);
+  const completedCredits = overview.accumulatedCredits ?? passedCredits;
+  const currentGpa = overview.gpa10 ?? average(validScores);
+  const gpa4 = overview.gpa4 ?? null;
 
   const semesterMap = new Map();
   graded.forEach((entry) => {
     const semesterName = entry.semesterName || 'Chưa xác định';
-    const score = entry.finalScore;
-    const existing = semesterMap.get(semesterName) || { total: 0, count: 0 };
-    existing.total += score;
-    existing.count += 1;
+    const weight = entry.credits > 0 ? entry.credits : 1;
+    const existing = semesterMap.get(semesterName) || { total: 0, weight: 0, latestAt: 0 };
+    existing.total += entry.finalScore * weight;
+    existing.weight += weight;
+    existing.latestAt = Math.max(existing.latestAt, publishedAtTime(entry.publishedAt));
     semesterMap.set(semesterName, existing);
   });
 
-  const gpaTrend = Array.from(semesterMap.entries()).map(([semester, values]) => ({
-    semester,
-    gpa: Number((values.total / values.count).toFixed(2)),
-  }));
+  const gpaTrend = Array.from(semesterMap.entries())
+    .sort((a, b) => a[1].latestAt - b[1].latestAt)
+    .map(([semester, values]) => ({
+      semester,
+      gpa: Number((values.total / values.weight).toFixed(2)),
+    }));
 
   return {
     enrollments: active,
     graded,
     enrolledCount: active.length,
-    totalCredits,
-    completedCredits,
-    currentGpa,
-    passedCourseCount: passed.length,
-    failedCourseCount: failed.length,
+    totalCredits: activeCredits,
+    activeCredits,
+    completedCredits: numberOrZero(completedCredits),
+    currentGpa: currentGpa === null || currentGpa === undefined ? null : Number(currentGpa).toFixed(2),
+    gpa4: gpa4 === null || gpa4 === undefined ? null : Number(gpa4).toFixed(2),
+    passedCourseCount: overview.passedCount ?? passed.length,
+    failedCourseCount: overview.failedCount ?? failed.length,
     totalCompletedCourses: graded.length,
     passRate: graded.length ? Math.round((passed.length / graded.length) * 100) : 0,
     averageScore: average(validScores),
