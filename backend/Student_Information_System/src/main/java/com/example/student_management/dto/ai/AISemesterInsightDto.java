@@ -16,6 +16,7 @@ public class AISemesterInsightDto {
     private BigDecimal gpa10;
     private BigDecimal gpa4;
     private int creditsEarned;
+    private int cumulativeCredits;
     private int coursesCompleted;
     private int coursesFailed;
     private String trend; // FIRST, UP, DOWN, STABLE

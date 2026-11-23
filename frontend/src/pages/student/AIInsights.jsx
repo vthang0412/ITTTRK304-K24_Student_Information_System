@@ -19,14 +19,18 @@ const AIInsights = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
 
   const load = async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
     try {
       const res = await aiInsightsApi.getInsights();
       setData(unwrap(res));
+      setError(null);
     } catch (err) {
-      toast.error('Không tải được dữ liệu phân tích', getErrorMessage(err));
+      const message = getErrorMessage(err);
+      setError(message);
+      toast.error('Không tải được dữ liệu phân tích', message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -40,9 +44,13 @@ const AIInsights = () => {
     try {
       const res = await aiInsightsApi.refreshInsights();
       setData(unwrap(res));
+      setError(null);
       toast.success('Đã làm mới dữ liệu phân tích');
     } catch (err) {
-      toast.error('Không thể làm mới dữ liệu', getErrorMessage(err));
+      const message = getErrorMessage(err);
+      setError(message);
+      toast.error('Không thể làm mới dữ liệu', message);
+    } finally {
       setRefreshing(false);
     }
   };
@@ -50,7 +58,7 @@ const AIInsights = () => {
   const chartData = useMemo(() => (data?.semesterInsights || []).map((item) => ({
     name: String(item.semesterName || 'HK').replace('Học kỳ ', 'HK'),
     gpa: Number(item.gpa10 || 0),
-    credits: Number(item.creditsEarned || 0),
+    credits: Number(item.cumulativeCredits ?? item.creditsEarned ?? 0),
   })), [data]);
 
   if (loading) return <LoadingBlock text="Đang phân tích dữ liệu học tập..." />;
@@ -67,10 +75,17 @@ const AIInsights = () => {
         )}
       />
 
+      {error && (
+        <Alert tone="error" style={{ marginBottom: 16 }}>
+          {`Không tải được dữ liệu phân tích: ${error}. `}
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => load()}>Thử lại</button>
+        </Alert>
+      )}
+
       {!data ? (
         <EmptyState
           title="Chưa có dữ liệu phân tích"
-          description="Chạy làm mới để hệ thống tổng hợp nhận xét từ kết quả học tập của bạn."
+          description={error ? 'Vui lòng thử lại hoặc kiểm tra kết nối đến máy chủ.' : 'Chạy làm mới để hệ thống tổng hợp nhận xét từ kết quả học tập của bạn.'}
           action={<button type="button" className="btn btn-primary" onClick={handleRefresh}>Làm mới ngay</button>}
         />
       ) : (
@@ -91,7 +106,7 @@ const AIInsights = () => {
                 </div>
               </div>
               {chartData.length === 0 ? (
-                <div className="ai-empty-inline">Chưa có dữ liệu để vẽ biểu đồ.</div>
+                <div className="ai-empty-inline">Chưa có đủ dữ liệu học tập để hiển thị biểu đồ.</div>
               ) : (
                 <div className="ai-chart-wrap">
                   <ResponsiveContainer width="100%" height="100%">
@@ -116,7 +131,7 @@ const AIInsights = () => {
                 </div>
               </div>
               {chartData.length === 0 ? (
-                <div className="ai-empty-inline">Chưa có dữ liệu để vẽ biểu đồ.</div>
+                <div className="ai-empty-inline">Chưa có đủ dữ liệu học tập để hiển thị biểu đồ.</div>
               ) : (
                 <div className="ai-chart-wrap">
                   <ResponsiveContainer width="100%" height="100%">

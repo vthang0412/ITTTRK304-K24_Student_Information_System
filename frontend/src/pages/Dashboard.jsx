@@ -10,9 +10,9 @@ import {
   AwardIcon, BookIcon, CalendarIcon, ClipboardIcon, LayersIcon, StudentsIcon,
   TrendingIcon, UserIcon, UsersIcon,
 } from '../components/Icons';
-import { EmptyState, LoadingBlock, PageHeader, SearchInput, StatCard, StatusBadge } from '../components/UI';
+import { Alert, EmptyState, LoadingBlock, PageHeader, SearchInput, StatCard, StatusBadge } from '../components/UI';
 import { cohortService } from '../services/dashboardService';
-import { formatScore, gradeLabel } from '../utils/format';
+import { formatScore, getErrorMessage, gradeLabel } from '../utils/format';
 
 const StatLink = ({ to, children }) => (
   <Link to={to} style={{ display: 'block' }}>{children}</Link>
@@ -23,6 +23,8 @@ const Dashboard = () => {
   const toast = useToast();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const displayName = user?.fullName || user?.username || 'bạn';
   const role = user?.role;
@@ -30,12 +32,17 @@ const Dashboard = () => {
   useEffect(() => {
     let mounted = true;
     setLoading(true);
+    setError(null);
     cohortService.load(role)
       .then((result) => { if (mounted) setData(result); })
-      .catch(() => { if (mounted) toast.error('Không tải được dữ liệu', 'Vui lòng kiểm tra kết nối tới máy chủ.'); })
+      .catch((err) => {
+        if (!mounted) return;
+        setError(getErrorMessage(err) || 'Vui lòng kiểm tra kết nối tới máy chủ.');
+        toast.error('Không tải được dữ liệu', 'Vui lòng kiểm tra kết nối tới máy chủ.');
+      })
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
-  }, [role]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [role, reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -52,6 +59,24 @@ const Dashboard = () => {
       <>
         <PageHeader title="Tổng quan" subtitle="Đang tổng hợp dữ liệu học vụ của bạn..." />
         <div className="card"><LoadingBlock /></div>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <PageHeader title="Tổng quan" subtitle="Không thể tải dữ liệu học vụ." />
+        <div className="card">
+          <div className="card-body">
+            <Alert tone="error">
+              <div>{error}</div>
+              <button type="button" className="btn btn-primary" style={{ marginTop: 12 }} onClick={() => setReloadKey((key) => key + 1)}>
+                Thử lại
+              </button>
+            </Alert>
+          </div>
+        </div>
       </>
     );
   }
@@ -515,6 +540,12 @@ const LecturerDashboard = ({ data }) => (
 
 const StudentDashboard = ({ data }) => {
   const gpaTrend = Array.isArray(data?.gpaTrend) && data.gpaTrend.length > 0 ? data.gpaTrend : [];
+  const gpa10Text = data?.totalCompletedCourses && data.currentGpa !== null && data.currentGpa !== undefined
+    ? Number(data.currentGpa).toFixed(2)
+    : '—';
+  const gpa4Text = data?.totalCompletedCourses && data.gpa4 !== null && data.gpa4 !== undefined
+    ? Number(data.gpa4).toFixed(2)
+    : '—';
   const passRatioData = [
     { name: 'Đạt', value: Number(data?.passedCourseCount || 0), color: '#16a34a' },
     { name: 'Không đạt', value: Number(data?.failedCourseCount || 0), color: '#f97316' },
@@ -530,9 +561,9 @@ const StudentDashboard = ({ data }) => {
     <>
       <div className="stats-grid">
         <StatCard label="Học phần đã đăng ký" value={data.enrolledCount} icon={<BookIcon />} tone="blue" />
-        <StatCard label="Tín chỉ tích luỹ" value={data.totalCredits} icon={<AwardIcon />} tone="green" />
-        <StatCard label="GPA hiện tại" value={data.currentGpa ? Number(data.currentGpa).toFixed(2) : '—'} icon={<TrendingIcon />} tone="amber" />
-        <StatCard label="Lớp đang mở" value={data.openSections} icon={<LayersIcon />} tone="indigo" />
+        <StatCard label="Tín chỉ tích luỹ" value={data.completedCredits} icon={<AwardIcon />} tone="green" />
+        <StatCard label="GPA hệ 10" value={gpa10Text} icon={<TrendingIcon />} tone="amber" />
+        <StatCard label="GPA hệ 4" value={gpa4Text} icon={<TrendingIcon />} tone="indigo" />
       </div>
 
       <div className="stats-grid chart-stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
@@ -647,9 +678,9 @@ const StudentDashboard = ({ data }) => {
             <div><h2>Tổng quan kết quả học tập</h2><p>Những chỉ số quan trọng nhất của bạn</p></div>
           </div>
           <div className="card-body" style={{ display: 'grid', gap: 12 }}>
-            <div className="info-row"><span>GPA hiện tại</span><strong>{data.currentGpa ? Number(data.currentGpa).toFixed(2) : '—'}</strong></div>
-            <div className="info-row"><span>Tổng số tín chỉ tích lũy</span><strong>{data.totalCredits}</strong></div>
-            <div className="info-row"><span>Tổng số môn đã hoàn thành</span><strong>{data.totalCompletedCourses}</strong></div>
+            <div className="info-row"><span>GPA hệ 10</span><strong>{gpa10Text}</strong></div>
+            <div className="info-row"><span>GPA hệ 4</span><strong>{gpa4Text}</strong></div>
+            <div className="info-row"><span>Tổng số tín chỉ tích lũy</span><strong>{data.completedCredits}</strong></div>
             <div className="info-row"><span>Số môn chưa đạt</span><strong>{data.failedCourseCount}</strong></div>
           </div>
         </div>
@@ -694,21 +725,24 @@ const StudentDashboard = ({ data }) => {
             </div>
             <div className="card-body">
               {data.graded.length === 0 ? (
-                <p className="muted small">Chưa có điểm được cập nhật.</p>
+                <EmptyState
+                  title="Chưa có điểm đã công bố"
+                  description="Kết quả sẽ xuất hiện sau khi nhà trường công bố điểm của học phần."
+                />
               ) : (
                 <div className="stack" style={{ gap: 12 }}>
                   {data.graded.slice(0, 4).map((e) => {
-                    const score = e.grade?.finalScore;
-                    const gl = gradeLabel(score);
+                    const score = e.finalScore;
+                    const gl = gradeLabel(score, e.attendanceScore);
                     return (
-                      <div key={e.id} className="flex-between">
+                      <div key={e.enrollmentId ?? e.id} className="flex-between">
                         <div style={{ minWidth: 0 }}>
-                          <div className="small" style={{ fontWeight: 600 }}>{e.courseSection?.course?.courseName || '—'}</div>
-                          <div className="small muted">{e.courseSection?.sectionCode}</div>
+                          <div className="small" style={{ fontWeight: 600 }}>{e.courseName}</div>
+                          <div className="small muted">{[e.sectionCode, e.semesterName].filter(Boolean).join(' · ')}</div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ fontWeight: 700 }}>{formatScore(score)}</div>
-                          <span className={`badge badge-${gl.tone}`}>{gl.label}</span>
+                          <span className={`badge badge-${gl.tone}`}>{e.classification || gl.label}</span>
                         </div>
                       </div>
                     );

@@ -12,6 +12,9 @@ import com.example.student_management.repository.ai.AIUsageLogRepository;
 import com.example.student_management.repository.auth.UserRepository;
 import com.example.student_management.service.ai.impl.AIInsightsServiceImpl;
 import com.example.student_management.service.grade.GradebookService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -91,13 +94,13 @@ class AIInsightsServiceTest {
 
         List<StudentGradeDto> grades = List.of(
                 StudentGradeDto.builder()
-                        .courseCode("INT2204").courseName("Lập trình hướng đối tượng")
-                        .credits(3).semesterName("Học kỳ 1")
-                        .finalScore(new BigDecimal("8.60")).classification("Xuất sắc").passed(true).build(),
-                StudentGradeDto.builder()
                         .courseCode("INT3507").courseName("Công nghệ phần mềm")
                         .credits(3).semesterName("Học kỳ 2")
-                        .finalScore(new BigDecimal("5.79")).classification("Trung bình").passed(true).build()
+                        .finalScore(new BigDecimal("5.79")).classification("Trung bình").passed(true).build(),
+                StudentGradeDto.builder()
+                        .courseCode("INT2204").courseName("Lập trình hướng đối tượng")
+                        .credits(3).semesterName("Học kỳ 1")
+                        .finalScore(new BigDecimal("8.60")).classification("Xuất sắc").passed(true).build()
         );
         when(gradebookService.getStudentPublishedGrades("student")).thenReturn(grades);
 
@@ -110,8 +113,12 @@ class AIInsightsServiceTest {
         // (8.60 * 3 + 5.79 * 3) / 6 = 7.20 (7.195 rounded HALF_UP)
         assertEquals(new BigDecimal("7.20"), result.getGpa10());
         assertEquals(2, result.getSemesterInsights().size());
+        assertEquals("Học kỳ 1", result.getSemesterInsights().get(0).getSemesterName());
         assertEquals("FIRST", result.getSemesterInsights().get(0).getTrend());
+        assertEquals(3, result.getSemesterInsights().get(0).getCumulativeCredits());
+        assertEquals("Học kỳ 2", result.getSemesterInsights().get(1).getSemesterName());
         assertEquals("DOWN", result.getSemesterInsights().get(1).getTrend());
+        assertEquals(6, result.getSemesterInsights().get(1).getCumulativeCredits());
         assertEquals(1, result.getLowScoreCourses().size());
         assertEquals("INT3507", result.getLowScoreCourses().get(0).get("courseCode"));
         assertTrue(result.getRecommendations().stream().anyMatch(r -> "IMPROVEMENT".equals(r.getType())));
@@ -137,6 +144,37 @@ class AIInsightsServiceTest {
         assertEquals(BigDecimal.ZERO, result.getGpa10());
         assertEquals("Chưa có dữ liệu", result.getAcademicClassification());
         assertTrue(result.getAiSummary().contains("chưa có dữ liệu bảng điểm chính thức"));
+    }
+
+    @Test
+    void getInsights_shouldExposeChartFieldsInJson() {
+        when(userRepository.findByUsername("student")).thenReturn(Optional.of(studentUser));
+        when(enrollmentRepository.findByStudentId(1L)).thenReturn(List.of());
+        when(contextService.buildSystemContextPrompt(student, studentUser)).thenReturn("Context");
+        when(providerService.generateExternalAnalysis(anyString(), anyString()))
+                .thenReturn(AIProviderService.AIProviderResult.builder()
+                        .providerUsed("SIS-ASSISTANT-ENGINE")
+                        .modelUsed("sis-local-v1")
+                        .success(false)
+                        .build());
+        when(gradebookService.getStudentPublishedGrades("student")).thenReturn(List.of(
+                StudentGradeDto.builder()
+                        .courseCode("INT2204").courseName("Lập trình hướng đối tượng")
+                        .credits(3).semesterName("Học kỳ 1")
+                        .finalScore(new BigDecimal("8.60")).classification("Xuất sắc").passed(true).build()
+        ));
+
+        AIInsightsDto result = insightsService.getInsights("student");
+        JsonNode json = new ObjectMapper().registerModule(new JavaTimeModule()).valueToTree(result);
+
+        JsonNode semesterInsights = json.get("semesterInsights");
+        assertNotNull(semesterInsights);
+        assertEquals(1, semesterInsights.size());
+        JsonNode semester = semesterInsights.get(0);
+        assertEquals("Học kỳ 1", semester.get("semesterName").asText());
+        assertEquals(0, new BigDecimal("8.60").compareTo(semester.get("gpa10").decimalValue()));
+        assertEquals(3, semester.get("creditsEarned").asInt());
+        assertEquals(3, semester.get("cumulativeCredits").asInt());
     }
 
     @Test
