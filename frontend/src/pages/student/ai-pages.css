@@ -166,7 +166,7 @@
 
 .ai-chart-wrap {
   width: 100%;
-  min-height: 240px;
+  height: 260px;
 }
 
 .ai-quick-actions {
@@ -178,13 +178,17 @@
 .ai-quick-action {
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 11px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
   text-align: left;
   background: var(--surface-2);
   cursor: pointer;
   color: var(--text);
   font-size: 12.5px;
   font-weight: 600;
+  line-height: 1.4;
   transition: all 0.15s ease;
 }
 
@@ -414,5 +418,8 @@
   .ai-inline-form,
   .ai-quick-actions {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .ai-chart-wrap {
+    height: 220px;
   }
 }

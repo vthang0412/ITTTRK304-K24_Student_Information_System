@@ -204,9 +204,12 @@ public class AIInsightsServiceImpl implements AIInsightsService {
 
     private List<AISemesterInsightDto> buildSemesterInsights(Map<String, List<StudentGradeDto>> bySemester) {
         List<AISemesterInsightDto> list = new ArrayList<>();
+        List<Map.Entry<String, List<StudentGradeDto>>> entries = new ArrayList<>(bySemester.entrySet());
+        entries.sort(Map.Entry.comparingByKey(Comparator.nullsFirst(Comparator.naturalOrder())));
         BigDecimal prevGpa10 = null;
+        int cumulativeCredits = 0;
 
-        for (Map.Entry<String, List<StudentGradeDto>> entry : bySemester.entrySet()) {
+        for (Map.Entry<String, List<StudentGradeDto>> entry : entries) {
             String semesterName = entry.getKey();
             List<StudentGradeDto> items = entry.getValue();
 
@@ -233,6 +236,7 @@ public class AIInsightsServiceImpl implements AIInsightsService {
             BigDecimal semGpa10 = semGradedCredits > 0
                     ? semPoints.divide(BigDecimal.valueOf(semGradedCredits), 2, RoundingMode.HALF_UP)
                     : BigDecimal.ZERO;
+            cumulativeCredits += semEarnedCredits;
 
             String trend;
             if (prevGpa10 == null) {
@@ -253,6 +257,7 @@ public class AIInsightsServiceImpl implements AIInsightsService {
                     .gpa10(semGpa10)
                     .gpa4(toGpa4(semGpa10))
                     .creditsEarned(semEarnedCredits)
+                    .cumulativeCredits(cumulativeCredits)
                     .coursesCompleted(passedCount)
                     .coursesFailed(failedCount)
                     .trend(trend)
